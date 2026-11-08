@@ -58,3 +58,45 @@ versi mengikuti [SemVer](https://semver.org/) selama masih 0.x (struktur bisa be
 - Kode `android/` **belum pernah di-compile oleh siapa pun** -- lingkungan kerja
   Claude tidak punya Android SDK/Gradle/jaringan. Verifikasi pertama terjadi
   lewat GitHub Actions setelah push. Lihat PROJECT_STATUS.md.
+
+## [0.3.1] - 2026-11-08
+
+### Verified
+- **Build pertama di GitHub Actions BERHASIL** (run #42462301338, job selesai dalam 1m59s).
+  Ini verifikasi riil pertama kode `android/` -- sebelumnya belum pernah di-compile sama sekali.
+  Repo: `memen02/me-futures-ai-bot` (privat).
+- `Backend CI` (test Node.js referensi, 55 test) juga tetap lulus di GitHub Actions.
+- Peringatan non-blocking di log Actions (tidak perlu aksi segera): `actions/setup-java@v4`
+  deprecated (migrasi ke v5 disarankan nanti), runner Node.js 20 dipaksa jalan di Node 24
+  oleh GitHub, `ubuntu-latest` akan migrasi ke Ubuntu 26 per 2026-10-19.
+
+## [0.3.2] - 2026-11-08
+
+### Verified
+- **APK terpasang & terbuka di perangkat nyata (Redmi Note 7, crDroid) tanpa crash** --
+  layar fondasi tampil persis seperti yang dirancang. Ini menutup "step 0" sepenuhnya:
+  compile (GitHub Actions) -> install -> launch, semua terverifikasi end-to-end.
+
+## [0.4.0] - 2026-11-08
+
+### Added — FASE 10 Increment 2: Auto-Reconnect
+- `Signer.kt` -- HMAC-SHA256 + query string builder, murni Kotlin/JVM, porting dari
+  referensi Node.js `signer.js`. 6 JUnit test (termasuk test vector independen yang
+  sama dipakai di versi Node.js).
+- `ReconnectingWebSocket.kt` -- wrapper OkHttp WebSocket dengan auto-reconnect
+  (backoff eksponensial + jitter). Callback selalu dipanggil di main thread. 3 JUnit
+  test untuk fungsi backoff murni (`computeBackoffMs`).
+- `MainActivity.kt` -- didemokan LANGSUNG di layar: konek ke stream publik Binance
+  (`btcusdt@bookTicker`, kategori `/public`), status berubah live
+  (Menyambungkan/Tersambung/Terputus/Menyambung ulang). Bisa diuji manual dengan
+  toggle mode pesawat.
+- Dependency baru: `com.squareup.okhttp3:okhttp:5.4.0` (WebSocket -- platform Android
+  minSdk 26 tidak punya WebSocket bawaan, baru ada mulai API 34), `junit:junit:4.13.2` (testImplementation).
+- `AndroidManifest.xml`: tambah `<uses-permission android:name="android.permission.INTERNET" />`.
+- `.github/workflows/android-build.yml`: tambah step `gradle test` sebelum `assembleDebug`.
+
+### Keterbatasan yang masih berlaku
+- Reconnect baru jalan SELAMA APP TERBUKA (lifecycle onStart/onStop) -- belum
+  persisten di background. Itu scope increment BERIKUTNYA (Foreground Service +
+  BOOT_COMPLETED receiver).
+- Belum pernah dites di GitHub Actions/device sungguhan -- menunggu hasil push berikutnya.
