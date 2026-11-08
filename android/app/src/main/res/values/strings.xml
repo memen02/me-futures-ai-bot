@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ME Futures AI Bot</string>
+    <string name="status_foundation">Fase 10 -- Fondasi Android.\nBelum ada logic trading di build ini.\nLihat PROJECT_STATUS.md untuk status terkini.</string>
+</resources>

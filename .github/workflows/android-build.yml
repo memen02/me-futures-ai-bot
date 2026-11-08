@@ -1,0 +1,47 @@
+name: Android Build
+
+# CATATAN: workflow ini TIDAK memakai ./gradlew (gradle-wrapper.jar tidak bisa dibuat
+# di lingkungan kerja Claude -- itu file biner, butuh Gradle+jaringan untuk generate).
+# Sebagai gantinya, gradle/actions/setup-gradle menginstal Gradle langsung di runner.
+# Ini SATU-SATUNYA cara kode Android di repo ini benar-benar diverifikasi compile --
+# jalankan dan baca hasilnya di tab Actions.
+
+on:
+  push:
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-build.yml'
+  pull_request:
+    paths:
+      - 'android/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: me-futures-ai-bot-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

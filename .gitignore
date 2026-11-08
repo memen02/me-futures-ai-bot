@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Rahasia - JANGAN PERNAH commit ini (lihat docs/SECURITY.md)
+.env
+*.key
+*.pem
+*.p12
+
+# Data & log runtime backend (backup database sensitif diatur terpisah, lihat Fase 9)
+backend/data/
+backend/logs/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+*.aab
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Test / coverage
+coverage/

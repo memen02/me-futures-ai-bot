@@ -1,0 +1,31 @@
+{
+  "name": "me-futures-ai-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bot trading otomatis Binance USD(S)-M Futures, berjalan lokal di Termux/Node.js, tanpa dependensi LLM/API AI saat live trading.",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "selftest": "node src/index.js --selftest",
+    "test": "node --test",
+    "check-connectivity": "node scripts/check-connectivity.js",
+    "check-connectivity:mainnet": "node scripts/check-connectivity.js --mainnet"
+  },
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {},
+  "_phaseNotes": {
+    "fase1": "Sengaja tanpa dependency eksternal: config/logger/event bus ditulis pakai Node builtin saja, supaya Fase 1 bisa diuji tanpa risiko gagal npm install/compile native module. Lihat docs/PROJECT_STATUS.md.",
+    "rencanaDependencyFaseBerikutnya": [
+      "better-sqlite3 dengan fallback sql.js (Fase 3 - storage persisten, perlu uji compile native di Termux)",
+      "technicalindicators (Fase 3 - indikator teknikal dasar)",
+      "node-cron (Fase 8 - scheduler cleanup/backup)",
+      "zod (opsional - validasi config lebih ketat, saat ini validasi manual sudah cukup)"
+    ],
+    "fase2": "Exchange Gateway + symbol registry + candle store + Tier-1 market snapshot. Masih TANPA dependency npm baru: REST pakai fetch bawaan Node, WS pakai WebSocket bawaan Node (karena itu engines dinaikkan ke >=22). better-sqlite3/sql.js (storage persisten) & technicalindicators sengaja DITUNDA ke Fase 3, supaya Fase 2 tetap bisa diuji 100% tanpa jaringan seperti Fase 1. Lihat docs/PROJECT_STATUS.md untuk hasil uji dan docs/TODO.md untuk langkah verifikasi yang masih perlu dijalankan di Termux."
+  }
+}

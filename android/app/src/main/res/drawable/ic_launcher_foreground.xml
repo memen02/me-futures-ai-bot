@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ikon placeholder sederhana (kotak gelap + monogram "M"), ditulis sebagai vector
+     drawable supaya tidak butuh file gambar biner. Ganti dengan Image Asset Studio
+     nanti begitu ada akses Android Studio/PC. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M0,0h108v108h-108z" />
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M30,78 L30,30 L42,30 L54,54 L66,30 L78,30 L78,78 L66,78 L66,48 L56,68 L52,68 L42,48 L42,78 Z" />
+</vector>
