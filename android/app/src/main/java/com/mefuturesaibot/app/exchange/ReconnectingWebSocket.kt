@@ -24,7 +24,13 @@ import kotlin.random.Random
  */
 class ReconnectingWebSocket(
     private val url: String,
-    private val client: OkHttpClient = OkHttpClient(),
+    // PERBAIKAN (audit 2026-11-08, temuan #5): dulu default `OkHttpClient()` di sini
+    // membuat INSTANCE BARU setiap kali ReconnectingWebSocket dipanggil tanpa `client`
+    // eksplisit -- OkHttp dirancang dipakai sebagai singleton (menyimpan thread pool &
+    // connection pool sendiri), jadi keluar-masuk app berulang menumpuk thread yang
+    // tidak perlu. Sekarang pakai `sharedHttpClient` (lazy, satu instance untuk seluruh
+    // proses app). Lihat OkHttpSingletonTest.kt untuk buktinya.
+    private val client: OkHttpClient = sharedHttpClient,
     private val onStatusChange: (ConnectionStatus) -> Unit = {},
     private val onMessage: (String) -> Unit = {},
 ) {
@@ -83,6 +89,14 @@ class ReconnectingWebSocket(
     }
 
     companion object {
+        /**
+         * OkHttpClient dibagi bersama untuk SELURUH proses app (lazy -- baru dibuat
+         * saat pertama kali dipakai). Dipublikasikan (bukan private) supaya bisa
+         * diperiksa langsung dari unit test bahwa ini benar-benar satu instance yang
+         * sama, bukan sekadar diklaim di komentar. Lihat OkHttpSingletonTest.kt.
+         */
+        val sharedHttpClient: OkHttpClient by lazy { OkHttpClient() }
+
         /**
          * Backoff eksponensial + jitter, dibatasi maxMs -- FUNGSI MURNI (tidak
          * menyentuh Android API apa pun), diuji penuh lewat JUnit biasa tanpa

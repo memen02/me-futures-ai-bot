@@ -5,6 +5,10 @@ plugins {
 
 android {
     namespace = "com.mefuturesaibot.app"
+    // Dinaikkan dari 35 -> 36 (2026-11-08): com.squareup.okhttp3:okhttp-android:5.4.0
+    // mewajibkan compileSdk >= 36 (AAR metadata check). Ini TERBUKTI dari error build
+    // GitHub Actions sungguhan (run 42528412688), bukan tebakan. AGP 8.13.0 mendukung
+    // compileSdk sampai 36, jadi tidak perlu naikkan versi AGP juga.
     compileSdk = 36
 
     defaultConfig {

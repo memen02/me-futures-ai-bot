@@ -1,55 +1,63 @@
-# INSTALLATION.md — Instalasi di Termux
+# INSTALLATION.md — Instalasi ME FUTURES AI BOT (Android, tanpa Termux)
 
-## 1. Pasang Termux
+> Dokumen ini ditulis ulang 2026-11-08. Versi lama mengarahkan ke instalasi
+> Termux -- itu sudah TIDAK BERLAKU sejak proyek pivot ke aplikasi Android
+> mandiri (2026-11-07). Jangan ikuti instruksi Termux dari sumber lain untuk
+> proyek ini.
 
-Gunakan Termux dari **F-Droid** atau GitHub Releases resmi Termux, **bukan**
-Google Play Store (versi Play Store sudah lama tidak diperbarui oleh pengembang
-Termux).
+## 1. Dapatkan APK
 
-## 2. Siapkan paket dasar
+Proyek ini dibangun lewat **GitHub Actions**, bukan di-compile di HP. Ada dua cara:
 
+**A. Lewat GitHub CLI (`gh`), kalau Anda juga mengembangkan proyek ini:**
 ```bash
-pkg update && pkg upgrade -y
-pkg install -y nodejs-lts git
-node -v   # pastikan >= 18
+pkg install gh -y   # kalau belum ada
+gh auth login
+gh run list -R <owner>/me-futures-ai-bot
+gh run download <run-id> -n me-futures-ai-bot-debug-apk -R <owner>/me-futures-ai-bot
 ```
 
-## 3. Clone / salin proyek
+**B. Lewat browser (kalau Anda hanya pengguna, bukan pengembang):**
+1. Buka halaman **Actions** di repo GitHub proyek ini.
+2. Pilih run terbaru yang hijau (sukses) untuk workflow **Android Build**.
+3. Di bagian **Artifacts**, unduh `me-futures-ai-bot-debug-apk`.
+
+## 2. Install APK di HP
+
+1. File hasil unduhan ada di folder **Download** (`app-debug.apk` atau
+   di dalam folder bernama sesuai artifact).
+2. Buka aplikasi **Files**/**My Files**, cari file APK itu, ketuk.
+3. Kalau muncul peringatan "Install blocked"/"Install unknown apps", ketuk
+   **Settings**, izinkan untuk aplikasi yang dipakai membuka file ini, lalu
+   kembali dan ketuk **Install** lagi.
+4. Setelah terpasang, ketuk **Open**.
+
+## 3. Verifikasi awal
+
+Layar pertama yang muncul menunjukkan status koneksi (demo: stream publik
+Binance BTCUSDT). Kalau statusnya berubah dari "Menyambungkan..." menjadi
+"Tersambung", instalasi berhasil.
+
+## 4. Fitur yang belum ada (jangan kaget)
+
+Sesuai [`PROJECT_STATUS.md`](PROJECT_STATUS.md) dan
+[`AUDIT_REPORT.md`](AUDIT_REPORT.md): belum ada input API Key, belum ada
+analisis trading, belum ada notifikasi, dan koneksi belum bertahan kalau app
+di-minimize (Foreground Service menyusul). Ini masih fondasi, bukan bot yang
+siap dipakai trading.
+
+## Untuk pengembang: setup push ke GitHub dari Termux
+
+Termux di sini HANYA dipakai sebagai alat pengembangan (git, bukan untuk
+menjalankan bot):
 
 ```bash
-git clone <url-repo-anda> me-futures-ai-bot
-cd me-futures-ai-bot
+pkg install git gh -y
+gh auth login
+git config --global user.name "Nama Anda"
+git config --global user.email "email@anda.com"
+cd /path/ke/folder/proyek
+git config --global --add safe.directory "$(pwd)"
+git add . && git commit -m "pesan" && git push
+gh run watch
 ```
-
-Jika belum punya repo GitHub, salin folder proyek ini langsung ke Termux
-(mis. lewat `termux-setup-storage` + salin dari penyimpanan bersama).
-
-## 4. Jalankan installer
-
-```bash
-bash backend/scripts/install.sh
-```
-
-Script ini akan: cek Node.js, membuat `.env` dari `.env.example` bila belum
-ada, lalu menjalankan `npm install`.
-
-## 5. Verifikasi
-
-```bash
-cd backend
-npm test          # harus 7/7 lulus, tanpa jaringan
-npm run selftest   # boot singkat, keluar otomatis jika semua OK
-npm start          # jalankan bot (Ctrl+C untuk berhenti)
-```
-
-## 6. Isi konfigurasi
-
-Edit `backend/.env`:
-- `BOT_MODE=paper` (default, paling aman) atau `testnet`.
-- **Jangan** isi API Key/Secret produksi di `.env` — itu nanti lewat APK
-  Android (Fase 10). Untuk pengembangan/testnet lokal boleh diisi sementara.
-
-## Opsional: Termux\:Boot (agar bisa start otomatis saat HP boot)
-
-Akan dibahas detail di Fase 11 (Watchdog & Auto Recovery), termasuk panduan
-battery optimization supaya proses tidak dimatikan Android di latar belakang.

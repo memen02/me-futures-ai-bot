@@ -8,5 +8,9 @@
 // dan tunggu hasil build pertama di GitHub Actions sebelum menganggap versi ini final.
 plugins {
     id("com.android.application") version "8.13.0" apply false
+    // Dinaikkan dari 2.0.21 -> 2.2.21 (2026-11-08): okhttp-android:5.4.0 menarik
+    // kotlin-stdlib 2.2.21 secara transitif. Kotlin compiler 2.0.21 tidak bisa
+    // membaca metadata binary versi 2.2.0 dari stdlib itu -> "Internal compiler
+    // error". TERBUKTI dari log GitHub Actions run 42528809919, bukan tebakan.
     id("org.jetbrains.kotlin.android") version "2.2.21" apply false
 }

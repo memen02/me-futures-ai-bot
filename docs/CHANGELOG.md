@@ -100,3 +100,39 @@ versi mengikuti [SemVer](https://semver.org/) selama masih 0.x (struktur bisa be
   persisten di background. Itu scope increment BERIKUTNYA (Foreground Service +
   BOOT_COMPLETED receiver).
 - Belum pernah dites di GitHub Actions/device sungguhan -- menunggu hasil push berikutnya.
+
+## [0.4.1] - 2026-11-08
+
+### Fixed
+- **Bug build nyata ditemukan & diperbaiki**: `okhttp-android:5.4.0` mewajibkan
+  `compileSdk >= 36`, proyek masih `compileSdk 35`. Terbukti dari log kegagalan
+  GitHub Actions run **42528412688** (`CheckAarMetadataWorkAction`), bukan dugaan.
+  Diperbaiki: `compileSdk`/`targetSdk` 35 -> 36 di `android/app/build.gradle.kts`.
+- Ditemukan juga: commit sebelumnya (fase10 signer+reconnect) sempat TIDAK ter-push
+  ke GitHub sama sekali selama beberapa putaran (tersimpan di folder lepas tanpa git),
+  sehingga klaim "Added" di entri 0.4.0 belum pernah terbukti sampai disinkronkan
+  ulang pada commit b4e2167.
+
+## [0.4.2] - 2026-11-08
+
+### Verified (bukti nyata, bukan klaim)
+- **GitHub Actions run 42554105921: SUKSES PENUH.** `gradle test` (9 JUnit test:
+  6 Signer + 3 BackoffCalculator) lulus, `gradle assembleDebug` berhasil, APK
+  ter-upload sebagai artifact. Ini pertama kalinya kode Fase 10 Increment 2
+  (Signer + ReconnectingWebSocket) benar-benar terbukti compile, setelah 2 bug
+  nyata ditemukan & diperbaiki (compileSdk 35->36, Kotlin plugin 2.0.21->2.2.21).
+- Catatan: APK hasil build ini BELUM diinstal ulang/dites di device sejak
+  perubahan terakhir -- compile sukses, runtime belum diverifikasi ulang.
+
+## [0.5.0] - 2026-11-08
+
+### Fixed — 6 dari 8 temuan Audit Report (dokumentasi #1-4 + android/README + singleton)
+- `docs/INSTALLATION.md`, `docs/RESTORE_GUIDE.md` — ditulis ulang total, tidak lagi menyebut Termux sebagai langkah wajib menjalankan bot (Termux kini hanya alat dev opsional untuk push git).
+- `docs/SECURITY.md` — ditulis ulang untuk arsitektur Android mandiri; status implementasi dijelaskan jujur (belum ada kode penyimpanan credential), referensi Node.js lama dipindah ke bagian terpisah di bawah.
+- `docs/TEST_PLAN.md` — tambah bagian "Fase 10 — Hasil Uji (Android Mandiri)" dengan bukti run 42554105921, termasuk daftar eksplisit apa yang BELUM diuji.
+- `android/README.md` — status & diagram folder diperbarui ke Increment 2.
+- `android/.../exchange/ReconnectingWebSocket.kt` — `OkHttpClient` dijadikan singleton (`sharedHttpClient`, lazy) menggantikan `OkHttpClient()` baru tiap instance (temuan audit #5).
+- `OkHttpSingletonTest.kt` (baru) — `assertSame` membuktikan singleton benar-benar satu instance, bukan klaim di komentar. Total test Android: 10 (6 Signer + 3 Backoff + 1 Singleton).
+
+### Belum dikerjakan (sengaja, sesuai aturan "jangan ubah banyak modul sekaligus")
+- MainActivity.kt & AndroidManifest.xml (temuan #6-7 di tabel D) — ini butuh Foreground Service yang belum dibuat (Roadmap F langkah 3-4), bukan sekadar "fix", jadi dikerjakan terpisah.

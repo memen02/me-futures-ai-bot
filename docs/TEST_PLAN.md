@@ -4,8 +4,12 @@
 
 Tidak ada klaim "selesai" tanpa bukti uji. Setiap fase punya kriteria uji
 sendiri (lihat PROJECT_MASTER.md §Rencana 12 Fase). Checklist di bawah ini
-**wajib lulus semua** sebelum `BOT_MODE=live` dibuka untuk pengguna (saat ini
-diblokir di level kode, lihat SECURITY.md).
+**wajib lulus semua** sebelum LIVE MODE dibuka untuk pengguna. **Catatan
+2026-11-08**: mekanisme pengunci LIVE MODE di level kode (`BOT_MODE=live`)
+ada di versi Node.js lama (`backend/`, referensi, tidak dipakai lagi) dan
+**belum dibangun ulang di Kotlin** — lihat SECURITY.md §LIVE MODE. Checklist
+di bawah tetap wajib terpenuhi sebelum LIVE MODE dibuka, terlepas dari
+mekanisme penguncinya.
 
 ## Checklist Sebelum LIVE MODE (Fase 12)
 
@@ -42,6 +46,24 @@ diblokir di level kode, lihat SECURITY.md).
 | WS client reconnect logic | Diuji dengan `WebSocket` palsu, lulus |
 | Parsing `exchangeInfo`, filter PERPETUAL, validasi order vs filter | Diuji dengan fixture realistis |
 | REST/WS koneksi nyata ke Binance (testnet) | **Belum** — lingkungan Claude tanpa jaringan. Jalankan `npm run check-connectivity` di Termux (lihat TODO.md) |
+
+## Fase 10 — Hasil Uji (Android Mandiri, Increment 2: Signer + Auto-Reconnect)
+
+| Uji | Hasil |
+|---|---|
+| `gradle test` (9 unit test JUnit, JVM murni) | **9/9 lulus** — bukti: GitHub Actions run **42554105921** |
+| `gradle assembleDebug` | **Sukses** — APK ter-upload sebagai artifact, run yang sama |
+| Signer HMAC-SHA256 vs test vector independen | Cocok (test vector sama dengan versi Node.js) |
+| Backoff reconnect (`computeBackoffMs`) — naik seiring attempt, dibatasi maxMs | Lulus |
+| OkHttpClient singleton (perbaikan audit #5) | Lulus — `assertSame` membuktikan instance identik, lihat `OkHttpSingletonTest.kt` |
+| Install APK & buka di device nyata (Redmi Note 7, crDroid) | **Terverifikasi sekali** (sebelum 2 bug compileSdk/Kotlin-plugin diperbaiki) — **belum diverifikasi ulang** sejak itu |
+| Reconnect bertahan saat app di-minimize/layar mati | **Belum ada** — perlu Foreground Service (lihat AUDIT_REPORT.md Roadmap F) |
+| Auto-start setelah HP reboot | **Belum ada** — perlu Boot Receiver |
+| REST/WS koneksi nyata ke Binance dari dalam APK | **Belum diuji otomatis** — MainActivity konek manual ke stream publik saat dibuka, bukan bagian test suite |
+
+Dua bug nyata ditemukan & diperbaiki selama proses ini (bukan klaim tanpa
+bukti): `compileSdk` 35→36 dan Kotlin plugin 2.0.21→2.2.21, keduanya terbukti
+dari pesan error build Gradle sungguhan, dicatat di `CHANGELOG.md`.
 
 ## Strategi Pengujian per Lapisan
 
