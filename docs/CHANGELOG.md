@@ -136,3 +136,31 @@ versi mengikuti [SemVer](https://semver.org/) selama masih 0.x (struktur bisa be
 
 ### Belum dikerjakan (sengaja, sesuai aturan "jangan ubah banyak modul sekaligus")
 - MainActivity.kt & AndroidManifest.xml (temuan #6-7 di tabel D) — ini butuh Foreground Service yang belum dibuat (Roadmap F langkah 3-4), bukan sekadar "fix", jadi dikerjakan terpisah.
+
+## [0.5.1] - 2026-11-10
+
+### Verified
+- **GitHub Actions run 42781296841: SUKSES.** Commit 73faf44 (6 perbaikan audit:
+  5 dokumentasi + singleton OkHttpClient + test baru) terkonfirmasi tidak
+  merusak build. `backend/` CI tidak ikut terpicu (sesuai desain path-filter,
+  karena backend/ tidak disentuh di commit ini).
+
+## [0.6.0] - 2026-11-10
+
+### Added — FASE 10 Increment 3: Foreground Service (Roadmap F langkah 3)
+- `BotForegroundService.kt` (baru) — Service `START_STICKY` memegang `ReconnectingWebSocket`,
+  notifikasi persisten (NotificationChannel IMPORTANCE_LOW), `foregroundServiceType="dataSync"`.
+  Komunikasi ke MainActivity lewat companion object + polling sederhana (sadar trade-off,
+  dicatat di komentar kode) -- bukan Binder/LiveData, supaya tidak nambah dependency.
+- `MainActivity.kt` — jadi murni UI: tidak lagi memegang WebSocket sendiri, polling status
+  Service tiap 500ms, meminta izin `POST_NOTIFICATIONS` (API 33+) sebelum start service.
+- `AndroidManifest.xml` — tambah permission `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`,
+  `POST_NOTIFICATIONS`; deklarasi `<service>` dengan `foregroundServiceType="dataSync"`.
+
+### PENTING — batasan verifikasi
+- **CI hijau TIDAK CUKUP untuk increment ini.** Foreground service di Android modern
+  (targetSdk 36) hanya gagal saat RUNTIME (ForegroundServiceDidNotStartInTimeException,
+  MissingForegroundServiceTypeException, izin notifikasi ditolak), tidak terdeteksi
+  `gradle test`/`gradle assembleDebug`. **WAJIB dites di device nyata**: install APK,
+  buka app, izinkan notifikasi, minimize app, tunggu >1 menit, cek notifikasi status
+  masih ada dan masih "Tersambung" (bukan hilang/force-close).

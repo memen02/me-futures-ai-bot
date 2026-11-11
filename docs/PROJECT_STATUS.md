@@ -1,6 +1,6 @@
 # PROJECT STATUS
 
-**Fase saat ini:** FASE 10 Android -- Increment 2 (Signer+auto-reconnect) terverifikasi compile+test via GitHub Actions. Audit menyeluruh sedang berjalan atas permintaan pengguna.
+**Fase saat ini:** FASE 10 Android -- Foreground Service ditambahkan (Roadmap F langkah 3). BELUM dites di device nyata -- CI hijau belum cukup untuk fitur ini, lihat CHANGELOG.md. Boot Receiver (langkah 4) menyusul.
 **Terakhir diperbarui:** 2026-11-07
 
 ## PERUBAHAN ARSITEKTUR BESAR (2026-11-07)

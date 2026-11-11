@@ -12,7 +12,6 @@
 - [ ] REST client Kotlin (signed request, belum ada -- baru WS).
 - [ ] Exchange Gateway LENGKAP (REST+WS tergabung rapi dalam satu lapisan).
 - [x] Unit test JUnit untuk logic murni -- SUDAH jalan otomatis di GitHub Actions (`gradle test`), terpisah dari `assembleDebug`.
-- [ ] Foreground Service -- supaya bot bisa jalan di background sesuai kebijakan Android (bukan lagi soal Termux:Boot, tapi START_STICKY + foreground service type yang benar).
 - [ ] **Auto-reconnect** WebSocket setelah koneksi putus (fitur yang diminta eksplisit).
 - [ ] **Auto-start setelah HP restart** -- pakai `BOOT_COMPLETED` broadcast receiver (versi Android native dari Termux:Boot).
 - [ ] Data layer (symbol registry, candle store) -- porting logic dari `backend/src/data/`.

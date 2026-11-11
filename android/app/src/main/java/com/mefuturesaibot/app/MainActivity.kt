@@ -1,28 +1,38 @@
 package com.mefuturesaibot.app
 
+import android.Manifest
 import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
 
 /**
- * FASE 10 -- Increment ke-2: demo AUTO-RECONNECT nyata (bukan cuma kode
- * tersembunyi). Layar ini konek ke stream publik Binance (bookTicker BTCUSDT,
- * kategori /public sesuai temuan migrasi WS yang sudah diverifikasi di Fase 2 --
- * lihat docs/API_SPEC.md), tidak butuh API Key. Matikan/nyalakan mode pesawat
- * HP Anda untuk melihat status berubah: Terputus -> Menyambung ulang -> Tersambung.
- *
- * PENTING: reconnect ini baru jalan SELAMA APP TERBUKA DI LAYAR (lifecycle
- * onStart/onStop). Supaya tetap reconnect walau app ditutup/layar mati, perlu
- * Foreground Service -- itu increment BERIKUTNYA, belum di build ini.
+ * FASE 10 -- Increment 3. MainActivity sekarang MURNI UI: tidak lagi memegang
+ * ReconnectingWebSocket sendiri (itu sudah pindah ke BotForegroundService).
+ * Status dibaca lewat polling sederhana ke companion object Service -- lihat
+ * catatan desain di BotForegroundService.kt soal kenapa bukan Binder/LiveData.
  */
 class MainActivity : Activity() {
     private lateinit var statusView: TextView
     private lateinit var dataView: TextView
-    private var socket: ReconnectingWebSocket? = null
+    private val pollHandler = Handler(Looper.getMainLooper())
+    private val pollIntervalMs = 500L
+
+    private val pollRunnable = object : Runnable {
+        override fun run() {
+            statusView.text = describeStatus(BotForegroundService.latestStatus)
+            dataView.text = BotForegroundService.latestMessage
+            pollHandler.postDelayed(this, pollIntervalMs)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,7 +46,7 @@ class MainActivity : Activity() {
         }
 
         val captionView = TextView(this).apply {
-            text = "Demo auto-reconnect -- stream publik Binance (BTCUSDT)"
+            text = "Foreground Service aktif -- coba minimize app ini, status tetap jalan"
             textSize = 13f
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#94A3B8"))
@@ -44,7 +54,7 @@ class MainActivity : Activity() {
         }
 
         statusView = TextView(this).apply {
-            text = "Menyambungkan..."
+            text = "Memulai service..."
             textSize = 16f
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#475569"))
@@ -70,27 +80,39 @@ class MainActivity : Activity() {
         }
 
         setContentView(root)
+
+        ensureNotificationPermission()
+        startForegroundService(Intent(this, BotForegroundService::class.java))
     }
 
     override fun onStart() {
         super.onStart()
-        socket = ReconnectingWebSocket(
-            url = "wss://fstream.binance.com/public/stream?streams=btcusdt@bookTicker",
-            onStatusChange = { status -> statusView.text = describeStatus(status) },
-            onMessage = { text -> dataView.text = text.take(140) },
-        ).also { it.connect() }
+        pollHandler.post(pollRunnable)
     }
 
     override fun onStop() {
         super.onStop()
-        socket?.close()
-        socket = null
+        pollHandler.removeCallbacks(pollRunnable)
+        // SENGAJA TIDAK stopService() di sini -- justru itu intinya Foreground
+        // Service: tetap jalan walau Activity/MainActivity ditutup.
+    }
+
+    private fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_CODE_NOTIFICATIONS)
+            }
+        }
     }
 
     private fun describeStatus(status: ReconnectingWebSocket.ConnectionStatus): String = when (status) {
         ReconnectingWebSocket.ConnectionStatus.CONNECTING -> "Menyambungkan..."
-        ReconnectingWebSocket.ConnectionStatus.CONNECTED -> "Tersambung \u2713"
+        ReconnectingWebSocket.ConnectionStatus.CONNECTED -> "Tersambung \u2713 (via Foreground Service)"
         ReconnectingWebSocket.ConnectionStatus.DISCONNECTED -> "Terputus, mencoba lagi..."
         ReconnectingWebSocket.ConnectionStatus.RECONNECTING -> "Menyambung ulang..."
+    }
+
+    companion object {
+        private const val REQUEST_CODE_NOTIFICATIONS = 1001
     }
 }
