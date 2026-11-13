@@ -164,3 +164,46 @@ versi mengikuti [SemVer](https://semver.org/) selama masih 0.x (struktur bisa be
   `gradle test`/`gradle assembleDebug`. **WAJIB dites di device nyata**: install APK,
   buka app, izinkan notifikasi, minimize app, tunggu >1 menit, cek notifikasi status
   masih ada dan masih "Tersambung" (bukan hilang/force-close).
+
+## [0.7.0] - 2026-11-10
+
+### Fixed — 3 temuan KRITIS dari Deep Audit
+- **#1** `foregroundServiceType` diganti `dataSync` -> `specialUse`. dataSync kena
+  batas keras 6 jam/24 jam di Android 15+ (targetSdk kita 36) -- setelah itu OS
+  memaksa `onTimeout()` lalu crash kalau tidak `stopSelf()` cepat. Dikonfirmasi dari
+  dokumentasi resmi developer.android.com (Android 15 behavior changes), bukan
+  ingatan lama. Manifest: permission `FOREGROUND_SERVICE_SPECIAL_USE` + elemen
+  `<property>` `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` menjelaskan alasan pemakaian.
+- **#2** Bug nyata: `close()` tidak membatalkan reconnect yang sudah terjadwal,
+  berpotensi menciptakan koneksi "zombie" setelah service seharusnya berhenti.
+  Diperbaiki dengan menambah abstraksi `Scheduler` (interface + `AndroidHandlerScheduler`)
+  supaya `cancelAll()` benar-benar membatalkan callback tertunda, plus guard
+  `closedByUser` di callback itu sendiri (defense in depth). Test baru
+  `CloseCancelsReconnectTest.kt` (2 test) membuktikan pola logikanya benar --
+  **catatan jujur**: belum menguji class `ReconnectingWebSocket` asli (lihat TODO.md).
+- **#3** Tidak ada tombol Start/Stop -- Service auto-start tanpa kontrol begitu app
+  dibuka. Ditambah tombol Start/Stop eksplisit di `MainActivity.kt`, `BotForegroundService`
+  menangani `ACTION_STOP` untuk berhenti bersih (`stopForeground` + `stopSelf`).
+
+### Fixed — minor
+- Notifikasi sekarang punya `setContentIntent` (ketuk notifikasi membuka app).
+- `PROJECT_MASTER.md`: baris QR-code pairing (konsep lama, sudah tidak relevan) dicoret dengan penjelasan.
+- `TODO.md`, `PROJECT_STATUS.md`: disinkronkan ulang dengan kode sebenarnya (checkbox basi diperbaiki, tanggal "terakhir diperbarui" diperbaiki).
+
+### Self-audit selama proses ini (sesuai permintaan eksplisit pengguna)
+- Ditemukan & diperbaiki SENDIRI sebelum dikirim: komentar XML di `AndroidManifest.xml`
+  memakai `--` (dilarang di komentar XML, akan gagal parse) -- diperbaiki, dan di-scan
+  ulang ke SELURUH file XML proyek untuk pastikan tidak ada yang lain.
+- Ditemukan & diperbaiki SENDIRI: perbandingan `statusView.text != "Dihentikan"`
+  (CharSequence vs String, berisiko gagal cocok) -- diganti flag boolean `userRequestedStop`.
+
+### Belum dikerjakan (ikon & nama app menunggu keputusan pengguna)
+- Ikon app kustom -- sengaja tidak dibuat, pengguna ingin ganti sendiri.
+- Nama app -- menunggu konfirmasi final.
+- Boot Receiver, REST client Kotlin, data layer, penyimpanan API Key, battery optimization exemption otomatis.
+
+### PENTING — verifikasi device WAJIB
+CI hijau (kalau nanti terbukti) TIDAK membuktikan: service benar-benar bertahan
+>6 jam tanpa crash (justru itu intinya perbaikan #1, hanya device yang bisa
+membuktikan), tombol Stop benar-benar membersihkan notifikasi & mematikan
+service total, tidak ada koneksi ganda saat Activity dibuka-tutup berulang.

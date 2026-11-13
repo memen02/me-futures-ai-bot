@@ -114,7 +114,7 @@ sudah ada (tidak menambah fase baru), dibangun saat fase terkait tiba.
 ### Android App -- Keamanan & Kontrol (Fase 10)
 - **Kunci biometrik untuk aksi sensitif** -- ganti API Key, ubah pengaturan risiko, Emergency Stop minta sidik jari/Face Unlock.
 - **Dua level stop terpisah**: Stop normal (hentikan entry baru, posisi tetap diproteksi -- sudah di spesifikasi awal) vs **Panic Mode** (tutup SEMUA posisi + stop total).
-- **Pairing APK↔backend lewat QR code** -- scan dari layar Termux, bukan ketik token manual (lebih kecil risiko salah ketik).
+- ~~Pairing APK↔backend lewat QR code~~ -- **sudah tidak relevan sejak pivot ke app mandiri (2026-11-07)**: tidak ada lagi "backend" terpisah yang perlu di-pairing, satu app, satu proses.
 - **Konfirmasi dua langkah** untuk aksi berisiko (Emergency Stop, ganti API Key).
 
 ### Android App -- Observability (Fase 10)
@@ -128,4 +128,4 @@ sudah ada (tidak menambah fase baru), dibangun saat fase terkait tiba.
 - **Filter & pencarian riwayat trade** (per simbol/strategi/tanggal).
 - **Export laporan (CSV)**.
 
-Prioritas tertinggi di antara semua ini (paling terkait keamanan & troubleshooting): kunci biometrik, pairing QR code, dan status koneksi granular.
+Prioritas tertinggi di antara semua ini (paling terkait keamanan & troubleshooting): kunci biometrik dan status koneksi granular (pairing QR code dicoret, lihat di atas).

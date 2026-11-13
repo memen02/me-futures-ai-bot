@@ -2,11 +2,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Foreground Service (Increment 3): wajib dideklarasikan sejak API 28,
-         FOREGROUND_SERVICE_DATA_SYNC wajib cocok dengan tipe di BotForegroundService.kt.
+    <!-- Foreground Service: wajib dideklarasikan sejak API 28.
+         PERBAIKAN (audit 2026-11-10, temuan #1): tipe diganti dari "dataSync" ke
+         "specialUse". Alasan: dataSync kena batas keras 6 jam per 24 jam di
+         Android 15+ (targetSdk kita 36), setelah itu service dipaksa berhenti oleh
+         OS (onTimeout lalu crash kalau tidak stopSelf cepat). specialUse tidak kena
+         batas waktu itu, lebih cocok untuk bot yang perlu memantau terus menerus.
+         Perlu elemen property di dalam service menjelaskan alasan pemakaian, lihat
+         di bawah. Sumber: developer.android.com, Android 15 behavior changes dan
+         foreground-service-types, diverifikasi 2026-11-10.
          POST_NOTIFICATIONS: izin runtime API 33+, diminta di MainActivity.kt. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -27,7 +34,11 @@
         <service
             android:name=".BotForegroundService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Menjaga koneksi WebSocket tetap hidup untuk memantau data pasar Binance Futures secara kontinu demi asisten analisis trading pribadi; tidak ada tipe foreground service baku yang cocok untuk pemantauan berkelanjutan (dataSync dibatasi 6 jam/24 jam di Android 15+)." />
+        </service>
     </application>
 
 </manifest>

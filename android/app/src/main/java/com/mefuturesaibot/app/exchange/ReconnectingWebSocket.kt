@@ -12,31 +12,50 @@ import kotlin.math.pow
 import kotlin.random.Random
 
 /**
+ * Abstraksi scheduler -- SENGAJA ditambahkan (audit 2026-11-10, temuan #2) supaya
+ * logic reconnect/cancel bisa diuji penuh lewat JUnit biasa tanpa Android Looper
+ * sungguhan. Implementasi default (AndroidHandlerScheduler) dipakai saat runtime;
+ * test memakai scheduler palsu yang bisa dikontrol manual. Lihat
+ * CloseCancelsReconnectTest.kt untuk bukti bug lama ini sudah benar-benar diperbaiki.
+ */
+interface Scheduler {
+    fun post(action: () -> Unit)
+    fun postDelayed(delayMs: Long, action: () -> Unit)
+    /** Batalkan SEMUA post/postDelayed yang masih tertunda. */
+    fun cancelAll()
+}
+
+class AndroidHandlerScheduler(looper: Looper = Looper.getMainLooper()) : Scheduler {
+    private val handler = Handler(looper)
+    override fun post(action: () -> Unit) {
+        handler.post(action)
+    }
+    override fun postDelayed(delayMs: Long, action: () -> Unit) {
+        handler.postDelayed(action, delayMs)
+    }
+    override fun cancelAll() {
+        handler.removeCallbacksAndMessages(null)
+    }
+}
+
+/**
  * Wrapper WebSocket dengan AUTO-RECONNECT (backoff eksponensial + jitter) -- versi
- * Kotlin dari referensi Node.js `backend/src/exchange/wsClient.js`. Ini FASE
- * sekarang: reconnect selama proses app hidup (dipanggil dari Activity). Supaya
- * tetap reconnect walau app ditutup/layar mati, perlu dipindah ke dalam Foreground
- * Service -- itu increment BERIKUTNYA, belum di sini (lihat docs/TODO.md).
+ * Kotlin dari referensi Node.js `backend/src/exchange/wsClient.js`.
  *
- * Callback `onStatusChange`/`onMessage` SELALU dipanggil di main thread Android,
- * supaya aman dipakai langsung untuk update UI tanpa runOnUiThread manual di
- * pemanggil (OkHttp sendiri memanggil listener-nya di thread background).
+ * Callback `onStatusChange`/`onMessage` SELALU dipanggil lewat `scheduler`, supaya
+ * aman dipakai langsung untuk update UI tanpa runOnUiThread manual di pemanggil
+ * (OkHttp sendiri memanggil listener-nya di thread background).
  */
 class ReconnectingWebSocket(
     private val url: String,
-    // PERBAIKAN (audit 2026-11-08, temuan #5): dulu default `OkHttpClient()` di sini
-    // membuat INSTANCE BARU setiap kali ReconnectingWebSocket dipanggil tanpa `client`
-    // eksplisit -- OkHttp dirancang dipakai sebagai singleton (menyimpan thread pool &
-    // connection pool sendiri), jadi keluar-masuk app berulang menumpuk thread yang
-    // tidak perlu. Sekarang pakai `sharedHttpClient` (lazy, satu instance untuk seluruh
-    // proses app). Lihat OkHttpSingletonTest.kt untuk buktinya.
+    // Singleton OkHttpClient (audit 2026-11-08 #5) -- lihat OkHttpSingletonTest.kt.
     private val client: OkHttpClient = sharedHttpClient,
     private val onStatusChange: (ConnectionStatus) -> Unit = {},
     private val onMessage: (String) -> Unit = {},
+    private val scheduler: Scheduler = AndroidHandlerScheduler(),
 ) {
     enum class ConnectionStatus { CONNECTING, CONNECTED, DISCONNECTED, RECONNECTING }
 
-    private val mainHandler = Handler(Looper.getMainLooper())
     private var webSocket: WebSocket? = null
     private var attempt = 0
     private var closedByUser = false
@@ -55,7 +74,7 @@ class ReconnectingWebSocket(
                 }
 
                 override fun onMessage(webSocket: WebSocket, text: String) {
-                    mainHandler.post { onMessage(text) }
+                    scheduler.post { onMessage(text) }
                 }
 
                 override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
@@ -75,32 +94,43 @@ class ReconnectingWebSocket(
         val delayMs = computeBackoffMs(attempt)
         attempt += 1
         postStatus(ConnectionStatus.RECONNECTING)
-        mainHandler.postDelayed({ connect() }, delayMs)
+        // PERBAIKAN (audit 2026-11-10 #2): dulu di sini langsung `{ connect() }` tanpa
+        // syarat -- kalau close() dipanggil SETELAH reconnect ini terjadwal tapi
+        // SEBELUM delay-nya habis, dulu connect() tetap jalan (bikin koneksi zombie).
+        // Sekarang double-protected: scheduler.cancelAll() di close() membatalkan
+        // callback ini sebelum sempat jalan, DAN kalaupun lolos (race condition),
+        // guard closedByUser di bawah ini mencegahnya benar-benar connect ulang.
+        scheduler.postDelayed(delayMs) {
+            if (!closedByUser) connect()
+        }
     }
 
     private fun postStatus(status: ConnectionStatus) {
-        mainHandler.post { onStatusChange(status) }
+        scheduler.post { onStatusChange(status) }
     }
 
-    /** Panggil ini saat Activity/Service berhenti, supaya tidak reconnect terus setelah sengaja ditutup. */
+    /**
+     * Panggil saat Activity/Service berhenti. PERBAIKAN (audit 2026-11-10 #2):
+     * sekarang membatalkan reconnect yang mungkin sudah terjadwal lewat
+     * `scheduler.cancelAll()` -- dulu tidak, lihat catatan di scheduleReconnect().
+     */
     fun close() {
         closedByUser = true
+        scheduler.cancelAll()
         webSocket?.close(1000, "Ditutup oleh pengguna")
     }
 
     companion object {
         /**
-         * OkHttpClient dibagi bersama untuk SELURUH proses app (lazy -- baru dibuat
-         * saat pertama kali dipakai). Dipublikasikan (bukan private) supaya bisa
-         * diperiksa langsung dari unit test bahwa ini benar-benar satu instance yang
-         * sama, bukan sekadar diklaim di komentar. Lihat OkHttpSingletonTest.kt.
+         * OkHttpClient dibagi bersama untuk SELURUH proses app (lazy). Dipublikasikan
+         * (bukan private) supaya bisa diperiksa langsung dari unit test. Lihat
+         * OkHttpSingletonTest.kt.
          */
         val sharedHttpClient: OkHttpClient by lazy { OkHttpClient() }
 
         /**
-         * Backoff eksponensial + jitter, dibatasi maxMs -- FUNGSI MURNI (tidak
-         * menyentuh Android API apa pun), diuji penuh lewat JUnit biasa tanpa
-         * perlu membuat instance ReconnectingWebSocket. Lihat BackoffCalculatorTest.kt.
+         * Backoff eksponensial + jitter, dibatasi maxMs -- FUNGSI MURNI, diuji penuh
+         * lewat JUnit biasa. Lihat BackoffCalculatorTest.kt.
          */
         fun computeBackoffMs(attempt: Int, baseMs: Long = 1000, maxMs: Long = 30_000): Long {
             val exp = min(maxMs.toDouble(), baseMs * 2.0.pow(attempt))
