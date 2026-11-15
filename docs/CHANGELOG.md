@@ -207,3 +207,25 @@ CI hijau (kalau nanti terbukti) TIDAK membuktikan: service benar-benar bertahan
 >6 jam tanpa crash (justru itu intinya perbaikan #1, hanya device yang bisa
 membuktikan), tombol Stop benar-benar membersihkan notifikasi & mematikan
 service total, tidak ada koneksi ganda saat Activity dibuka-tutup berulang.
+
+## [0.7.1] - 2026-11-13
+
+### Verified
+- **GitHub Actions run 43512005442: SUKSES.** Commit f46afca (3 perbaikan audit
+  kritis: specialUse, bug close(), tombol Start/Stop) terkonfirmasi compile +
+  12 unit test lulus. **Belum diverifikasi di device nyata** -- lihat TODO.md,
+  ini WAJIB sebelum dianggap benar-benar selesai (CI tidak bisa membuktikan
+  perilaku Service/notifikasi/tombol yang sungguhan).
+
+## [0.7.2] - 2026-11-13
+
+### Fixed — audit mandiri tambahan (MainActivity.kt)
+- **Stop saat Service belum pernah dijalankan** sempat memicu koneksi "kedip"
+  (Android membuat instance Service baru dulu -- `onCreate()` ikut terpanggil
+  dan langsung connect -- baru setelah itu memproses `ACTION_STOP`). Diperbaiki
+  dengan guard `if (!BotForegroundService.isRunning) return` di awal `onStopClicked()`.
+- **Izin notifikasi diminta terlalu telat**: dulu di dalam `onStartClicked()`,
+  tepat sebelum `startForegroundService()` -- padahal `requestPermissions()`
+  asinkron, jadi Service sempat `startForeground()` sebelum dialog izin dijawab
+  (notifikasi berisiko tidak tampil di percobaan pertama). Dipindah ke `onCreate()`
+  supaya ada jeda alami sebelum pengguna sempat menekan Start.

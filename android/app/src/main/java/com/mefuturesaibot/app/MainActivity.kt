@@ -104,6 +104,16 @@ class MainActivity : Activity() {
         }
 
         setContentView(root)
+
+        // PERBAIKAN (audit 2026-11-13): dulu izin notifikasi diminta di dalam
+        // onStartClicked(), TEPAT SEBELUM startForegroundService() -- padahal
+        // requestPermissions() itu asinkron (dialog sistem, tidak menunggu jawaban),
+        // jadi Service sempat jalan & memanggil startForeground() SEBELUM pengguna
+        // sempat menjawab dialognya. Hasilnya: pertama kali pakai, notifikasi
+        // kemungkinan tidak tampil (bukan crash, cuma membingungkan). Sekarang
+        // diminta di sini (saat app dibuka), supaya ada jeda alami sebelum
+        // pengguna sempat menekan Start.
+        ensureNotificationPermission()
     }
 
     override fun onStart() {
@@ -119,12 +129,22 @@ class MainActivity : Activity() {
     }
 
     private fun onStartClicked() {
+        // Catatan: permintaan izin notifikasi sudah dipindah ke onCreate() (lihat
+        // komentar di sana) -- tidak diulang di sini supaya tidak memunculkan
+        // dialog dua kali kalau pengguna menekan Start berulang.
         userRequestedStop = false
-        ensureNotificationPermission()
         startForegroundService(Intent(this, BotForegroundService::class.java))
     }
 
     private fun onStopClicked() {
+        // PERBAIKAN (audit 2026-11-13): dulu Stop ditekan saat Service belum pernah
+        // dijalankan tetap mengirim Intent ke BotForegroundService -- Android akan
+        // membuat instance Service baru dulu (onCreate() ikut terpanggil, yang
+        // UNCONDITIONALLY connect ke WebSocket) baru SETELAH itu memproses ACTION_STOP.
+        // Efeknya: Stop pada kondisi "Belum dimulai" sempat menyalakan koneksi
+        // sesaat sebelum mematikannya lagi. Sekarang dicegah di sumbernya.
+        if (!BotForegroundService.isRunning) return
+
         userRequestedStop = true
         startService(Intent(this, BotForegroundService::class.java).setAction(BotForegroundService.ACTION_STOP))
         statusView.text = "Dihentikan"

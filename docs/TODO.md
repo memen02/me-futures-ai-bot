@@ -10,6 +10,8 @@
 - [x] Bug `close()` tidak membatalkan reconnect terjadwal -- diperbaiki (audit #2, 2026-11-10), scheduler dibuat bisa diuji (`CloseCancelsReconnectTest.kt`), **tapi lihat catatan testing di bawah**.
 - [x] `foregroundServiceType` diganti dataSync -> specialUse (audit #1, 2026-11-10) -- dataSync kena batas 6 jam/24 jam di Android 15+.
 - [x] Notifikasi: `setContentIntent` supaya ketuk notifikasi membuka app.
+- [x] Guard Stop saat belum running (audit mandiri 2026-11-13) -- cegah koneksi "kedip".
+- [x] Izin notifikasi dipindah ke onCreate() (audit mandiri 2026-11-13) -- cegah race dengan startForegroundService().
 
 ## Menunggu keputusan/aset dari Anda
 - [ ] **Ikon app kustom** -- sengaja belum dibuat, Anda ingin ganti sendiri.
