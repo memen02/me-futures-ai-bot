@@ -5,40 +5,69 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * HMAC-SHA256 signing untuk request SIGNED Binance Futures -- versi Kotlin dari
- * referensi Node.js `backend/src/exchange/signer.js` (lihat docs/PROJECT_STATUS.md
- * soal status referensi itu). Logic murni, tanpa Android API apa pun -- bisa diuji
- * penuh lewat JUnit biasa (JVM), tidak butuh emulator. Lihat SignerTest.kt.
+ * HMAC-SHA256 signing untuk request SIGNED Binance Futures.
  */
 object Signer {
     private const val HMAC_ALGORITHM = "HmacSHA256"
 
-    /** HMAC SHA256, hex-encoded (huruf kecil, 64 karakter) -- primitif tanda tangan Binance. */
+    /**
+     * HMAC SHA256, hex-encoded huruf kecil.
+     */
     fun hmacSha256Hex(message: String, secret: String): String {
+        require(secret.isNotBlank()) { "HMAC secret wajib diisi" }
+
         val mac = Mac.getInstance(HMAC_ALGORITHM)
-        mac.init(SecretKeySpec(secret.toByteArray(Charsets.UTF_8), HMAC_ALGORITHM))
+        mac.init(
+            SecretKeySpec(
+                secret.toByteArray(Charsets.UTF_8),
+                HMAC_ALGORITHM
+            )
+        )
+
         val bytes = mac.doFinal(message.toByteArray(Charsets.UTF_8))
-        return bytes.joinToString(separator = "") { byte -> "%02x".format(byte) }
+        return bytes.joinToString(separator = "") { byte ->
+            "%02x".format(byte)
+        }
     }
 
     /**
-     * Bangun query string dari daftar pasangan key-value, urutan dipertahankan
-     * sesuai urutan di `params` (List, bukan Map, supaya urutan selalu pasti).
-     * Pasangan bernilai null dilewati. Value di-encode dengan URLEncoder.
+     * Bangun query string dengan urutan parameter tetap.
+     * Nilai null dilewati.
+     * Spasi diubah menjadi %20, bukan +.
      */
     fun buildQueryString(params: List<Pair<String, String?>>): String {
         return params
-            .filter { it.second != null }
-            .joinToString(separator = "&") { (key, value) ->
-                "${URLEncoder.encode(key, "UTF-8")}=${URLEncoder.encode(value, "UTF-8")}"
+            .mapNotNull { (key, value) ->
+                value?.let {
+                    "${encode(key)}=${encode(it)}"
+                }
             }
+            .joinToString("&")
     }
 
-    /** Bangun query string yang sudah ditandatangani: `...&signature=<hmac>`. */
-    fun signQueryString(params: List<Pair<String, String?>>, apiSecret: String): String {
-        require(apiSecret.isNotEmpty()) { "signQueryString: apiSecret wajib diisi" }
+    private fun encode(value: String): String {
+        return URLEncoder.encode(value, "UTF-8")
+            .replace("+", "%20")
+    }
+
+    /**
+     * Bangun query string yang sudah ditandatangani.
+     */
+    fun signQueryString(
+        params: List<Pair<String, String?>>,
+        apiSecret: String
+    ): String {
+        require(apiSecret.isNotBlank()) {
+            "signQueryString: apiSecret wajib diisi"
+        }
+
         val qs = buildQueryString(params)
         val signature = hmacSha256Hex(qs, apiSecret)
-        return if (qs.isNotEmpty()) "$qs&signature=$signature" else "signature=$signature"
+
+        return if (qs.isNotEmpty()) {
+            "$qs&signature=$signature"
+        } else {
+            "signature=$signature"
+        }
     }
 }
