@@ -37,16 +37,29 @@ class BotForegroundService : Service() {
         isRunning = true
         ensureNotificationChannel()
         startForegroundCompat(buildNotification(ReconnectingWebSocket.ConnectionStatus.CONNECTING))
-        connectSocket()
+        if (BotPreferences.shouldRun(this)) {
+            connectSocket()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            BotPreferences.setShouldRun(this, false)
             stopEverything()
             return START_NOT_STICKY
         }
-        // START_STICKY: kalau OS membunuh proses karena tekanan RAM (BUKAN karena
-        // pengguna menekan Stop), Android akan coba buat ulang Service ini.
+
+        if (!BotPreferences.shouldRun(this)) {
+            stopEverything()
+            return START_NOT_STICKY
+        }
+
+        if (socket == null) {
+            connectSocket()
+        }
+
+        // START_STICKY: Android boleh mencoba membuat ulang Service
+        // jika proses dihentikan OS, selama pengguna belum menekan Stop.
         return START_STICKY
     }
 
@@ -60,6 +73,7 @@ class BotForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null // tidak dipakai, MainActivity poll companion object
 
     private fun stopEverything() {
+        BotPreferences.setShouldRun(this, false)
         socket?.close()
         socket = null
         isRunning = false

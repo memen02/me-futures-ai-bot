@@ -13,6 +13,7 @@ import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Switch
 import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
 
 /**
@@ -85,6 +86,14 @@ class MainActivity : Activity() {
             setOnClickListener { onStopClicked() }
         }
 
+        val autoStartSwitch = Switch(this).apply {
+            text = "Auto Start setelah reboot"
+            isChecked = BotPreferences.isAutoStartEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, enabled ->
+                BotPreferences.setAutoStartEnabled(this@MainActivity, enabled)
+            }
+        }
+
         val buttonRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -100,6 +109,7 @@ class MainActivity : Activity() {
             addView(captionView)
             addView(statusView)
             addView(dataView)
+            addView(autoStartSwitch)
             addView(buttonRow)
         }
 
@@ -133,20 +143,21 @@ class MainActivity : Activity() {
         // komentar di sana) -- tidak diulang di sini supaya tidak memunculkan
         // dialog dua kali kalau pengguna menekan Start berulang.
         userRequestedStop = false
+        BotPreferences.setShouldRun(this, true)
         startForegroundService(Intent(this, BotForegroundService::class.java))
     }
 
     private fun onStopClicked() {
-        // PERBAIKAN (audit 2026-11-13): dulu Stop ditekan saat Service belum pernah
-        // dijalankan tetap mengirim Intent ke BotForegroundService -- Android akan
-        // membuat instance Service baru dulu (onCreate() ikut terpanggil, yang
-        // UNCONDITIONALLY connect ke WebSocket) baru SETELAH itu memproses ACTION_STOP.
-        // Efeknya: Stop pada kondisi "Belum dimulai" sempat menyalakan koneksi
-        // sesaat sebelum mematikannya lagi. Sekarang dicegah di sumbernya.
-        if (!BotForegroundService.isRunning) return
-
         userRequestedStop = true
-        startService(Intent(this, BotForegroundService::class.java).setAction(BotForegroundService.ACTION_STOP))
+        BotPreferences.setShouldRun(this, false)
+
+        if (BotForegroundService.isRunning) {
+            startService(
+                Intent(this, BotForegroundService::class.java)
+                    .setAction(BotForegroundService.ACTION_STOP)
+            )
+        }
+
         statusView.text = "Dihentikan"
         dataView.text = ""
     }
