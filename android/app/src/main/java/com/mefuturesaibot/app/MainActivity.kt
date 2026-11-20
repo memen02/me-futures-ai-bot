@@ -35,6 +35,7 @@ import com.mefuturesaibot.app.exchange.SignalSide
 class MainActivity : Activity() {
     private lateinit var signalView: TextView
     private lateinit var signalReason: TextView
+    private lateinit var signalDetails: TextView
     private lateinit var statusView: TextView
     private lateinit var historyButton: Button
     private lateinit var dataView: TextView
@@ -62,9 +63,22 @@ class MainActivity : Activity() {
             textSize = 22f
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#0F172A"))
-            setPadding(48, 160, 48, 24)
+            setPadding(32, 32, 32, 2)
         }
 
+        val buildView = TextView(this).apply {
+            text = getString(R.string.build_identity)
+            gravity = Gravity.CENTER
+            textSize = 12f
+            setTextColor(Color.parseColor("#475569"))
+            setPadding(32, 0, 32, 24)
+        }
+        signalDetails = TextView(this).apply {
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#334155"))
+            setPadding(24, 0, 24, 18)
+        }
         signalView = TextView(this).apply {
             gravity = Gravity.CENTER
             textSize = 24f
@@ -129,8 +143,10 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             setBackgroundColor(Color.WHITE)
             addView(titleView)
+            addView(buildView)
             addView(signalView)
             addView(signalReason)
+            addView(signalDetails)
             addView(statusView)
             addView(dataView)
             addView(historyButton)
@@ -206,9 +222,9 @@ class MainActivity : Activity() {
         val connection = BotForegroundService.latestStatus
         val quote = BotForegroundService.latestQuote
         val elapsed = SystemClock.elapsedRealtime()
-        val stale = quote?.isStale(elapsed, System.currentTimeMillis()) ?: true
+        val stale = quote?.isStale(elapsed, BotForegroundService.exchangeClock) ?: true
         val exchangeTime = if (connection == ReconnectingWebSocket.ConnectionStatus.CONNECTED && quote != null && !stale)
-            quote.eventTimeMs + (elapsed - quote.receivedElapsedMs) else null
+            BotForegroundService.exchangeClock.at(elapsed) else null
         val historyStatus = history.statusAt(exchangeTime)
         val lastOpen = history.candles.lastOrNull()?.openTime
         historyButton.text = if (lastOpen == null) historyStatus else
@@ -238,6 +254,17 @@ class MainActivity : Activity() {
     private fun renderSignal(signal: SmaSignal) {
         signalView.text = "Sinyal · ${signal.side.name}"
         signalReason.text = signal.reason
+        signalDetails.visibility = if (signal.intervals.isEmpty()) android.view.View.GONE else android.view.View.VISIBLE
+        signalDetails.text = signal.intervals.joinToString("\n\n") { interval ->
+            val position = when {
+                interval.direction > 0 -> "di atas SMA"
+                interval.direction < 0 -> "di bawah SMA"
+                else -> "sama dengan SMA"
+            }
+            val time = quoteTime.format(Instant.ofEpochMilli(interval.closedAtMs))
+            "${interval.minutes} menit · $position · $time\n" +
+                "Tutup ${interval.close.stripTrailingZeros().toPlainString()}   SMA 20 ${interval.sma.stripTrailingZeros().toPlainString()}"
+        }
         val color = when (signal.side) {
             SignalSide.WAIT -> "#744B10"
             SignalSide.BUY -> "#11653F"

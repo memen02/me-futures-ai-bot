@@ -31,7 +31,7 @@ gradle test             # unit test JUnit (JVM murni, tanpa emulator)
 
 ```bash
 gh run list -R <owner>/me-futures-ai-bot
-gh run download <run-id> -n me-futures-ai-bot-debug-apk -R <owner>/me-futures-ai-bot
+gh run download <run-id> -n me-project-debug-apk -R <owner>/me-futures-ai-bot
 ```
 
 Lalu install `app-debug.apk` lewat aplikasi Files di HP (izinkan "install

@@ -22,6 +22,21 @@ class SmaSignalTest {
         assertEquals(SignalSide.WAIT, mixed.signalAt(now).side)
     }
 
+    @Test fun detailsUseTheSameClosedCandlesAsTheSignal() {
+        val signal = history(1..120) { it + 1 }.signalAt(121 * 60_000L)
+        val (one, five) = signal.intervals
+        assertEquals(1, one.minutes)
+        assertEquals(0, one.close.compareTo(BigDecimal("121")))
+        assertEquals(0, one.sma.compareTo(BigDecimal("111.5")))
+        assertEquals(121 * 60_000L - 1, one.closedAtMs)
+        assertEquals(5, five.minutes)
+        assertEquals(0, five.close.compareTo(BigDecimal("120")))
+        assertEquals(0, five.sma.compareTo(BigDecimal("72.5")))
+        assertEquals(120 * 60_000L - 1, five.closedAtMs)
+        assertEquals(2, history { 10 }.signalAt(120 * 60_000L).intervals.size)
+        assertEquals(0, history { 10 }.signalAt(121 * 60_000L).intervals.size)
+    }
+
     @Test fun formingFiveMinuteBarDoesNotCount() {
         // The 1m close jumped above its SMA, but the latest completed 5m bar
         // still closed below its SMA. The new bucket has only one minute.

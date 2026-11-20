@@ -1,4 +1,4 @@
-# ME FUTURES AI BOT
+# ME Project
 
 Aplikasi Android **mandiri** (Kotlin, tanpa Termux) untuk trading otomatis
 Binance USDⓈ-M Futures — tanpa bergantung pada LLM/API AI apa pun saat live
@@ -36,7 +36,7 @@ Karena tidak pakai PC/Termux, APK dibangun lewat GitHub Actions:
 
 1. Pilih cabang yang ingin diuji di GitHub.
 2. Cek tab **Actions** di github.com — workflow **Android Build**.
-3. Unduh APK dari hasil build (artifact `me-futures-ai-bot-debug-apk`), install manual di HP.
+3. Unduh APK dari hasil build (artifact `me-project-debug-apk`), install manual di HP.
 
 ## Dokumentasi
 
