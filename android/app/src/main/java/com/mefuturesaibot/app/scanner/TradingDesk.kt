@@ -18,6 +18,7 @@ import android.widget.ListView
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
+import com.mefuturesaibot.app.maintenance.CacheCleanupJob
 import com.mefuturesaibot.app.account.AccountPage
 import com.mefuturesaibot.app.BotPreferences
 import com.mefuturesaibot.app.BotForegroundService
@@ -57,6 +58,7 @@ internal class TradingDesk(
     private var btcFresh = false
     private var fresh = false
     private var running = false
+    var onTabSelected: (() -> Unit)? = null
     var tab = 0
         private set
 
@@ -90,6 +92,7 @@ internal class TradingDesk(
     fun close() = accountPage.close()
 
     fun select(index: Int) {
+        if (tab == 1 && index != tab) clearTokenList()
         tab = index.coerceIn(0, pages.lastIndex)
         accountPage.show(tab == 3)
         pages.forEachIndexed { i, id -> view<View>(id).visibility = if (i == tab) View.VISIBLE else View.GONE }
@@ -100,8 +103,12 @@ internal class TradingDesk(
             button.setTextColor(tint)
             button.compoundDrawableTintList = ColorStateList.valueOf(tint)
         }
-        if (tab == 3) view<Switch>(R.id.account_autostart).isChecked = BotPreferences.isAutoStartEnabled(activity)
+        if (tab == 3) {
+            view<Switch>(R.id.account_autostart).isChecked = BotPreferences.isAutoStartEnabled(activity)
+            view<TextView>(R.id.account_cache_status).text = CacheCleanupJob.status(activity)
+        }
         update(BotForegroundService.latestScan, BotForegroundService.isRunning, force = true)
+        onTabSelected?.invoke()
     }
 
     fun update(scan: Scan, active: Boolean, force: Boolean = false) {
@@ -156,7 +163,20 @@ internal class TradingDesk(
         }
     }
 
+    fun releaseDisplayData() {
+        clearTokenList()
+        snapshot = Scan()
+        btcTicker = null
+    }
+
+    private fun clearTokenList() {
+        if (adapter.rows.isEmpty()) return
+        adapter.rows = emptyList()
+        adapter.notifyDataSetChanged()
+    }
+
     private fun listTokens() {
+        if (tab != 1) return
         val search = query.text.toString().trim()
         val stars = store.favorites
         val matches = snapshot.rows.filter { row ->
