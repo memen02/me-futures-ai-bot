@@ -6,23 +6,15 @@ yang sebelumnya direncanakan di Node.js/Termux (`../backend/`) sekarang
 ditulis ulang di sini sebagai satu APK mandiri. Lihat
 `../docs/PROJECT_STATUS.md` untuk alasan & detail perubahan ini.
 
-## Status saat ini (per 2026-11-08)
+## Status pemantauan
 
-**Increment 2 selesai & TERBUKTI compile+test lewat GitHub Actions** (run
-42554105921): Exchange layer dasar (signing + WebSocket auto-reconnect),
-dengan demo nyata di layar utama. **Belum ada**: Foreground Service (reconnect
-baru hidup selama app terbuka), Boot Receiver, REST client, data layer,
-penyimpanan API Key. Daftar lengkap kekurangan & rencana:
-[`../docs/AUDIT_REPORT.md`](../docs/AUDIT_REPORT.md).
+Tombol Start menjalankan layanan pemantauan BTC/USDT. Layar menampilkan
+bid, ask, dan waktu pembaruan dari bursa. Harga terakhir ditandai kedaluwarsa
+saat koneksi putus atau data berumur 10 detik. Tombol Stop menghentikan
+layanan. Opsi Auto Start mengikuti pilihan pengguna setelah reboot.
 
-- `src/main/java/.../MainActivity.kt` — layar demo, konek ke stream publik Binance.
-- `src/main/java/.../exchange/Signer.kt` — HMAC-SHA256 signing, 6 unit test.
-- `src/main/java/.../exchange/ReconnectingWebSocket.kt` — WebSocket auto-reconnect + OkHttpClient singleton, 4 unit test (3 backoff + 1 singleton).
-
-**Verifikasi kode**: lingkungan kerja Claude tidak punya Android SDK/Gradle/
-akses jaringan, jadi SEMUA perubahan kode di folder ini baru benar-benar
-terbukti jalan setelah di-push ke GitHub dan dicek di tab **Actions**
-(`.github/workflows/android-build.yml`) — bukan dari klaim di commit message.
+GitHub Actions menjalankan unit test lalu membuat APK debug. Hasil uji di HP
+dan daftar fitur berikutnya dicatat di [status proyek](../docs/PROJECT_STATUS.md).
 
 ## Build lokal (nanti, kalau sudah ada Android Studio/PC)
 
@@ -47,25 +39,6 @@ unknown apps" sekali untuk app yang dipakai membukanya).
 
 ## Struktur
 
-```
-android/
-├── app/
-│   ├── build.gradle.kts
-│   └── src/
-│       ├── main/
-│       │   ├── AndroidManifest.xml
-│       │   ├── java/com/mefuturesaibot/app/
-│       │   │   ├── MainActivity.kt
-│       │   │   └── exchange/
-│       │   │       ├── Signer.kt
-│       │   │       └── ReconnectingWebSocket.kt
-│       │   └── res/
-│       └── test/
-│           └── java/com/mefuturesaibot/app/exchange/
-│               ├── SignerTest.kt
-│               ├── BackoffCalculatorTest.kt
-│               └── OkHttpSingletonTest.kt
-├── build.gradle.kts   (root)
-├── settings.gradle.kts
-└── gradle.properties
-```
+Kode layanan dan layar utama ada di `app/src/main/java/com/mefuturesaibot/app/`.
+Subfolder `exchange/` berisi penandatanganan permintaan, koneksi WebSocket,
+dan pembacaan harga. Tes JVM ada di `app/src/test/`.

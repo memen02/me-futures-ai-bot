@@ -49,7 +49,7 @@ class AndroidHandlerScheduler(looper: Looper = Looper.getMainLooper()) : Schedul
 class ReconnectingWebSocket(
     private val url: String,
     // Singleton OkHttpClient (audit 2026-11-08 #5) -- lihat OkHttpSingletonTest.kt.
-    private val client: OkHttpClient = sharedHttpClient,
+    private val client: WebSocket.Factory = sharedHttpClient,
     private val onStatusChange: (ConnectionStatus) -> Unit = {},
     private val onMessage: (String) -> Unit = {},
     private val scheduler: Scheduler = AndroidHandlerScheduler(),
@@ -58,66 +58,68 @@ class ReconnectingWebSocket(
 
     private var webSocket: WebSocket? = null
     private var attempt = 0
-    private var closedByUser = false
+    // connect(), close() dan semua mutasi status berjalan di thread utama Service.
+    // Listener OkHttp hanya mengantrekan pekerjaan ke thread tersebut.
+    private var session = 0L
 
     fun connect() {
-        closedByUser = false
-        postStatus(if (attempt == 0) ConnectionStatus.CONNECTING else ConnectionStatus.RECONNECTING)
+        if (webSocket != null) return
+        scheduler.cancelAll()
+        val currentSession = ++session
+        onStatusChange(if (attempt == 0) ConnectionStatus.CONNECTING else ConnectionStatus.RECONNECTING)
 
         val request = Request.Builder().url(url).build()
-        webSocket = client.newWebSocket(
-            request,
-            object : WebSocketListener() {
-                override fun onOpen(webSocket: WebSocket, response: Response) {
+        webSocket = client.newWebSocket(request, object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                withActiveSocket(webSocket) {
                     attempt = 0
-                    postStatus(ConnectionStatus.CONNECTED)
+                    onStatusChange(ConnectionStatus.CONNECTED)
                 }
+            }
 
-                override fun onMessage(webSocket: WebSocket, text: String) {
-                    scheduler.post { onMessage(text) }
-                }
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                withActiveSocket(webSocket) { onMessage(text) }
+            }
 
-                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                    postStatus(ConnectionStatus.DISCONNECTED)
-                    if (!closedByUser) scheduleReconnect()
-                }
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                webSocket.close(1000, null)
+            }
 
-                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                    postStatus(ConnectionStatus.DISCONNECTED)
-                    if (!closedByUser) scheduleReconnect()
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                disconnected(webSocket)
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                disconnected(webSocket)
+            }
+
+            private fun disconnected(socket: WebSocket) {
+                withActiveSocket(socket) {
+                    this@ReconnectingWebSocket.webSocket = null
+                    onStatusChange(ConnectionStatus.DISCONNECTED)
+                    val delayMs = computeBackoffMs(attempt++)
+                    onStatusChange(ConnectionStatus.RECONNECTING)
+                    scheduler.postDelayed(delayMs) {
+                        if (session == currentSession) connect()
+                    }
                 }
-            },
-        )
+            }
+        })
     }
 
-    private fun scheduleReconnect() {
-        val delayMs = computeBackoffMs(attempt)
-        attempt += 1
-        postStatus(ConnectionStatus.RECONNECTING)
-        // PERBAIKAN (audit 2026-11-10 #2): dulu di sini langsung `{ connect() }` tanpa
-        // syarat -- kalau close() dipanggil SETELAH reconnect ini terjadwal tapi
-        // SEBELUM delay-nya habis, dulu connect() tetap jalan (bikin koneksi zombie).
-        // Sekarang double-protected: scheduler.cancelAll() di close() membatalkan
-        // callback ini sebelum sempat jalan, DAN kalaupun lolos (race condition),
-        // guard closedByUser di bawah ini mencegahnya benar-benar connect ulang.
-        scheduler.postDelayed(delayMs) {
-            if (!closedByUser) connect()
+    private fun withActiveSocket(source: WebSocket, action: () -> Unit) {
+        scheduler.post {
+            if (webSocket === source) action()
         }
     }
 
-    private fun postStatus(status: ConnectionStatus) {
-        scheduler.post { onStatusChange(status) }
-    }
-
-    /**
-     * Panggil saat Activity/Service berhenti. PERBAIKAN (audit 2026-11-10 #2):
-     * sekarang membatalkan reconnect yang mungkin sudah terjadwal lewat
-     * `scheduler.cancelAll()` -- dulu tidak, lihat catatan di scheduleReconnect().
-     */
     fun close() {
-        closedByUser = true
+        session++
+        attempt = 0
+        val closing = webSocket
+        webSocket = null
         scheduler.cancelAll()
-        webSocket?.close(1000, "Ditutup oleh pengguna")
+        closing?.close(1000, "Ditutup oleh pengguna")
     }
 
     companion object {

@@ -13,9 +13,10 @@ trading.
 ## Status Proyek
 
 **Pivot arsitektur (2026-11-07)**: dari "backend Node.js/Termux + APK
-terpisah" menjadi **satu app Android Kotlin mandiri**. Baru fondasi
-(`android/` berisi skeleton Gradle + 1 Activity minimal, BELUM PERNAH
-di-compile oleh siapa pun — verifikasi pertama lewat GitHub Actions).
+terpisah" menjadi **satu app Android Kotlin mandiri**. Aplikasi sudah memiliki layanan pemantauan BTC/USDT,
+tombol Start/Stop, dan opsi mulai otomatis setelah reboot. GitHub Actions
+menjalankan unit test dan membuat APK debug. Pengujian perubahan terbaru
+di HP masih tertunda. Fitur pengiriman order belum tersedia.
 Lihat [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) untuk status
 lengkap & alasan perubahan, dan [`docs/PROJECT_MASTER.md`](docs/PROJECT_MASTER.md)
 untuk arsitektur/fitur (sebagian besar masih berlaku, cuma bahasa
@@ -33,7 +34,7 @@ docs/      Dokumentasi master proyek
 
 Karena tidak pakai PC/Termux, APK dibangun lewat GitHub Actions:
 
-1. Push repo ini ke GitHub (lihat `docs/PROJECT_STATUS.md` untuk 7 langkah setupnya).
+1. Pilih cabang yang ingin diuji di GitHub.
 2. Cek tab **Actions** di github.com — workflow **Android Build**.
 3. Unduh APK dari hasil build (artifact `me-futures-ai-bot-debug-apk`), install manual di HP.
 

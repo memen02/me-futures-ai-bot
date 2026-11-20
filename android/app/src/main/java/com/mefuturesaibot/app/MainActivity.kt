@@ -9,6 +9,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
@@ -27,6 +31,7 @@ class MainActivity : Activity() {
     private lateinit var statusView: TextView
     private lateinit var dataView: TextView
     private val pollHandler = Handler(Looper.getMainLooper())
+    private val quoteTime = DateTimeFormatter.ofPattern("dd/MM HH:mm:ss").withZone(ZoneId.systemDefault())
     private val pollIntervalMs = 500L
     // PERBAIKAN audit-mandiri: dulu status "Dihentikan" dideteksi dengan membandingkan
     // isi TextView (statusView.text != "Dihentikan") -- rapuh, karena getText()
@@ -163,12 +168,26 @@ class MainActivity : Activity() {
     }
 
     private fun refreshStatusText() {
-        if (!BotForegroundService.isRunning) {
+        if (userRequestedStop || !BotForegroundService.isRunning) {
+            dataView.text = ""
             statusView.text = if (userRequestedStop) "Dihentikan" else "Belum dimulai"
             return
         }
         statusView.text = describeStatus(BotForegroundService.latestStatus)
-        dataView.text = BotForegroundService.latestMessage
+        val quote = BotForegroundService.latestQuote
+        dataView.text = if (quote == null) {
+            "Menunggu harga BTC/USDT"
+        } else {
+            val updated = quoteTime.format(Instant.ofEpochMilli(quote.eventTimeMs))
+            val stale = quote.isStale(SystemClock.elapsedRealtime(), System.currentTimeMillis())
+            listOfNotNull(
+                if (stale) "Data kedaluwarsa" else null,
+                "BTC/USDT",
+                "Bid (beli tertinggi)  ${quote.bid}",
+                "Ask (jual terendah)  ${quote.ask}",
+                "Pembaruan bursa  $updated",
+            ).joinToString("\n")
+        }
     }
 
     private fun ensureNotificationPermission() {

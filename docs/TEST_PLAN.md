@@ -71,3 +71,16 @@ dari pesan error build Gradle sungguhan, dicatat di `CHANGELOG.md`.
 - **Integration test** — terhadap Binance Futures **Testnet**, bukan live.
 - **Backtest / out-of-sample / walk-forward** — sebelum parameter strategi baru dipakai live (Fase 7).
 - **Paper trading** — simulasi penuh tanpa order sungguhan, sebagai jembatan sebelum Testnet.
+
+## Uji pemantauan di HP
+
+Hasil untuk revisi ini masih tertunda. Catat versi Android, model HP, commit APK,
+dan hasil tiap skenario. Gunakan stream publik BTC/USDT.
+
+| Langkah | Hasil yang diharapkan |
+|---|---|
+| Tekan Start, tunggu bid dan ask, lalu tekan Stop. | Notifikasi hilang, angka harga bersih, dan layar tetap menampilkan Dihentikan. |
+| Matikan jaringan saat harga tampil. Tekan Stop saat aplikasi mencoba menyambung ulang, lalu nyalakan jaringan. | Harga lama ditandai kedaluwarsa sebelum Stop. Notifikasi dan koneksi tetap berhenti sesudah jaringan pulih. |
+| Tekan Start, pindahkan jaringan Wi-Fi ke seluler. | Harga lama ditandai kedaluwarsa hingga pembaruan baru diterima. |
+| Kunci layar, tunggu satu menit, lalu buka aplikasi. | Status dan waktu harga sesuai koneksi. Tombol Stop tetap berfungsi. |
+| Aktifkan Auto Start saat layanan berjalan, lalu reboot dan buka kunci HP. Ulangi setelah menekan Stop. | Layanan dilanjutkan pada percobaan pertama dan tetap berhenti pada percobaan kedua. |

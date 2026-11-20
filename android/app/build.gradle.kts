@@ -45,5 +45,6 @@ android {
 // butuh emulator, jalan di JVM biasa.
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
+    testImplementation("org.json:json:20240303")
     testImplementation("junit:junit:4.13.2")
 }
