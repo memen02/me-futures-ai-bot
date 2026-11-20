@@ -1,0 +1,14 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:paddingHorizontal="16dp" android:paddingTop="14dp">
+    <TextView style="@style/DeskTitle" android:text="Scanner pasar"/>
+    <TextView style="@style/DashLabel" android:text="Binance USDⓈ-M  /  Perpetual  /  24 jam"/>
+    <TextView android:id="@+id/scan_state" style="@style/DashHeading" android:layout_marginTop="12dp" android:textSize="16sp"/>
+    <Button android:id="@+id/scan_start" style="@style/DeskAction" android:text="Mulai scanner"/>
+    <EditText android:id="@+id/scan_query" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:singleLine="true" android:inputType="textNoSuggestions" android:hint="Cari simbol, mis. ETH" android:textSize="15sp"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+        <Spinner android:id="@+id/scan_filter" android:layout_width="0dp" android:layout_weight="1" android:layout_height="48dp" android:contentDescription="Filter kontrak"/>
+        <Spinner android:id="@+id/scan_sort" android:layout_width="0dp" android:layout_weight="1" android:layout_height="48dp" android:contentDescription="Urutkan kontrak"/>
+    </LinearLayout>
+    <TextView android:id="@+id/scan_count" style="@style/DashLabel" android:paddingVertical="6dp"/>
+    <ListView android:id="@+id/scan_list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:divider="#2A3037" android:dividerHeight="1dp"/>
+</LinearLayout>

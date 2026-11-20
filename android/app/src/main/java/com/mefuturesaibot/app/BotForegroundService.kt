@@ -1,6 +1,9 @@
 package com.mefuturesaibot.app
 
 import android.app.Notification
+import com.mefuturesaibot.app.scanner.DeskStore
+import com.mefuturesaibot.app.scanner.MarketScanner
+import com.mefuturesaibot.app.scanner.Scan
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -39,12 +42,14 @@ class BotForegroundService : Service() {
 
     private val candleSync by lazy { CandleHistorySync(clock = exchangeClock) { latestHistory = it } }
     private var reconnecting = false
+    private var scanner: MarketScanner? = null
 
     override fun onCreate() {
         super.onCreate()
         exchangeClock = ExchangeClock()
         latestHistory = CandleHistory()
         latestQuote = null
+        latestScan = Scan()
         latestStatus = ReconnectingWebSocket.ConnectionStatus.CONNECTING
         isRunning = true
         ensureNotificationChannel()
@@ -77,6 +82,9 @@ class BotForegroundService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+        scanner?.close()
+        scanner = null
+        latestScan = Scan()
         candleSync.stop()
         socket?.close()
         socket = null
@@ -87,6 +95,9 @@ class BotForegroundService : Service() {
 
     private fun stopEverything() {
         BotPreferences.setShouldRun(this, false)
+        scanner?.close()
+        scanner = null
+        latestScan = Scan()
         candleSync.stop()
         socket?.close()
         socket = null
@@ -96,6 +107,7 @@ class BotForegroundService : Service() {
     }
 
     private fun connectSocket() {
+        scanner = MarketScanner(DeskStore(this)) { latestScan = it }.also { it.start() }
         candleSync.start()
         socket = ReconnectingWebSocket(
             url = ReconnectingWebSocket.BTC_BOOK_TICKER_URL,
@@ -195,6 +207,9 @@ class BotForegroundService : Service() {
             private set
 
         @Volatile var latestHistory = CandleHistory()
+            private set
+
+        @Volatile internal var latestScan = Scan()
             private set
 
         @Volatile var latestQuote: BookQuote? = null
