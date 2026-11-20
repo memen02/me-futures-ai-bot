@@ -20,8 +20,8 @@
 - [ ] Database: Room (SQLite Android) sebagai pengganti `better-sqlite3`/`sql.js` yang dulu direncanakan untuk Node.js.
 
 ## Belum dibuat sama sekali
-- [ ] REST client Kotlin (signed request) -- baru ada WS, belum ada REST.
-- [ ] Data layer (symbol registry, candle store) -- porting logic dari `backend/src/data/`.
+- [ ] REST client Kotlin (signed request) -- REST publik untuk riwayat BTC/USDT sudah tersedia.
+- [ ] Data layer lanjutan (symbol registry dan riwayat multi-simbol) -- porting logic dari `backend/src/data/`.
 - [ ] Penyimpanan API Key terenkripsi (Android Keystore/EncryptedSharedPreferences).
 - [ ] Battery optimization exemption -- diminta otomatis dari dalam app (saat ini cuma panduan manual dari percakapan lama, belum ada kode).
 

@@ -20,12 +20,13 @@ APK monitor terpisah" menjadi **satu aplikasi Android Kotlin mandiri**
 | Build Android | Unit test JVM dan build APK debug lulus untuk commit `dad1ed1`. [Hasil build](https://github.com/memen02/me-futures-ai-bot/actions/runs/44701605795). |
 | Koneksi pasar | WebSocket memakai backoff dan satu OkHttpClient. Tes kelas asli mencakup Stop, callback terlambat, pembatalan reconnect, dan reconnect normal. |
 | Tampilan BTC/USDT | Menampilkan bid, ask, dan waktu bursa. Tes memeriksa pembacaan harga, data tidak valid, dan kedaluwarsa. |
+| Riwayat BTC/USDT | REST publik `GET /fapi/v1/klines` memuat 120 candle tertutup 1 menit. Data disimpan di RAM selama layanan berjalan dan dimuat ulang saat Start. |
 | Layanan dan reboot | Foreground Service memegang koneksi. BootReceiver memeriksa Auto Start dan pilihan Start/Stop terakhir pengguna. Perilaku sistem Android perlu diuji di HP. |
 | Penandatanganan | Signer Kotlin menyediakan HMAC-SHA256 dengan unit test. |
 
 ## Yang BELUM dibangun sama sekali
 
-REST client Kotlin, symbol registry, candle store, indikator, signal engine,
+REST untuk akun Binance, symbol registry, penyimpanan candle lintas sesi, indikator, signal engine,
 risk management, order execution, TP/SL, anti-duplicate, penyimpanan API Key,
 battery optimization exemption otomatis, LIVE MODE lock di
 Kotlin, paper trading, jurnal/PnL, dashboard lengkap. Rincian lengkap:
@@ -46,6 +47,5 @@ tetap relevan untuk diimplementasikan nanti.
 
 ## Berikutnya
 
-Roadmap F (lihat `AUDIT_REPORT.md`): uji layanan dan reboot di HP, lalu REST client Kotlin
-(pakai `Signer.kt` yang sudah teruji), data layer, penyimpanan API Key --
-tetap satu-satu, diuji & dites device tiap langkah.
+Uji layanan, reboot, dan pemulihan candle di HP. Setelah riwayat terverifikasi,
+lanjutkan ke indikator dan pengujian pada candle tertutup.
