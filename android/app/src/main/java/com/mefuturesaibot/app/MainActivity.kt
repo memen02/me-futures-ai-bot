@@ -110,6 +110,11 @@ class MainActivity : Activity() {
         // tetap jalan walau Activity ditutup. Berhenti HANYA lewat tombol Stop.
     }
 
+    override fun onDestroy() {
+        desk.close()
+        super.onDestroy()
+    }
+
     private fun onStartClicked() {
         // Catatan: permintaan izin notifikasi sudah dipindah ke onCreate() (lihat
         // komentar di sana) -- tidak diulang di sini supaya tidak memunculkan
