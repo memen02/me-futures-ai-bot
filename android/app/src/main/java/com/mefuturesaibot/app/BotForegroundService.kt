@@ -9,6 +9,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.SystemClock
+import com.mefuturesaibot.app.exchange.CandleHistory
+import com.mefuturesaibot.app.exchange.CandleHistorySync
 import com.mefuturesaibot.app.exchange.BookQuote
 import android.os.IBinder
 import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
@@ -34,8 +36,12 @@ class BotForegroundService : Service() {
 
     private var socket: ReconnectingWebSocket? = null
 
+    private val candleSync = CandleHistorySync { latestHistory = it }
+    private var reconnecting = false
+
     override fun onCreate() {
         super.onCreate()
+        latestHistory = CandleHistory()
         latestQuote = null
         latestStatus = ReconnectingWebSocket.ConnectionStatus.CONNECTING
         isRunning = true
@@ -69,6 +75,7 @@ class BotForegroundService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+        candleSync.stop()
         socket?.close()
         socket = null
         super.onDestroy()
@@ -78,6 +85,7 @@ class BotForegroundService : Service() {
 
     private fun stopEverything() {
         BotPreferences.setShouldRun(this, false)
+        candleSync.stop()
         socket?.close()
         socket = null
         isRunning = false
@@ -86,11 +94,17 @@ class BotForegroundService : Service() {
     }
 
     private fun connectSocket() {
+        candleSync.start()
         socket = ReconnectingWebSocket(
             url = "wss://fstream.binance.com/public/stream?streams=btcusdt@bookTicker",
             onStatusChange = { status ->
                 if (status != ReconnectingWebSocket.ConnectionStatus.CONNECTED) {
                     latestQuote = latestQuote?.copy(disconnected = true)
+                }
+                if (status == ReconnectingWebSocket.ConnectionStatus.DISCONNECTED) reconnecting = true
+                if (reconnecting && status == ReconnectingWebSocket.ConnectionStatus.CONNECTED) {
+                    reconnecting = false
+                    candleSync.refresh()
                 }
                 latestStatus = status
                 updateNotification(status)
@@ -173,6 +187,9 @@ class BotForegroundService : Service() {
             private set
 
         @Volatile var latestStatus: ReconnectingWebSocket.ConnectionStatus = ReconnectingWebSocket.ConnectionStatus.CONNECTING
+            private set
+
+        @Volatile var latestHistory = CandleHistory()
             private set
 
         @Volatile var latestQuote: BookQuote? = null

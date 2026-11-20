@@ -1,6 +1,7 @@
 package com.mefuturesaibot.app
 
 import android.Manifest
+import android.app.AlertDialog
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -17,6 +18,7 @@ import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ScrollView
 import android.widget.Switch
 import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
 
@@ -29,6 +31,7 @@ import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
  */
 class MainActivity : Activity() {
     private lateinit var statusView: TextView
+    private lateinit var historyButton: Button
     private lateinit var dataView: TextView
     private val pollHandler = Handler(Looper.getMainLooper())
     private val quoteTime = DateTimeFormatter.ofPattern("dd/MM HH:mm:ss").withZone(ZoneId.systemDefault())
@@ -81,6 +84,11 @@ class MainActivity : Activity() {
             setPadding(48, 0, 48, 24)
         }
 
+        historyButton = Button(this).apply {
+            visibility = android.view.View.GONE
+            setOnClickListener { showCandleHistory() }
+        }
+
         val startButton = Button(this).apply {
             text = "Start"
             setOnClickListener { onStartClicked() }
@@ -114,11 +122,15 @@ class MainActivity : Activity() {
             addView(captionView)
             addView(statusView)
             addView(dataView)
+            addView(historyButton)
             addView(autoStartSwitch)
             addView(buttonRow)
         }
 
-        setContentView(root)
+        setContentView(ScrollView(this).apply {
+            isFillViewport = true
+            addView(root)
+        })
 
         // PERBAIKAN (audit 2026-11-13): dulu izin notifikasi diminta di dalam
         // onStartClicked(), TEPAT SEBELUM startForegroundService() -- padahal
@@ -163,16 +175,23 @@ class MainActivity : Activity() {
             )
         }
 
+        historyButton.visibility = android.view.View.GONE
         statusView.text = "Dihentikan"
         dataView.text = ""
     }
 
     private fun refreshStatusText() {
         if (userRequestedStop || !BotForegroundService.isRunning) {
+            historyButton.visibility = android.view.View.GONE
             dataView.text = ""
             statusView.text = if (userRequestedStop) "Dihentikan" else "Belum dimulai"
             return
         }
+        val history = BotForegroundService.latestHistory
+        historyButton.visibility = android.view.View.VISIBLE
+        historyButton.isEnabled = history.candles.isNotEmpty()
+        historyButton.text = if (history.candles.isEmpty()) history.status else
+            "${history.status} · ${history.candles.size} candle 1 menit"
         statusView.text = describeStatus(BotForegroundService.latestStatus)
         val quote = BotForegroundService.latestQuote
         dataView.text = if (quote == null) {
@@ -188,6 +207,28 @@ class MainActivity : Activity() {
                 "Pembaruan bursa  $updated",
             ).joinToString("\n")
         }
+    }
+
+    private fun showCandleHistory() {
+        val candles = BotForegroundService.latestHistory.candles.asReversed()
+        val rows = candles.map { candle ->
+            val time = quoteTime.format(Instant.ofEpochMilli(candle.openTime))
+            "$time  ·  Tutup ${candle.close}"
+        }
+        AlertDialog.Builder(this)
+            .setTitle("BTC/USDT · Candle tertutup 1 menit")
+            .setItems(rows.toTypedArray()) { _, index ->
+                val candle = candles[index]
+                val time = quoteTime.format(Instant.ofEpochMilli(candle.openTime))
+                AlertDialog.Builder(this)
+                    .setTitle("BTC/USDT · $time")
+                    .setMessage("Buka ${candle.open}\nTinggi ${candle.high}\nRendah ${candle.low}\n" +
+                        "Tutup ${candle.close}\nVolume ${candle.volume} BTC")
+                    .setPositiveButton("Tutup", null)
+                    .show()
+            }
+            .setPositiveButton("Tutup", null)
+            .show()
     }
 
     private fun ensureNotificationPermission() {

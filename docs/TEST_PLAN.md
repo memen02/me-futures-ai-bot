@@ -84,3 +84,14 @@ dan hasil tiap skenario. Gunakan stream publik BTC/USDT.
 | Tekan Start, pindahkan jaringan Wi-Fi ke seluler. | Harga lama ditandai kedaluwarsa hingga pembaruan baru diterima. |
 | Kunci layar, tunggu satu menit, lalu buka aplikasi. | Status dan waktu harga sesuai koneksi. Tombol Stop tetap berfungsi. |
 | Aktifkan Auto Start saat layanan berjalan, lalu reboot dan buka kunci HP. Ulangi setelah menekan Stop. | Layanan dilanjutkan pada percobaan pertama dan tetap berhenti pada percobaan kedua. |
+
+### Uji riwayat candle BTC/USDT
+
+1. Tekan Start dan buka **Riwayat tersinkron**. Periksa 120 candle 1 menit.
+   Daftar menampilkan waktu buka di zona waktu HP, terbaru di atas. Ketuk
+   satu candle untuk melihat harga buka, tertinggi, terendah, tutup, serta volume.
+2. Catat waktu candle terakhir dan tutup daftar. Matikan jaringan selama tiga
+   menit, lalu sambungkan lagi dan buka ulang daftar setelah sinkronisasi.
+   Periksa urutan menit sebelum, selama, dan sesudah putus. Setiap menit muncul sekali.
+3. Tekan Stop, tunggu satu menit, lalu Start. Riwayat dimuat ulang. Jika bursa
+   menolak akses, catat kode HTTP yang tampil dan versi Android.
