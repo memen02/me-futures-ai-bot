@@ -34,7 +34,7 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".MainActivity" android:exported="false" />
+        <activity android:name=".MainActivity" android:theme="@style/DashboardTheme" android:exported="false" />
 
         <service
             android:name=".BotForegroundService"

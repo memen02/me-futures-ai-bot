@@ -1,0 +1,30 @@
+<resources>
+    <style name="DashboardTheme" parent="StartupBase">
+        <item name="android:colorAccent">#FF8655</item>
+    </style>
+    <style name="DashPanel">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">12dp</item>
+        <item name="android:padding">16dp</item>
+        <item name="android:background">@drawable/dashboard_panel</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+    <style name="DashLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">#C0C6D0</item>
+    </style>
+    <style name="DashHeading" parent="DashLabel">
+        <item name="android:textColor">#F7F1E9</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    <style name="DashPrice" parent="DashHeading">
+        <item name="android:fontFamily">sans-serif-condensed</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">23sp</item>
+        <item name="android:text">—</item>
+    </style>
+</resources>

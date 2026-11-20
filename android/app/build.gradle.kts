@@ -23,6 +23,8 @@ android {
         resValue("string", "build_identity", "Versi 0.2.0 · Build $build")
     }
 
+    testOptions.unitTests.isIncludeAndroidResources = true
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -51,4 +53,5 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
     testImplementation("org.json:json:20240303")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.15.1")
 }

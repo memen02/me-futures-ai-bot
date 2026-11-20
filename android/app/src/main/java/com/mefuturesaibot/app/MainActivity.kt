@@ -5,7 +5,6 @@ import android.app.AlertDialog
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Typeface
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -15,12 +14,13 @@ import android.os.SystemClock
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import android.view.Gravity
+import android.view.View
 import android.widget.Button
-import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.ScrollView
 import android.widget.Switch
+import com.mefuturesaibot.app.exchange.BookQuote
+import com.mefuturesaibot.app.exchange.CandleHistory
+import com.mefuturesaibot.app.exchange.ExchangeClock
 import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
 import com.mefuturesaibot.app.exchange.SmaSignal
 import com.mefuturesaibot.app.exchange.SignalSide
@@ -38,7 +38,13 @@ class MainActivity : Activity() {
     private lateinit var signalDetails: TextView
     private lateinit var statusView: TextView
     private lateinit var historyButton: Button
-    private lateinit var dataView: TextView
+    private lateinit var bidView: TextView
+    private lateinit var askView: TextView
+    private lateinit var quoteTimeView: TextView
+    private lateinit var historyStatusView: TextView
+    private lateinit var chart: ClosePriceChart
+    private lateinit var chartKey: TextView
+    private lateinit var smaPanel: View
     private val pollHandler = Handler(Looper.getMainLooper())
     private val quoteTime = DateTimeFormatter.ofPattern("dd/MM HH:mm:ss").withZone(ZoneId.systemDefault())
     private val pollIntervalMs = 500L
@@ -58,116 +64,34 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val titleView = TextView(this).apply {
-            text = getString(R.string.app_name)
-            textSize = 22f
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#0F172A"))
-            setPadding(32, 32, 32, 2)
-        }
-
-        val buildView = TextView(this).apply {
-            text = getString(R.string.build_identity)
-            gravity = Gravity.CENTER
-            textSize = 12f
-            setTextColor(Color.parseColor("#475569"))
-            setPadding(32, 0, 32, 24)
-        }
-        signalDetails = TextView(this).apply {
-            textSize = 14f
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#334155"))
-            setPadding(24, 0, 24, 18)
-        }
-        signalView = TextView(this).apply {
-            gravity = Gravity.CENTER
-            textSize = 24f
-            setTypeface(typeface, Typeface.BOLD)
-        }
-        signalReason = TextView(this).apply {
-            gravity = Gravity.CENTER
-            textSize = 14f
-            setTextColor(Color.parseColor("#475569"))
-            setPadding(32, 4, 32, 20)
-        }
-        renderSignal(SmaSignal.waitFor("Tekan Start untuk memantau BTC/USDT"))
-
-        statusView = TextView(this).apply {
-            text = "Belum dimulai"
-            textSize = 16f
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#475569"))
-            setPadding(48, 0, 48, 16)
-        }
-
-        dataView = TextView(this).apply {
-            text = ""
-            textSize = 12f
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#0EA5E9"))
-            setPadding(48, 0, 48, 24)
-        }
-
-        historyButton = Button(this).apply {
-            visibility = android.view.View.GONE
-            setOnClickListener { showCandleHistory() }
-        }
-
-        val startButton = Button(this).apply {
-            text = "Start"
-            setOnClickListener { onStartClicked() }
-        }
-
-        val stopButton = Button(this).apply {
-            text = "Stop"
-            setOnClickListener { onStopClicked() }
-        }
-
-        val autoStartSwitch = Switch(this).apply {
-            text = "Auto Start setelah reboot"
+        setContentView(R.layout.activity_dashboard)
+        signalView = findViewById(R.id.dash_signal)
+        signalReason = findViewById(R.id.dash_reason)
+        signalDetails = findViewById(R.id.dash_sma_details)
+        smaPanel = findViewById(R.id.dash_sma_panel)
+        statusView = findViewById(R.id.dash_status)
+        bidView = findViewById(R.id.dash_bid)
+        askView = findViewById(R.id.dash_ask)
+        quoteTimeView = findViewById(R.id.dash_quote_time)
+        historyStatusView = findViewById(R.id.dash_history_status)
+        chart = findViewById(R.id.dash_chart)
+        chartKey = findViewById(R.id.dash_chart_key)
+        historyButton = findViewById(R.id.dash_history)
+        historyButton.setOnClickListener { showCandleHistory() }
+        findViewById<Button>(R.id.dash_start).setOnClickListener { onStartClicked() }
+        findViewById<Button>(R.id.dash_stop).setOnClickListener { onStopClicked() }
+        findViewById<Switch>(R.id.dash_auto_start).apply {
             isChecked = BotPreferences.isAutoStartEnabled(this@MainActivity)
-            setOnCheckedChangeListener { _, enabled ->
-                BotPreferences.setAutoStartEnabled(this@MainActivity, enabled)
-            }
+            setOnCheckedChangeListener { _, enabled -> BotPreferences.setAutoStartEnabled(this@MainActivity, enabled) }
         }
-
-        val buttonRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            addView(startButton)
-            addView(stopButton)
-        }
-
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(Color.WHITE)
-            addView(titleView)
-            addView(buildView)
-            addView(signalView)
-            addView(signalReason)
-            addView(signalDetails)
-            addView(statusView)
-            addView(dataView)
-            addView(historyButton)
-            addView(autoStartSwitch)
-            addView(buttonRow)
-        }
-
-        setContentView(ScrollView(this).apply {
-            isFillViewport = true
-            addView(root)
-        })
-
-        // PERBAIKAN (audit 2026-11-13): dulu izin notifikasi diminta di dalam
-        // onStartClicked(), TEPAT SEBELUM startForegroundService() -- padahal
-        // requestPermissions() itu asinkron (dialog sistem, tidak menunggu jawaban),
-        // jadi Service sempat jalan & memanggil startForeground() SEBELUM pengguna
-        // sempat menjawab dialognya. Hasilnya: pertama kali pakai, notifikasi
-        // kemungkinan tidak tampil (bukan crash, cuma membingungkan). Sekarang
-        // diminta di sini (saat app dibuka), supaya ada jeda alami sebelum
-        // pengguna sempat menekan Start.
+        userRequestedStop = savedInstanceState?.getBoolean("userRequestedStop") ?: false
+        refreshStatusText()
         ensureNotificationPermission()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean("userRequestedStop", userRequestedStop)
     }
 
     override fun onStart() {
@@ -202,33 +126,50 @@ class MainActivity : Activity() {
             )
         }
 
-        renderSignal(SmaSignal.waitFor("Pemantauan dihentikan"))
-        historyButton.visibility = android.view.View.GONE
-        statusView.text = "Dihentikan"
-        dataView.text = ""
+        refreshStatusText()
     }
 
     private fun refreshStatusText() {
         if (userRequestedStop || !BotForegroundService.isRunning) {
             renderSignal(SmaSignal.waitFor(if (userRequestedStop) "Pemantauan dihentikan" else "Tekan Start untuk memantau BTC/USDT"))
-            historyButton.visibility = android.view.View.GONE
-            dataView.text = ""
-            statusView.text = if (userRequestedStop) "Dihentikan" else "Belum dimulai"
+            statusView.text = if (userRequestedStop) "Pemantauan dihentikan" else "Pemantauan belum dimulai"
+            bidView.text = "—"
+            askView.text = "—"
+            quoteTimeView.text = "Belum ada pembaruan harga"
+            historyStatusView.text = "Belum ada data candle"
+            historyButton.visibility = View.GONE
+            chart.show(emptyList())
+            chart.visibility = View.GONE
+            chartKey.visibility = View.GONE
             return
         }
-        val history = BotForegroundService.latestHistory
-        historyButton.visibility = android.view.View.VISIBLE
+        renderMarket(BotForegroundService.latestStatus, BotForegroundService.latestQuote,
+            BotForegroundService.latestHistory, BotForegroundService.exchangeClock, SystemClock.elapsedRealtime())
+    }
+
+    internal fun renderMarket(
+        connection: ReconnectingWebSocket.ConnectionStatus,
+        quote: BookQuote?,
+        history: CandleHistory,
+        clock: ExchangeClock,
+        elapsed: Long,
+    ) {
+        historyButton.visibility = View.VISIBLE
         historyButton.isEnabled = history.candles.isNotEmpty()
-        val connection = BotForegroundService.latestStatus
-        val quote = BotForegroundService.latestQuote
-        val elapsed = SystemClock.elapsedRealtime()
-        val stale = quote?.isStale(elapsed, BotForegroundService.exchangeClock) ?: true
-        val exchangeTime = if (connection == ReconnectingWebSocket.ConnectionStatus.CONNECTED && quote != null && !stale)
-            BotForegroundService.exchangeClock.at(elapsed) else null
+        val stale = quote?.isStale(elapsed, clock) ?: true
+        val exchangeTime = if (connection == ReconnectingWebSocket.ConnectionStatus.CONNECTED && !stale)
+            clock.at(elapsed) else null
         val historyStatus = history.statusAt(exchangeTime)
         val lastOpen = history.candles.lastOrNull()?.openTime
-        historyButton.text = if (lastOpen == null) historyStatus else
-            "$historyStatus · ${history.candles.size} candle 1 menit\nTerakhir ${quoteTime.format(Instant.ofEpochMilli(lastOpen))}"
+        historyStatusView.text = if (lastOpen == null) historyStatus else {
+            val start = quoteTime.format(Instant.ofEpochMilli(history.candles.first().openTime))
+            val end = quoteTime.format(Instant.ofEpochMilli(lastOpen))
+            "$historyStatus · ${history.candles.size} × 1 menit\n$start — $end"
+        }
+        chart.show(history.candles)
+        chart.visibility = if (history.candles.isEmpty()) View.GONE else View.VISIBLE
+        chartKey.visibility = chart.visibility
+        chartKey.text = chart.rangeLabel
         statusView.text = describeStatus(connection)
         val signal = when {
             connection != ReconnectingWebSocket.ConnectionStatus.CONNECTED -> SmaSignal.waitFor("Menunggu koneksi pasar")
@@ -237,24 +178,20 @@ class MainActivity : Activity() {
             else -> history.signalAt(exchangeTime)
         }
         renderSignal(signal)
-        dataView.text = if (quote == null) {
+        bidView.text = quote?.bid ?: "—"
+        askView.text = quote?.ask ?: "—"
+        quoteTimeView.text = if (quote == null) {
             "Menunggu harga BTC/USDT"
         } else {
             val updated = quoteTime.format(Instant.ofEpochMilli(quote.eventTimeMs))
-            listOfNotNull(
-                if (stale) "Data kedaluwarsa" else null,
-                "BTC/USDT",
-                "Bid (beli tertinggi)  ${quote.bid}",
-                "Ask (jual terendah)  ${quote.ask}",
-                "Pembaruan bursa  $updated",
-            ).joinToString("\n")
+            if (stale) "Data kedaluwarsa · $updated" else "Pembaruan bursa · $updated"
         }
     }
 
     private fun renderSignal(signal: SmaSignal) {
-        signalView.text = "Sinyal · ${signal.side.name}"
+        signalView.text = signal.side.name
         signalReason.text = signal.reason
-        signalDetails.visibility = if (signal.intervals.isEmpty()) android.view.View.GONE else android.view.View.VISIBLE
+        smaPanel.visibility = if (signal.intervals.isEmpty()) View.GONE else View.VISIBLE
         signalDetails.text = signal.intervals.joinToString("\n\n") { interval ->
             val position = when {
                 interval.direction > 0 -> "di atas SMA"
@@ -266,9 +203,9 @@ class MainActivity : Activity() {
                 "Tutup ${interval.close.stripTrailingZeros().toPlainString()}   SMA 20 ${interval.sma.stripTrailingZeros().toPlainString()}"
         }
         val color = when (signal.side) {
-            SignalSide.WAIT -> "#744B10"
-            SignalSide.BUY -> "#11653F"
-            SignalSide.SELL -> "#9D2933"
+            SignalSide.WAIT -> "#FFD19C"
+            SignalSide.BUY -> "#82E5BE"
+            SignalSide.SELL -> "#FF9B8F"
         }
         signalView.setTextColor(Color.parseColor(color))
     }
@@ -305,7 +242,7 @@ class MainActivity : Activity() {
 
     private fun describeStatus(status: ReconnectingWebSocket.ConnectionStatus): String = when (status) {
         ReconnectingWebSocket.ConnectionStatus.CONNECTING -> "Menyambungkan..."
-        ReconnectingWebSocket.ConnectionStatus.CONNECTED -> "Tersambung \u2713 (via Foreground Service)"
+        ReconnectingWebSocket.ConnectionStatus.CONNECTED -> "WebSocket tersambung"
         ReconnectingWebSocket.ConnectionStatus.DISCONNECTED -> "Terputus, mencoba lagi..."
         ReconnectingWebSocket.ConnectionStatus.RECONNECTING -> "Menyambung ulang..."
     }
