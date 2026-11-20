@@ -43,6 +43,7 @@ class MainActivity : Activity() {
     private lateinit var askView: TextView
     private lateinit var quoteTimeView: TextView
     private lateinit var historyStatusView: TextView
+    private lateinit var depth: DashboardDepth
     private lateinit var chart: ClosePriceChart
     private lateinit var chartKey: TextView
     private lateinit var smaPanel: View
@@ -77,11 +78,37 @@ class MainActivity : Activity() {
         historyStatusView = findViewById(R.id.dash_history_status)
         chart = findViewById(R.id.dash_chart)
         chartKey = findViewById(R.id.dash_chart_key)
+        depth = DashboardDepth(this)
+        val intervals = findViewById<android.widget.RadioGroup>(R.id.dash_interval)
+        intervals.check(R.id.dash_tf1)
+        intervals.setOnCheckedChangeListener { _, selected ->
+            chart.selectInterval(when (selected) {
+                R.id.dash_tf5 -> 5
+                R.id.dash_tf15 -> 15
+                else -> 1
+            })
+            chartKey.text = chart.rangeLabel
+        }
+        val home = findViewById<android.widget.ScrollView>(R.id.page_home)
+        for ((link, section) in listOf(R.id.jump_market to R.id.section_market,
+            R.id.jump_strategy to R.id.section_strategy, R.id.jump_watch to R.id.section_watch,
+            R.id.jump_risk to R.id.section_risk)) {
+            findViewById<View>(link).setOnClickListener {
+                val dest = findViewById<View>(section)
+                val bounds = android.graphics.Rect()
+                dest.getDrawingRect(bounds)
+                home.offsetDescendantRectToMyCoords(dest, bounds)
+                home.smoothScrollTo(0, bounds.top)
+            }
+        }
         historyButton = findViewById(R.id.dash_history)
         historyButton.setOnClickListener { showCandleHistory() }
         findViewById<Button>(R.id.scan_stop).setOnClickListener { onStopClicked() }
         desk = TradingDesk(this, savedInstanceState?.getInt("deskTab") ?: 0, ::onStartClicked)
-        desk.onTabSelected = ::refreshStatusText
+        desk.onTabSelected = {
+            if (desk.tab != 0) depth.clear()
+            refreshStatusText()
+        }
         userRequestedStop = savedInstanceState?.getBoolean("userRequestedStop") ?: false
         refreshStatusText()
         ensureNotificationPermission()
@@ -101,6 +128,7 @@ class MainActivity : Activity() {
     override fun onStop() {
         super.onStop()
         pollHandler.removeCallbacks(pollRunnable)
+        depth.clear()
         desk.releaseDisplayData()
         chart.show(emptyList())
         // SENGAJA TIDAK stopService() di sini -- itu intinya Foreground Service:
@@ -146,6 +174,7 @@ class MainActivity : Activity() {
             statusView.text = if (userRequestedStop) "Pemantauan dihentikan" else "Pemantauan belum dimulai"
             bidView.text = "—"
             askView.text = "—"
+            findViewById<TextView>(R.id.desk_spread).text = "Spread —"
             quoteTimeView.text = "Belum ada pembaruan harga"
             historyStatusView.text = "Belum ada data candle"
             historyButton.visibility = View.GONE
@@ -191,6 +220,10 @@ class MainActivity : Activity() {
         renderSignal(signal)
         bidView.text = quote?.bid ?: "—"
         askView.text = quote?.ask ?: "—"
+        findViewById<TextView>(R.id.desk_spread).text = if (quote == null) "Spread —" else {
+            val spread = quote.ask.toBigDecimal() - quote.bid.toBigDecimal()
+            "Spread ${spread.toPlainString()} USDT\nVolume bid ${quote.bidQuantity ?: "—"} · ask ${quote.askQuantity ?: "—"} BTC"
+        }
         quoteTimeView.text = if (quote == null) {
             "Menunggu harga BTC/USDT"
         } else {
@@ -218,7 +251,12 @@ class MainActivity : Activity() {
             SignalSide.BUY -> "#82E5BE"
             SignalSide.SELL -> "#FF9B8F"
         }
-        signalView.setTextColor(Color.parseColor(color))
+        val tint = Color.parseColor(color)
+        signalView.setTextColor(tint)
+        findViewById<TextView>(R.id.dash_signal_tag).apply {
+            text = signal.side.name
+            setTextColor(tint)
+        }
     }
 
     private fun showCandleHistory() {

@@ -4,73 +4,96 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Path
 import android.util.AttributeSet
 import android.view.View
 import com.mefuturesaibot.app.exchange.Candle
+import com.mefuturesaibot.app.exchange.CandleHistory
+import kotlin.math.max
+import kotlin.math.min
 
-/** One point per closed minute; the vertical scale spans this window's closing prices. */
+internal fun chartCandles(candles: List<Candle>, minutes: Int): List<Candle> {
+    require(minutes in listOf(1, 5, 15))
+    if (minutes == 1) return candles
+    val minute = CandleHistory.INTERVAL_MS
+    return candles.groupBy { it.openTime / (minute * minutes) }.mapNotNull { (bucket, group) ->
+        if (group.size != minutes || group.first().openTime != bucket * minute * minutes ||
+            group.last().openTime != (bucket + 1) * minute * minutes - minute) return@mapNotNull null
+        Candle(group.first().openTime, group.first().open, group.maxOf { it.high }, group.minOf { it.low },
+            group.last().close, group.sumOf { it.volume })
+    }
+}
+
 class ClosePriceChart(context: Context, attrs: AttributeSet) : View(context, attrs) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val line = Path()
-    private val fill = Path()
     private val dp = resources.displayMetrics.density
+    private val up = Color.rgb(47, 221, 159)
+    private val down = Color.rgb(255, 100, 133)
     private var source: List<Candle> = emptyList()
-    private var levels = DoubleArray(0)
+    private var bars: List<Candle> = emptyList()
+    private var high = 0.0
+    private var low = 0.0
+    private var volume = 0.0
+    private var minutes = 1
     var rangeLabel = ""
         private set
+
+    fun selectInterval(value: Int) {
+        if (minutes == value) return
+        minutes = value
+        rebuild()
+    }
 
     fun show(candles: List<Candle>) {
         if (source === candles) return
         source = candles
-        if (candles.isEmpty()) {
+        rebuild()
+    }
+
+    private fun rebuild() {
+        bars = chartCandles(source, minutes).takeLast(60)
+        if (bars.isEmpty()) {
             rangeLabel = ""
-            levels = DoubleArray(0)
+            contentDescription = null
         } else {
-            val low = candles.minOf { it.close }
-            val high = candles.maxOf { it.close }
-            val spread = (high - low).toDouble()
-            levels = DoubleArray(candles.size) { i ->
-                if (spread == 0.0) 0.5 else (candles[i].close - low).toDouble() / spread
-            }
-            rangeLabel = "Min ${low.stripTrailingZeros().toPlainString()}   ·   Maks ${high.stripTrailingZeros().toPlainString()}"
+            val top = bars.maxOf { it.high }
+            val bottom = bars.minOf { it.low }
+            high = top.toDouble()
+            low = bottom.toDouble()
+            volume = bars.maxOf { it.volume }.toDouble()
+            rangeLabel = "Min ${bottom.stripTrailingZeros().toPlainString()} · Maks ${top.stripTrailingZeros().toPlainString()} USDT"
+            contentDescription = "${bars.size} candle $minutes menit dan volume BTC. $rangeLabel"
         }
-        contentDescription = if (levels.isEmpty()) null else "Harga penutupan ${levels.size} candle satu menit. $rangeLabel USDT."
         invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (levels.isEmpty()) return
-        val inset = 4f * dp
-        val right = width - inset
-        val bottom = height - inset
-        if (right <= inset || bottom <= inset) return
-        paint.style = Paint.Style.STROKE
+        if (bars.isEmpty()) return
+        val pad = 4 * dp
+        val chartHeight = height * 0.73f
+        val step = (width - 2 * pad) / bars.size
+        val half = min(8 * dp, step * 0.34f)
+        fun y(price: Double) = if (high == low) pad + chartHeight / 2
+            else pad + chartHeight * ((high - price) / (high - low)).toFloat()
         paint.strokeWidth = dp
-        paint.color = Color.rgb(47, 56, 65)
-        for (y in listOf(inset, height / 2f, bottom)) canvas.drawLine(inset, y, right, y, paint)
-        line.reset()
-        var lastX = inset
-        var lastY = bottom
-        for (i in levels.indices) {
-            lastX = inset + (right - inset) * i / (levels.size - 1).coerceAtLeast(1)
-            lastY = bottom - (bottom - inset) * levels[i].toFloat()
-            if (i == 0) line.moveTo(lastX, lastY) else line.lineTo(lastX, lastY)
+        paint.color = Color.rgb(36, 63, 86)
+        for (i in 0..3) {
+            val level = pad + chartHeight * i / 3
+            canvas.drawLine(pad, level, width - pad, level, paint)
         }
-        fill.set(line)
-        fill.lineTo(lastX, bottom)
-        fill.lineTo(inset, bottom)
-        fill.close()
-        paint.style = Paint.Style.FILL
-        paint.color = Color.argb(25, 255, 134, 85)
-        canvas.drawPath(fill, paint)
-        paint.style = Paint.Style.STROKE
-        paint.strokeJoin = Paint.Join.ROUND
-        paint.strokeWidth = 2 * dp
-        paint.color = Color.rgb(255, 145, 91)
-        canvas.drawPath(line, paint)
-        paint.style = Paint.Style.FILL
-        canvas.drawCircle(lastX, lastY, 3 * dp, paint)
+        bars.forEachIndexed { index, bar ->
+            val x = pad + step * (index + 0.5f)
+            val open = y(bar.open.toDouble())
+            val close = y(bar.close.toDouble())
+            paint.color = if (bar.close >= bar.open) up else down
+            canvas.drawLine(x, y(bar.high.toDouble()), x, y(bar.low.toDouble()), paint)
+            canvas.drawRect(x - half, min(open, close), x + half, max(max(open, close), min(open, close) + dp), paint)
+            if (volume > 0) {
+                val h = (bar.volume.toDouble() / volume * height * 0.17).toFloat()
+                paint.alpha = 155
+                canvas.drawRect(x - half, height - pad - h, x + half, height - pad, paint)
+                paint.alpha = 255
+            }
+        }
     }
 }

@@ -58,6 +58,10 @@ class MarketDeskTest {
         assertNull(done.position)
         assertEquals(1002.8985, done.balance, 0.000001)
         assertEquals(1, done.trades)
+        assertEquals(1, done.ratedTrades)
+        assertEquals(done, PaperAccount.read(done.json()))
+        val legacy = done.json().apply { remove("rated"); remove("wins") }
+        assertEquals(0, PaperAccount.read(legacy).ratedTrades)
         assertEquals(done, PaperAccount.read(done.json()))
         assertEquals(open, PaperAccount.read(open.json()))
     }

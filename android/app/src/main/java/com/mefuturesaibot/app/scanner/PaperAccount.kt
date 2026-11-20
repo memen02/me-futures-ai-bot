@@ -20,13 +20,17 @@ internal data class PaperPosition(val symbol: String, val side: Int, val entry: 
     fun gross(price: Double) = side * NOTIONAL * (price / entry - 1)
     fun exitFee(price: Double) = NOTIONAL * price / entry * FEE
     companion object {
+        const val LOSS_LIMIT = 1.0
+        const val PROFIT_TARGET = 2.0
+        const val MAX_MINUTES = 30
         const val NOTIONAL = 100.0
         const val FEE = 0.0005
     }
 }
 
-internal data class PaperAccount(val balance: Double = 1000.0, val position: PaperPosition? = null,
-    val journal: List<String> = emptyList(), val lastAction: Long = 0L, val trades: Int = 0) {
+internal data class PaperAccount(val balance: Double = INITIAL_BALANCE, val position: PaperPosition? = null,
+    val journal: List<String> = emptyList(), val lastAction: Long = 0L, val trades: Int = 0,
+    val ratedTrades: Int = 0, val wins: Int = 0) {
 
     fun advance(scan: Scan, candidate: MarketRow?, enabled: Boolean): PaperAccount {
         if (!scan.ok || scan.time <= lastAction) return this
@@ -37,15 +41,16 @@ internal data class PaperAccount(val balance: Double = 1000.0, val position: Pap
             val gross = held.gross(t.price)
             val reason = when {
                 !enabled -> "simulasi dinonaktifkan"
-                gross <= -1 -> "batas rugi"
-                gross >= 2 -> "target laba"
-                scan.time - held.opened >= 1_800_000L -> "30 menit"
+                gross <= -PaperPosition.LOSS_LIMIT -> "batas rugi"
+                gross >= PaperPosition.PROFIT_TARGET -> "target laba"
+                scan.time - held.opened >= PaperPosition.MAX_MINUTES * 60_000L -> "30 menit"
                 else -> return this
             }
             val net = gross - held.exitFee(t.price) - PaperPosition.NOTIONAL * PaperPosition.FEE
             val event = "${scan.time}|Tutup ${held.symbol} · $reason · ${String.format(Locale.US, "%+.3f", net)} USDT"
             return copy(balance = balance + gross - held.exitFee(t.price), position = null,
-                journal = (listOf(event) + journal).take(75), trades = trades + 1, lastAction = scan.time)
+                journal = (listOf(event) + journal).take(75), trades = trades + 1, ratedTrades = ratedTrades + 1,
+                wins = wins + (if (net > 0) 1 else 0), lastAction = scan.time)
         }
         if (!enabled || balance < PaperPosition.NOTIONAL * (1 + PaperPosition.FEE) || candidate == null) return this
         val t = candidate.ticker ?: return this
@@ -60,18 +65,20 @@ internal data class PaperAccount(val balance: Double = 1000.0, val position: Pap
 
     fun json(): JSONObject {
         val out = JSONObject().put("balance", balance).put("last", lastAction).put("trades", trades).put("log", JSONArray(journal))
+            .put("rated", ratedTrades).put("wins", wins)
         position?.let { out.put("position", JSONObject().put("symbol", it.symbol).put("side", it.side).put("entry", it.entry).put("opened", it.opened)) }
         return out
     }
 
     companion object {
+        const val INITIAL_BALANCE = 1000.0
         fun read(data: JSONObject?): PaperAccount {
             if (data == null) return PaperAccount()
             val p = data.optJSONObject("position")
             val position = p?.let { PaperPosition(it.getString("symbol"), it.getInt("side"), it.getDouble("entry"), it.getLong("opened")) }
             val log = data.optJSONArray("log") ?: JSONArray()
             return PaperAccount(data.getDouble("balance"), position, (0 until log.length()).map { log.getString(it) },
-                data.optLong("last"), data.optInt("trades"))
+                data.optLong("last"), data.optInt("trades"), data.optInt("rated"), data.optInt("wins"))
         }
     }
 }
