@@ -18,6 +18,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
+        android:name=".maintenance.MeProjectApplication"
         android:allowBackup="true"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
@@ -44,6 +45,9 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Menjaga koneksi WebSocket tetap hidup untuk memantau data pasar Binance Futures secara kontinu demi asisten analisis trading pribadi; tidak ada tipe foreground service baku yang cocok untuk pemantauan berkelanjutan (dataSync dibatasi 6 jam/24 jam di Android 15+)." />
         </service>
+        <service android:name=".maintenance.CacheCleanupJob"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="true" />
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"

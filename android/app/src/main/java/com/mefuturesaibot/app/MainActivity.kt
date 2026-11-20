@@ -81,6 +81,7 @@ class MainActivity : Activity() {
         historyButton.setOnClickListener { showCandleHistory() }
         findViewById<Button>(R.id.scan_stop).setOnClickListener { onStopClicked() }
         desk = TradingDesk(this, savedInstanceState?.getInt("deskTab") ?: 0, ::onStartClicked)
+        desk.onTabSelected = ::refreshStatusText
         userRequestedStop = savedInstanceState?.getBoolean("userRequestedStop") ?: false
         refreshStatusText()
         ensureNotificationPermission()
@@ -94,12 +95,14 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
-        pollHandler.post(pollRunnable)
+        pollRunnable.run()
     }
 
     override fun onStop() {
         super.onStop()
         pollHandler.removeCallbacks(pollRunnable)
+        desk.releaseDisplayData()
+        chart.show(emptyList())
         // SENGAJA TIDAK stopService() di sini -- itu intinya Foreground Service:
         // tetap jalan walau Activity ditutup. Berhenti HANYA lewat tombol Stop.
     }
@@ -134,6 +137,10 @@ class MainActivity : Activity() {
 
     private fun refreshStatusText() {
         desk.update(BotForegroundService.latestScan, !userRequestedStop && BotForegroundService.isRunning)
+        if (desk.tab != 0) {
+            chart.show(emptyList())
+            return
+        }
         if (userRequestedStop || !BotForegroundService.isRunning) {
             renderSignal(SmaSignal.waitFor(if (userRequestedStop) "Pemantauan dihentikan" else "Mulai pemantauan dari tab Scanner"))
             statusView.text = if (userRequestedStop) "Pemantauan dihentikan" else "Pemantauan belum dimulai"
