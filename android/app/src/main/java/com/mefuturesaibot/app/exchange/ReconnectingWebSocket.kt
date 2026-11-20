@@ -123,6 +123,8 @@ class ReconnectingWebSocket(
     }
 
     companion object {
+        const val BTC_BOOK_TICKER_URL = "wss://fstream.binance.com/public/stream?streams=btcusdt@bookTicker"
+
         /**
          * OkHttpClient dibagi bersama untuk SELURUH proses app (lazy). Dipublikasikan
          * (bukan private) supaya bisa diperiksa langsung dari unit test. Lihat

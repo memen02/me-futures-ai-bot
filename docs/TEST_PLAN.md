@@ -95,3 +95,13 @@ dan hasil tiap skenario. Gunakan stream publik BTC/USDT.
    Periksa urutan menit sebelum, selama, dan sesudah putus. Setiap menit muncul sekali.
 3. Tekan Stop, tunggu satu menit, lalu Start. Riwayat dimuat ulang. Jika bursa
    menolak akses, catat kode HTTP yang tampil dan versi Android.
+
+### Layar pembuka ME Project
+
+1. Buka dari ikon elang. Pada jaringan yang bisa mengakses Binance, periksa
+   tiga centang sebelum dasbor terbuka. Pemantauan berkelanjutan dimulai lewat Start.
+2. Dengan internet mati, buka ulang aplikasi. Pemeriksaan berhenti setelah
+   20 detik. Pulihkan jaringan lalu coba lagi, atau buka dasbor secara manual.
+3. Pindah ke aplikasi lain saat pemeriksaan, lalu kembali. Pemeriksaan dimulai
+   kembali. Jika layanan pemantauan sedang aktif, periksa bahwa tombol Stop
+   tetap berfungsi setelah masuk ke dasbor.
