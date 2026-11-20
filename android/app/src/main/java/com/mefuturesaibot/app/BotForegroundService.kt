@@ -98,7 +98,7 @@ class BotForegroundService : Service() {
     private fun connectSocket() {
         candleSync.start()
         socket = ReconnectingWebSocket(
-            url = "wss://fstream.binance.com/public/stream?streams=btcusdt@bookTicker",
+            url = ReconnectingWebSocket.BTC_BOOK_TICKER_URL,
             onStatusChange = { status ->
                 if (status != ReconnectingWebSocket.ConnectionStatus.CONNECTED) {
                     latestQuote = latestQuote?.copy(disconnected = true)
