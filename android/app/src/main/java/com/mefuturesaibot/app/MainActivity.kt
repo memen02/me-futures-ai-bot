@@ -1,5 +1,6 @@
 package com.mefuturesaibot.app
 
+import com.mefuturesaibot.app.scanner.TradingDesk
 import android.Manifest
 import android.app.AlertDialog
 import android.app.Activity
@@ -33,6 +34,7 @@ import com.mefuturesaibot.app.exchange.SignalSide
  * ada tombol Start/Stop eksplisit -- service baru jalan kalau pengguna menekan Start.
  */
 class MainActivity : Activity() {
+    private lateinit var desk: TradingDesk
     private lateinit var signalView: TextView
     private lateinit var signalReason: TextView
     private lateinit var signalDetails: TextView
@@ -64,7 +66,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        setContentView(R.layout.activity_dashboard)
+        setContentView(R.layout.activity_trading_desk)
         signalView = findViewById(R.id.dash_signal)
         signalReason = findViewById(R.id.dash_reason)
         signalDetails = findViewById(R.id.dash_sma_details)
@@ -84,6 +86,7 @@ class MainActivity : Activity() {
             isChecked = BotPreferences.isAutoStartEnabled(this@MainActivity)
             setOnCheckedChangeListener { _, enabled -> BotPreferences.setAutoStartEnabled(this@MainActivity, enabled) }
         }
+        desk = TradingDesk(this, savedInstanceState?.getInt("deskTab") ?: 0, ::onStartClicked)
         userRequestedStop = savedInstanceState?.getBoolean("userRequestedStop") ?: false
         refreshStatusText()
         ensureNotificationPermission()
@@ -92,6 +95,7 @@ class MainActivity : Activity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean("userRequestedStop", userRequestedStop)
+        outState.putInt("deskTab", desk.tab)
     }
 
     override fun onStart() {
@@ -130,6 +134,7 @@ class MainActivity : Activity() {
     }
 
     private fun refreshStatusText() {
+        desk.update(BotForegroundService.latestScan, !userRequestedStop && BotForegroundService.isRunning)
         if (userRequestedStop || !BotForegroundService.isRunning) {
             renderSignal(SmaSignal.waitFor(if (userRequestedStop) "Pemantauan dihentikan" else "Tekan Start untuk memantau BTC/USDT"))
             statusView.text = if (userRequestedStop) "Pemantauan dihentikan" else "Pemantauan belum dimulai"
