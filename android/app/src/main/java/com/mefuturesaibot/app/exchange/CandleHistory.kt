@@ -12,7 +12,28 @@ data class Candle(
     val volume: BigDecimal,
 )
 
-data class CandleHistory(val candles: List<Candle> = emptyList(), val status: String = "Menunggu riwayat") {
+data class CandleHistory(
+    val candles: List<Candle> = emptyList(),
+    val status: String = "Menunggu riwayat",
+    val syncOk: Boolean = false,
+) {
+    private val trend by lazy { SmaSignal.fromClosedCandles(candles) }
+
+    private fun waitReason(exchangeTimeMs: Long?): String? {
+        if (!syncOk) return status
+        if (exchangeTimeMs == null) return "Menunggu waktu bursa"
+        val expectedOpen = exchangeTimeMs - exchangeTimeMs % INTERVAL_MS - INTERVAL_MS
+        if (candles.lastOrNull()?.openTime != expectedOpen) return "Riwayat tertinggal"
+        return null
+    }
+
+    fun statusAt(exchangeTimeMs: Long?) = waitReason(exchangeTimeMs) ?: status
+
+    fun signalAt(exchangeTimeMs: Long?): SmaSignal {
+        val reason = waitReason(exchangeTimeMs)
+        return if (reason != null) SmaSignal.waitFor(reason) else trend
+    }
+
     companion object {
         const val SIZE = 120
         const val INTERVAL_MS = 60_000L
