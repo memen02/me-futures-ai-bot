@@ -8,6 +8,8 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.SystemClock
+import com.mefuturesaibot.app.exchange.BookQuote
 import android.os.IBinder
 import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
 
@@ -34,6 +36,8 @@ class BotForegroundService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        latestQuote = null
+        latestStatus = ReconnectingWebSocket.ConnectionStatus.CONNECTING
         isRunning = true
         ensureNotificationChannel()
         startForegroundCompat(buildNotification(ReconnectingWebSocket.ConnectionStatus.CONNECTING))
@@ -85,10 +89,17 @@ class BotForegroundService : Service() {
         socket = ReconnectingWebSocket(
             url = "wss://fstream.binance.com/public/stream?streams=btcusdt@bookTicker",
             onStatusChange = { status ->
+                if (status != ReconnectingWebSocket.ConnectionStatus.CONNECTED) {
+                    latestQuote = latestQuote?.copy(disconnected = true)
+                }
                 latestStatus = status
                 updateNotification(status)
             },
-            onMessage = { text -> latestMessage = text.take(140) },
+            onMessage = { message ->
+                BookQuote.parse(message, SystemClock.elapsedRealtime())?.let { quote ->
+                    if (quote.eventTimeMs >= (latestQuote?.eventTimeMs ?: 0L)) latestQuote = quote
+                }
+            },
         ).also { it.connect() }
     }
 
@@ -164,7 +175,7 @@ class BotForegroundService : Service() {
         @Volatile var latestStatus: ReconnectingWebSocket.ConnectionStatus = ReconnectingWebSocket.ConnectionStatus.CONNECTING
             private set
 
-        @Volatile var latestMessage: String = ""
+        @Volatile var latestQuote: BookQuote? = null
             private set
     }
 }
