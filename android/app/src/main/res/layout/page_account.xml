@@ -1,6 +1,43 @@
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-        <TextView style="@style/DeskTitle" android:text="Akun"/>
-        <LinearLayout style="@style/DashPanel"><TextView style="@style/DashHeading" android:text="Dompet simulasi"/><TextView android:id="@+id/account_wallet" style="@style/DashLabel" android:layout_marginTop="6dp" android:lineSpacingExtra="3dp" android:textSize="15sp"/></LinearLayout><LinearLayout style="@style/DashPanel"><TextView style="@style/DashHeading" android:text="Koneksi akun"/><TextView android:id="@+id/account_connection" style="@style/DashLabel" android:layout_marginTop="6dp" android:lineSpacingExtra="3dp" android:textSize="15sp"/></LinearLayout><LinearLayout style="@style/DashPanel"><TextView style="@style/DashHeading" android:text="Preferensi perangkat"/><Switch android:id="@+id/account_autostart" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="52dp" android:text="Auto Start setelah reboot" android:textColor="#F7F1E9"/><TextView android:id="@+id/account_build" style="@style/DashLabel" android:layout_marginTop="6dp" android:lineSpacingExtra="3dp" android:textSize="15sp"/></LinearLayout>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="20dp" android:focusableInTouchMode="true">
+        <TextView style="@style/DeskTitle" android:text="Akun Binance" />
+        <LinearLayout style="@style/DashPanel" android:background="@drawable/dashboard_signal">
+            <TextView style="@style/DashLabel" android:text="BINANCE FUTURES" android:letterSpacing="0.10" android:textColor="#FFB58F" />
+            <TextView style="@style/DashHeading" android:text="USDⓈ-M · Mainnet" android:textSize="23sp" android:layout_marginTop="4dp" />
+            <TextView android:id="@+id/account_connection" style="@style/DashLabel" android:text="Belum terhubung"
+                android:textSize="15sp" android:layout_marginTop="8dp" android:accessibilityLiveRegion="polite" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/account_form" style="@style/DashPanel" android:importantForAutofill="noExcludeDescendants">
+            <TextView style="@style/DashHeading" android:text="Kredensial API" />
+            <TextView style="@style/DashLabel" android:layout_marginTop="4dp" android:text="Gunakan pasangan key HMAC dari API Management Binance." />
+            <TextView style="@style/AccountFieldLabel" android:text="API Key" android:labelFor="@+id/account_key" />
+            <EditText android:id="@id/account_key" style="@style/AccountInput" android:hint="Masukkan API Key"
+                android:imeOptions="actionNext" />
+            <TextView style="@style/AccountFieldLabel" android:text="API Secret" android:labelFor="@+id/account_secret" />
+            <EditText android:id="@id/account_secret" style="@style/AccountInput" android:hint="Masukkan API Secret"
+                android:imeOptions="actionDone" />
+            <TextView style="@style/DashLabel" android:layout_marginTop="8dp"
+                android:text="Tersimpan terenkripsi di HP. Jika secret lama hilang, buat pasangan API baru di Binance." />
+            <Button android:id="@+id/account_save" style="@style/AccountPrimary" android:text="Simpan di HP" />
+            <Button android:id="@+id/account_cancel" style="@style/AccountSecondary" android:text="Batal mengganti" android:visibility="gone" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/account_actions" style="@style/DashPanel" android:visibility="gone">
+            <TextView style="@style/DashHeading" android:text="Akses API" />
+            <TextView android:id="@+id/account_access" style="@style/DashLabel" android:layout_marginTop="6dp" android:lineSpacingExtra="4dp" />
+            <Button android:id="@+id/account_check" style="@style/AccountPrimary" android:text="Uji koneksi ke Binance" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+                <Button android:id="@+id/account_replace" style="@style/AccountSecondary" android:layout_width="0dp" android:layout_weight="1" android:text="Ganti key" />
+                <Button android:id="@+id/account_remove" style="@style/AccountSecondary" android:layout_width="0dp" android:layout_weight="1" android:textColor="#FFA392" android:text="Hapus dari HP" />
+            </LinearLayout>
+        </LinearLayout>
+        <TextView style="@style/DashLabel" android:layout_marginTop="12dp" android:text="Trading otomatis pada build ini memakai saldo simulasi. Uji koneksi hanya membaca status akun dan izin key." />
+        <LinearLayout style="@style/DashPanel">
+            <TextView style="@style/DashHeading" android:text="Perangkat" />
+            <Switch android:id="@+id/account_autostart" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:minHeight="52dp" android:text="Auto Start setelah reboot" android:textColor="#F7F1E9"/>
+            <TextView android:id="@+id/account_build" style="@style/DashLabel" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

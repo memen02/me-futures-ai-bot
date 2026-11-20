@@ -57,7 +57,7 @@ posisi, dan 75 catatan jurnal terakhir disimpan di HP.
 
 Pengujian jalan terus 24 jam di HP, penilaian model pada data di luar periode
 pelatihan, riwayat candle lintas sesi, dan rekonsiliasi akun Binance privat.
-Eksekusi uang asli dan penyimpanan API key belum tersedia.
+Tab Akun menyimpan pasangan API HMAC secara terenkripsi di HP dan menguji akses baca Binance Futures. Eksekusi order uang asli masih dalam rencana.
 
 ## Menunggu dari Anda
 

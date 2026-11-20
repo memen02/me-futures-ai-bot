@@ -5,30 +5,13 @@
 > dipindah ke bawah sebagai catatan referensi -- itu bukan kode yang dipakai
 > aplikasi sekarang.
 
-## Status Implementasi (per 2026-11-08)
+## Kredensial Binance di Android
 
-**Belum ada kode penyimpanan credential sama sekali di `android/`** -- karena
-REST client (yang butuh API Key) juga belum dibangun. Bagian di bawah ini
-adalah ATURAN yang akan dipakai begitu fitur itu dibangun, bukan deskripsi
-kode yang sudah ada. Lihat `AUDIT_REPORT.md` dan `TODO.md` untuk status.
+Tab Akun menyimpan pasangan HMAC milik pengguna dalam satu berkas privat di `noBackupFilesDir`. Android Keystore menyimpan kunci AES-256. Setiap penyimpanan mengenkripsi ulang pasangan dengan GCM dan IV baru. Kolom disamarkan, dikecualikan dari autofill dan penyimpanan state, serta dikosongkan saat pengguna meninggalkan tab. Tombol Hapus dari HP menghapus salinan perangkat. Pencabutan key dilakukan melalui API Management Binance.
 
-## Rencana Penyimpanan API Key (Kotlin/Android)
+Uji koneksi membaca waktu Binance dan menandatangani GET ke `/fapi/v1/accountConfig`. GET opsional ke `/sapi/v1/account/apiRestrictions` memeriksa izin Futures dan penarikan pada key. API Secret dipakai di perangkat untuk HMAC. Kegagalan membaca izin ditampilkan sebagai belum terverifikasi.
 
-- API Key/Secret Binance **milik pengguna sendiri** — tidak pernah ada di source code, APK, atau repo publik.
-- Rencana: disimpan terenkripsi di perangkat lewat `EncryptedSharedPreferences` (Jetpack Security) yang memakai Android Keystore sebagai akar enkripsinya — **belum diimplementasikan**.
-- Tidak ada lagi konsep "APK ↔ backend lewat localhost" -- arsitektur sekarang satu aplikasi mandiri, jadi tidak ada komunikasi localhost yang perlu diamankan seperti rencana lama.
-- Log (begitu logging Android dibangun -- saat ini belum ada) tidak boleh pernah mencatat nilai API Secret/token secara utuh.
-
-## LIVE MODE
-
-Prinsip "LIVE MODE terkunci sampai semua pengujian & persetujuan pengguna
-selesai" (sesuai aturan awal proyek) **masih berlaku sebagai prinsip, tapi
-mekanisme penguncinya di level kode BELUM diimplementasikan ulang di
-Kotlin** -- versi lama (`BOT_MODE=live` diblokir di `src/core/config.js`)
-adalah bagian dari backend Node.js yang sudah tidak dipakai. Ini harus
-dibangun ulang begitu Execution Engine Kotlin mulai dikerjakan (lihat
-Roadmap di `AUDIT_REPORT.md`) -- jangan anggap proteksi ini sudah ada hanya
-karena pernah ada di versi lama.
+Trading otomatis memakai portofolio simulasi. Menghubungkan akun hanya mengaktifkan pemeriksaan akses.
 
 ## Apa yang TIDAK BOLEH masuk repo publik
 

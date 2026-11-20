@@ -18,6 +18,7 @@ import android.widget.ListView
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
+import com.mefuturesaibot.app.account.AccountPage
 import com.mefuturesaibot.app.BotPreferences
 import com.mefuturesaibot.app.BotForegroundService
 import com.mefuturesaibot.app.R
@@ -44,6 +45,7 @@ internal class TradingDesk(
 ) {
     private fun <T : View> view(id: Int): T = activity.findViewById(id)
     private val store = DeskStore(activity)
+    private val accountPage = AccountPage(activity)
     private val nav = listOf(R.id.nav_home, R.id.nav_scanner, R.id.nav_paper, R.id.nav_account)
     private val pages = listOf(R.id.page_home, R.id.page_scanner, R.id.page_paper, R.id.page_account)
     private val query = view<EditText>(R.id.scan_query)
@@ -85,8 +87,11 @@ internal class TradingDesk(
         select(initialTab)
     }
 
+    fun close() = accountPage.close()
+
     fun select(index: Int) {
         tab = index.coerceIn(0, pages.lastIndex)
+        accountPage.show(tab == 3)
         pages.forEachIndexed { i, id -> view<View>(id).visibility = if (i == tab) View.VISIBLE else View.GONE }
         nav.forEachIndexed { i, id ->
             val button = view<TextView>(id)
@@ -201,7 +206,6 @@ internal class TradingDesk(
         val equity = if (position == null) money(account.balance) else unrealized?.let { money(account.balance + it) }
         view<TextView>(R.id.account_wallet).text = "Saldo virtual   ${money(account.balance)} USDT\n" +
             "Ekuitas virtual   ${equity ?: "menunggu harga"}\nModal awal   1.000 USDT\nTransaksi selesai   ${account.trades}"
-        view<TextView>(R.id.account_connection).text = "Mode akun   Simulasi lokal\nAkun Binance pribadi   Belum terhubung\nScanner memakai data pasar publik."
         view<TextView>(R.id.account_build).text = activity.getString(R.string.build_identity)
     }
 

@@ -13,14 +13,15 @@
 - [x] Guard Stop saat belum running (audit mandiri 2026-11-13) -- cegah koneksi "kedip".
 - [x] Izin notifikasi dipindah ke onCreate() (audit mandiri 2026-11-13) -- cegah race dengan startForegroundService().
 
+- [x] Penyimpanan kredensial HMAC di Android Keystore (kunci AES) dan uji akses Futures Binance.
+
 ## Menunggu keputusan/aset dari Anda
 - [ ] Mode Posisi Binance: One-way atau Hedge?
 - [ ] Database: Room (SQLite Android) sebagai pengganti `better-sqlite3`/`sql.js` yang dulu direncanakan untuk Node.js.
 
 ## Belum dibuat sama sekali
-- [ ] REST client Kotlin (signed request) -- REST publik untuk riwayat BTC/USDT sudah tersedia.
+- [ ] Rekonsiliasi posisi dan saldo melalui REST privat.
 - [ ] Penyimpanan riwayat candle multi-simbol lintas sesi -- porting logic dari `backend/src/data/`.
-- [ ] Penyimpanan API Key terenkripsi (Android Keystore/EncryptedSharedPreferences).
 - [ ] Battery optimization exemption -- diminta otomatis dari dalam app (saat ini cuma panduan manual dari percakapan lama, belum ada kode).
 
 ## Verifikasi di perangkat
