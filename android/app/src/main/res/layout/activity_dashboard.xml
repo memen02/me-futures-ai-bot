@@ -48,11 +48,7 @@
                     </LinearLayout>
                     <TextView style="@style/TerminalNote" android:id="@+id/desk_volume" />
                     <TextView style="@style/TerminalNote" android:id="@+id/dash_ticker_time" />
-                    <RadioGroup android:id="@+id/dash_interval" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
-                        <RadioButton android:id="@+id/dash_tf1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp" android:buttonTint="#62C4FF" android:textColor="#DCEDFF" android:text="1m" />
-                        <RadioButton android:id="@+id/dash_tf5" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp" android:buttonTint="#62C4FF" android:textColor="#DCEDFF" android:text="5m" />
-                        <RadioButton android:id="@+id/dash_tf15" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp" android:buttonTint="#62C4FF" android:textColor="#DCEDFF" android:text="15m" />
-                    </RadioGroup>
+                    <Button android:id="@+id/dash_interval" style="@style/TerminalLink" android:text="Interval grafik · 1m ▾" />
                     <com.mefuturesaibot.app.ClosePriceChart android:id="@+id/dash_chart" android:layout_width="match_parent" android:layout_height="164dp" android:visibility="gone" />
                     <TextView style="@style/TerminalNote" android:id="@+id/dash_chart_key" />
                     <TextView style="@style/TerminalNote" android:id="@+id/dash_history_status" />
