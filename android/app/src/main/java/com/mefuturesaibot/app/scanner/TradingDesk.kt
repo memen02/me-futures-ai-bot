@@ -53,6 +53,8 @@ internal class TradingDesk(
     private val sort = view<Spinner>(R.id.scan_sort)
     private val adapter = TokenAdapter()
     private var snapshot = Scan()
+    private var btcTicker: Ticker? = null
+    private var btcFresh = false
     private var fresh = false
     private var running = false
     var tab = 0
@@ -60,7 +62,6 @@ internal class TradingDesk(
 
     init {
         nav.forEachIndexed { index, id -> view<TextView>(id).setOnClickListener { select(index) } }
-        view<Button>(R.id.dash_market_summary).setOnClickListener { select(1) }
         view<Button>(R.id.scan_start).setOnClickListener { start() }
         val list = view<ListView>(R.id.scan_list)
         list.adapter = adapter
@@ -82,7 +83,6 @@ internal class TradingDesk(
         }
         view<Switch>(R.id.account_autostart).setOnCheckedChangeListener { _, enabled ->
             BotPreferences.setAutoStartEnabled(activity, enabled)
-            view<Switch>(R.id.dash_auto_start).isChecked = enabled
         }
         select(initialTab)
     }
@@ -105,8 +105,12 @@ internal class TradingDesk(
     }
 
     fun update(scan: Scan, active: Boolean, force: Boolean = false) {
-        val current = active && scan.fresh(SystemClock.elapsedRealtime())
-        if (!force && snapshot === scan && current == fresh && running == active) return
+        val elapsed = SystemClock.elapsedRealtime()
+        val current = active && scan.fresh(elapsed)
+        if (snapshot !== scan) btcTicker = scan.rows.firstOrNull { it.contract.symbol == "BTCUSDT" }?.ticker
+        val tickerCurrent = current && btcTicker?.fresh(scan.time + (elapsed - scan.received)) == true
+        if (!force && snapshot === scan && current == fresh && running == active && btcFresh == tickerCurrent) return
+        btcFresh = tickerCurrent
         snapshot = scan
         fresh = current
         running = active
@@ -118,10 +122,30 @@ internal class TradingDesk(
         val last = if (scan.time > 0) " · ${time(scan.time)}" else ""
         view<TextView>(R.id.scan_state).text = status + last
         view<Button>(R.id.scan_start).visibility = if (active) View.GONE else View.VISIBLE
-        view<Button>(R.id.dash_market_summary).text = if (scan.rows.isEmpty()) "Buka Scanner 24 jam   ›"
-            else "Scanner 24 jam   ·   ${scan.rows.size} kontrak   ›"
+        view<Button>(R.id.scan_stop).visibility = if (active) View.VISIBLE else View.GONE
+        renderBtcTicker(btcTicker.takeIf { btcFresh })
         if (tab == 1) listTokens()
         if (tab == 2 || tab == 3) renderAccount()
+    }
+
+    private fun renderBtcTicker(ticker: Ticker?) {
+        view<TextView>(R.id.dash_last_price).text = ticker?.let { money(it.price) } ?: "—"
+        view<TextView>(R.id.dash_high).text = ticker?.let { money(it.high) } ?: "—"
+        view<TextView>(R.id.dash_low).text = ticker?.let { money(it.low) } ?: "—"
+        view<TextView>(R.id.dash_change).apply {
+            text = ticker?.let { pct(it.change) + "  ·  24 jam" } ?: "—  ·  24 jam"
+            setTextColor(when {
+                ticker == null || ticker.change == 0.0 -> Color.LTGRAY
+                ticker.change > 0 -> Color.rgb(130, 229, 190)
+                else -> Color.rgb(255, 155, 143)
+            })
+        }
+        view<TextView>(R.id.dash_ticker_time).text = when {
+            ticker != null -> "Ticker · ${time(ticker.time)}"
+            !running -> "Pemantauan nonaktif"
+            btcTicker == null -> "Menunggu ticker BTC/USDT"
+            else -> "Menunggu pembaruan ticker"
+        }
     }
 
     private fun configure(spinner: Spinner, options: List<String>) {

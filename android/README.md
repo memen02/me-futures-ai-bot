@@ -8,10 +8,10 @@ ditulis ulang di sini sebagai satu APK mandiri. Lihat
 
 ## Status pemantauan
 
-Tombol Start menjalankan layanan pemantauan BTC/USDT. Layar menampilkan
+Tombol **Mulai bot** di tab Scanner menjalankan layanan pemantauan BTC/USDT. Layar menampilkan
 bid, ask, dan waktu pembaruan dari bursa. Harga terakhir ditandai kedaluwarsa
-saat koneksi putus atau data berumur 10 detik. Tombol Stop menghentikan
-layanan. Opsi Auto Start mengikuti pilihan pengguna setelah reboot.
+saat koneksi putus atau data berumur 10 detik. Tombol **Hentikan bot** di tab yang sama menghentikan
+layanan. Opsi Auto Start di tab Akun mengikuti pilihan pengguna setelah reboot.
 
 GitHub Actions menjalankan unit test lalu membuat APK debug. Hasil uji di HP
 dan daftar fitur berikutnya dicatat di [status proyek](../docs/PROJECT_STATUS.md).

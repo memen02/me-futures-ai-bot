@@ -18,7 +18,6 @@ import java.time.format.DateTimeFormatter
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
-import android.widget.Switch
 import com.mefuturesaibot.app.exchange.BookQuote
 import com.mefuturesaibot.app.exchange.CandleHistory
 import com.mefuturesaibot.app.exchange.ExchangeClock
@@ -80,12 +79,7 @@ class MainActivity : Activity() {
         chartKey = findViewById(R.id.dash_chart_key)
         historyButton = findViewById(R.id.dash_history)
         historyButton.setOnClickListener { showCandleHistory() }
-        findViewById<Button>(R.id.dash_start).setOnClickListener { onStartClicked() }
-        findViewById<Button>(R.id.dash_stop).setOnClickListener { onStopClicked() }
-        findViewById<Switch>(R.id.dash_auto_start).apply {
-            isChecked = BotPreferences.isAutoStartEnabled(this@MainActivity)
-            setOnCheckedChangeListener { _, enabled -> BotPreferences.setAutoStartEnabled(this@MainActivity, enabled) }
-        }
+        findViewById<Button>(R.id.scan_stop).setOnClickListener { onStopClicked() }
         desk = TradingDesk(this, savedInstanceState?.getInt("deskTab") ?: 0, ::onStartClicked)
         userRequestedStop = savedInstanceState?.getBoolean("userRequestedStop") ?: false
         refreshStatusText()
@@ -141,7 +135,7 @@ class MainActivity : Activity() {
     private fun refreshStatusText() {
         desk.update(BotForegroundService.latestScan, !userRequestedStop && BotForegroundService.isRunning)
         if (userRequestedStop || !BotForegroundService.isRunning) {
-            renderSignal(SmaSignal.waitFor(if (userRequestedStop) "Pemantauan dihentikan" else "Tekan Start untuk memantau BTC/USDT"))
+            renderSignal(SmaSignal.waitFor(if (userRequestedStop) "Pemantauan dihentikan" else "Mulai pemantauan dari tab Scanner"))
             statusView.text = if (userRequestedStop) "Pemantauan dihentikan" else "Pemantauan belum dimulai"
             bidView.text = "—"
             askView.text = "—"

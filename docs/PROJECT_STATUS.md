@@ -1,6 +1,6 @@
 # PROJECT STATUS
 
-Nama aplikasi Android adalah **ME Project**. Nomor build terlihat di layar utama.
+Nama aplikasi Android adalah **ME Project**. Nomor build tersedia di tab Akun, bagian Perangkat.
 
 **Fase saat ini:** scanner pasar publik dan simulasi transaksi otomatis pada perangkat Android.
 Pengujian Stop, notifikasi, jaringan, dan reboot pada HP untuk revisi ini masih tertunda.
@@ -29,7 +29,7 @@ APK monitor terpisah" menjadi **satu aplikasi Android Kotlin mandiri**
 
 ## Scanner pasar dan simulasi
 
-Dasbor, Scanner, Simulasi, dan Akun tersedia dari navigasi bawah. Tombol Start
+Dasbor, Scanner, Simulasi, dan Akun tersedia dari navigasi bawah. Tombol Mulai bot di tab Scanner
 menjalankan foreground service. Selama layanan berjalan, scanner mengambil
 statistik bergulir 24 jam dari seluruh kontrak perpetual aktif Binance USDⓈ-M
 sekitar sekali per menit. Daftar kontrak berasal dari exchangeInfo dan
