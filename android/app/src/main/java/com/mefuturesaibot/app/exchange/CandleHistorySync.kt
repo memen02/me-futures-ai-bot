@@ -12,6 +12,7 @@ class CandleHistorySync(
     private val client: Call.Factory = ReconnectingWebSocket.sharedHttpClient,
     private val scheduler: Scheduler = AndroidHandlerScheduler(),
     private val nowMs: () -> Long = android.os.SystemClock::elapsedRealtime,
+    private val epochMs: () -> Long = System::currentTimeMillis,
     private val onUpdate: (CandleHistory) -> Unit,
 ) {
     private val request = Request.Builder()
@@ -74,12 +75,15 @@ class CandleHistorySync(
             retryAfterMs = nowMs() + pause
             val lastTime = history.candles.lastOrNull()?.openTime ?: -1L
             history = when {
-                candles == null -> history.copy(status = error)
-                candles.last().openTime < lastTime -> history.copy(status = "Menunggu riwayat terbaru")
-                else -> CandleHistory(candles, "Riwayat tersinkron")
+                candles == null -> history.copy(status = error, syncOk = false)
+                candles.last().openTime < lastTime -> history.copy(status = "Menunggu riwayat terbaru", syncOk = false)
+                else -> CandleHistory(candles, "Riwayat tersinkron", syncOk = true)
             }
             onUpdate(history)
-            scheduler.postDelayed(maxOf(CandleHistory.INTERVAL_MS, pause)) { refresh() }
+            // Ambil sesaat setelah batas menit berikut, ketika candle baru telah ditutup.
+            val untilUpdate = CandleHistory.INTERVAL_MS - Math.floorMod(epochMs() - 1500L, CandleHistory.INTERVAL_MS)
+            val delayMs = if (history.syncOk) untilUpdate else maxOf(CandleHistory.INTERVAL_MS, pause)
+            scheduler.postDelayed(delayMs) { refresh() }
         }
     }
 

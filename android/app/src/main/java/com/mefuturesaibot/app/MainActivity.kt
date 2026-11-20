@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Typeface
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -21,6 +22,8 @@ import android.widget.TextView
 import android.widget.ScrollView
 import android.widget.Switch
 import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
+import com.mefuturesaibot.app.exchange.SmaSignal
+import com.mefuturesaibot.app.exchange.SignalSide
 
 /**
  * MURNI UI: tidak memegang ReconnectingWebSocket sendiri (ada di BotForegroundService).
@@ -30,6 +33,8 @@ import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
  * ada tombol Start/Stop eksplisit -- service baru jalan kalau pengguna menekan Start.
  */
 class MainActivity : Activity() {
+    private lateinit var signalView: TextView
+    private lateinit var signalReason: TextView
     private lateinit var statusView: TextView
     private lateinit var historyButton: Button
     private lateinit var dataView: TextView
@@ -60,13 +65,18 @@ class MainActivity : Activity() {
             setPadding(48, 160, 48, 24)
         }
 
-        val captionView = TextView(this).apply {
-            text = "Foreground Service -- tekan Start, lalu coba minimize app ini"
-            textSize = 13f
+        signalView = TextView(this).apply {
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#94A3B8"))
-            setPadding(48, 0, 48, 24)
+            textSize = 24f
+            setTypeface(typeface, Typeface.BOLD)
         }
+        signalReason = TextView(this).apply {
+            gravity = Gravity.CENTER
+            textSize = 14f
+            setTextColor(Color.parseColor("#475569"))
+            setPadding(32, 4, 32, 20)
+        }
+        renderSignal(SmaSignal.waitFor("Tekan Start untuk memantau BTC/USDT"))
 
         statusView = TextView(this).apply {
             text = "Belum dimulai"
@@ -119,7 +129,8 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             setBackgroundColor(Color.WHITE)
             addView(titleView)
-            addView(captionView)
+            addView(signalView)
+            addView(signalReason)
             addView(statusView)
             addView(dataView)
             addView(historyButton)
@@ -175,6 +186,7 @@ class MainActivity : Activity() {
             )
         }
 
+        renderSignal(SmaSignal.waitFor("Pemantauan dihentikan"))
         historyButton.visibility = android.view.View.GONE
         statusView.text = "Dihentikan"
         dataView.text = ""
@@ -182,6 +194,7 @@ class MainActivity : Activity() {
 
     private fun refreshStatusText() {
         if (userRequestedStop || !BotForegroundService.isRunning) {
+            renderSignal(SmaSignal.waitFor(if (userRequestedStop) "Pemantauan dihentikan" else "Tekan Start untuk memantau BTC/USDT"))
             historyButton.visibility = android.view.View.GONE
             dataView.text = ""
             statusView.text = if (userRequestedStop) "Dihentikan" else "Belum dimulai"
@@ -190,15 +203,28 @@ class MainActivity : Activity() {
         val history = BotForegroundService.latestHistory
         historyButton.visibility = android.view.View.VISIBLE
         historyButton.isEnabled = history.candles.isNotEmpty()
-        historyButton.text = if (history.candles.isEmpty()) history.status else
-            "${history.status} · ${history.candles.size} candle 1 menit"
-        statusView.text = describeStatus(BotForegroundService.latestStatus)
+        val connection = BotForegroundService.latestStatus
         val quote = BotForegroundService.latestQuote
+        val elapsed = SystemClock.elapsedRealtime()
+        val stale = quote?.isStale(elapsed, System.currentTimeMillis()) ?: true
+        val exchangeTime = if (connection == ReconnectingWebSocket.ConnectionStatus.CONNECTED && quote != null && !stale)
+            quote.eventTimeMs + (elapsed - quote.receivedElapsedMs) else null
+        val historyStatus = history.statusAt(exchangeTime)
+        val lastOpen = history.candles.lastOrNull()?.openTime
+        historyButton.text = if (lastOpen == null) historyStatus else
+            "$historyStatus · ${history.candles.size} candle 1 menit\nTerakhir ${quoteTime.format(Instant.ofEpochMilli(lastOpen))}"
+        statusView.text = describeStatus(connection)
+        val signal = when {
+            connection != ReconnectingWebSocket.ConnectionStatus.CONNECTED -> SmaSignal.waitFor("Menunggu koneksi pasar")
+            quote == null -> SmaSignal.waitFor("Menunggu harga BTC/USDT")
+            stale -> SmaSignal.waitFor("Harga pasar kedaluwarsa")
+            else -> history.signalAt(exchangeTime)
+        }
+        renderSignal(signal)
         dataView.text = if (quote == null) {
             "Menunggu harga BTC/USDT"
         } else {
             val updated = quoteTime.format(Instant.ofEpochMilli(quote.eventTimeMs))
-            val stale = quote.isStale(SystemClock.elapsedRealtime(), System.currentTimeMillis())
             listOfNotNull(
                 if (stale) "Data kedaluwarsa" else null,
                 "BTC/USDT",
@@ -207,6 +233,17 @@ class MainActivity : Activity() {
                 "Pembaruan bursa  $updated",
             ).joinToString("\n")
         }
+    }
+
+    private fun renderSignal(signal: SmaSignal) {
+        signalView.text = "Sinyal · ${signal.side.name}"
+        signalReason.text = signal.reason
+        val color = when (signal.side) {
+            SignalSide.WAIT -> "#744B10"
+            SignalSide.BUY -> "#11653F"
+            SignalSide.SELL -> "#9D2933"
+        }
+        signalView.setTextColor(Color.parseColor(color))
     }
 
     private fun showCandleHistory() {
