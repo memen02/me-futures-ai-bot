@@ -1,103 +1,114 @@
 package com.mefuturesaibot.app.exchange
 
+import java.io.IOException
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.Protocol
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import okio.ByteString
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Scheduler palsu yang TIDAK otomatis menjalankan apa pun -- tugas yang di-post
- * ditampung dulu, baru dijalankan kalau test secara eksplisit memanggil
- * `runPendingDelayed()`. Ini yang memungkinkan test mensimulasikan "waktu
- * berjalan" secara deterministik, tanpa Thread.sleep() sungguhan.
- */
-private class FakeScheduler : Scheduler {
-    val immediateActions = mutableListOf<() -> Unit>()
-    val delayedActions = mutableListOf<Pair<Long, () -> Unit>>()
-    var cancelAllCallCount = 0
-        private set
-
-    override fun post(action: () -> Unit) {
-        immediateActions.add(action)
-        action() // post() tanpa delay: jalankan langsung, cukup realistis untuk test ini
-    }
-
-    override fun postDelayed(delayMs: Long, action: () -> Unit) {
-        delayedActions.add(delayMs to action)
-    }
-
+private class ManualScheduler : Scheduler {
+    val ready = mutableListOf<() -> Unit>()
+    val delayed = mutableListOf<() -> Unit>()
+    override fun post(action: () -> Unit) { ready.add(action) }
+    override fun postDelayed(delayMs: Long, action: () -> Unit) { delayed.add(action) }
     override fun cancelAll() {
-        cancelAllCallCount += 1
-        delayedActions.clear() // ini inti perbaikannya: batalkan semua yang masih tertunda
+        ready.clear()
+        delayed.clear()
     }
-
-    /** Simulasikan semua delayed action yang MASIH TERSISA benar-benar terjadi. */
-    fun runPendingDelayed() {
-        val toRun = delayedActions.toList()
-        delayedActions.clear()
-        toRun.forEach { (_, action) -> action() }
+    fun deliverCallbacks() {
+        while (ready.isNotEmpty()) ready.removeAt(0).invoke()
     }
 }
 
-/**
- * Bukti perbaikan temuan audit 2026-11-10 #2: dulu `close()` tidak membatalkan
- * reconnect yang sudah terjadwal, jadi koneksi "zombie" bisa muncul setelah
- * close() dipanggil. Test ini mensimulasikan skenario itu persis dan membuktikan
- * sekarang TIDAK terjadi lagi.
- */
+private class TestSocket(private val request: Request, val listener: WebSocketListener) : WebSocket {
+    var closed = false
+    override fun request() = request
+    override fun queueSize() = 0L
+    override fun send(text: String) = error("Tidak dipakai")
+    override fun send(bytes: ByteString) = error("Tidak dipakai")
+    override fun close(code: Int, reason: String?): Boolean {
+        closed = true
+        return true
+    }
+    override fun cancel() { closed = true }
+
+    fun opened() {
+        val response = Response.Builder().request(request).protocol(Protocol.HTTP_1_1)
+            .code(101).message("Switching Protocols").build()
+        listener.onOpen(this, response)
+    }
+    fun fail() = listener.onFailure(this, IOException("putus"), null)
+}
+
 class CloseCancelsReconnectTest {
+    private val scheduler = ManualScheduler()
+    private val sockets = mutableListOf<TestSocket>()
+    private val statuses = mutableListOf<ReconnectingWebSocket.ConnectionStatus>()
+    private val messages = mutableListOf<String>()
+    private val connection = ReconnectingWebSocket(
+        url = "wss://example.test/stream",
+        client = object : WebSocket.Factory {
+            override fun newWebSocket(request: Request, listener: WebSocketListener): WebSocket =
+                TestSocket(request, listener).also { sockets.add(it) }
+        },
+        scheduler = scheduler,
+        onStatusChange = { statuses.add(it) },
+        onMessage = { messages.add(it) },
+    )
 
     @Test
-    fun reconnect_yang_sudah_terjadwal_DIBATALKAN_saat_close_dipanggil() {
-        val scheduler = FakeScheduler()
-        var connectCallCount = 0
-
-        // Kita tidak bisa memanggil ReconnectingWebSocket.connect() yang sungguhan
-        // (butuh OkHttp newWebSocket ke jaringan nyata), jadi di sini kita uji
-        // LANGSUNG perilaku FakeScheduler + pola guard `if (!closedByUser)` yang
-        // dipakai di scheduleReconnect() -- ini mereplikasi persis logic yang ada
-        // di ReconnectingWebSocket.scheduleReconnect()/close().
-        var closedByUser = false
-
-        fun scheduleReconnect(delayMs: Long) {
-            scheduler.postDelayed(delayMs) {
-                if (!closedByUser) connectCallCount += 1
-            }
-        }
-
-        fun close() {
-            closedByUser = true
-            scheduler.cancelAll()
-        }
-
-        // 1. Koneksi putus -> reconnect dijadwalkan (seperti onFailure/onClosed asli)
-        scheduleReconnect(5000)
-        assertEquals("Harus ada 1 reconnect tertunda", 1, scheduler.delayedActions.size)
-
-        // 2. SEBELUM delay 5 detik itu habis, close() dipanggil (skenario bug lama)
-        close()
-
-        // 3. Simulasikan waktu berjalan sampai delay yang tadi terjadwal
-        scheduler.runPendingDelayed()
-
-        // 4. Dengan perbaikan: reconnect TIDAK PERNAH benar-benar jalan
-        assertEquals("cancelAll() harus terpanggil tepat sekali oleh close()", 1, scheduler.cancelAllCallCount)
-        assertTrue("Tidak boleh ada reconnect tertunda tersisa setelah close()", scheduler.delayedActions.isEmpty())
-        assertEquals("connect() TIDAK BOLEH terpanggil sama sekali setelah close() (dulu ini bug: nilainya 1)", 0, connectCallCount)
+    fun stopIgnoresQueuedAndLateCallbacks() {
+        connection.connect()
+        val socket = sockets.single()
+        socket.opened()
+        scheduler.deliverCallbacks()
+        assertEquals(ReconnectingWebSocket.ConnectionStatus.CONNECTED, statuses.last())
+        socket.listener.onMessage(socket, "queued")
+        val beforeStop = statuses.toList()
+        connection.close()
+        socket.listener.onClosed(socket, 1000, "closed")
+        socket.fail()
+        socket.listener.onMessage(socket, "late")
+        scheduler.deliverCallbacks()
+        assertEquals(beforeStop, statuses)
+        assertTrue(socket.closed)
+        assertTrue(messages.isEmpty())
+        assertTrue(scheduler.delayed.isEmpty())
     }
 
     @Test
-    fun tanpa_close_reconnect_yang_terjadwal_tetap_jalan_normal() {
-        // Kontrol negatif: pastikan perbaikan ini tidak mematikan reconnect yang SAH
-        // (yang tidak didahului close()).
-        val scheduler = FakeScheduler()
-        var connectCallCount = 0
-        val closedByUser = false
+    fun stopDuringBackoffInvalidatesEvenAnAlreadyDequeuedRetry() {
+        connection.connect()
+        sockets.single().fail()
+        scheduler.deliverCallbacks()
+        val retry = scheduler.delayed.single()
+        connection.close()
+        assertTrue(scheduler.delayed.isEmpty())
+        retry()
+        assertEquals(1, sockets.size)
+    }
 
-        scheduler.postDelayed(5000) {
-            if (!closedByUser) connectCallCount += 1
-        }
-        scheduler.runPendingDelayed()
-
-        assertEquals("Reconnect normal (tanpa close) harus tetap jalan", 1, connectCallCount)
+    @Test
+    fun reconnectAcceptsOnlyTheNewSocket() {
+        connection.connect()
+        val old = sockets.single()
+        old.fail()
+        scheduler.deliverCallbacks()
+        scheduler.delayed.single().invoke()
+        assertEquals(2, sockets.size)
+        val new = sockets.last()
+        new.opened()
+        old.fail()
+        old.listener.onMessage(old, "old")
+        new.listener.onMessage(new, "new")
+        scheduler.deliverCallbacks()
+        assertEquals(listOf("new"), messages)
+        assertEquals(ReconnectingWebSocket.ConnectionStatus.CONNECTED, statuses.last())
+        assertTrue(scheduler.delayed.isEmpty())
     }
 }
