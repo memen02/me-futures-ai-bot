@@ -18,6 +18,9 @@ import java.time.format.DateTimeFormatter
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
+import com.mefuturesaibot.app.exchange.PublicChart
+import com.mefuturesaibot.app.exchange.PublicChartFeed
+import com.mefuturesaibot.app.exchange.chartIntervals
 import com.mefuturesaibot.app.exchange.BookQuote
 import com.mefuturesaibot.app.exchange.CandleHistory
 import com.mefuturesaibot.app.exchange.ExchangeClock
@@ -45,6 +48,8 @@ class MainActivity : Activity() {
     private lateinit var historyStatusView: TextView
     private lateinit var depth: DashboardDepth
     private lateinit var chart: ClosePriceChart
+    internal var chartFeed = PublicChartFeed(publish = ::renderChart)
+    private var visibleActivity = false
     private lateinit var chartKey: TextView
     private lateinit var smaPanel: View
     private val pollHandler = Handler(Looper.getMainLooper())
@@ -79,16 +84,17 @@ class MainActivity : Activity() {
         chart = findViewById(R.id.dash_chart)
         chartKey = findViewById(R.id.dash_chart_key)
         depth = DashboardDepth(this)
-        val intervals = findViewById<android.widget.RadioGroup>(R.id.dash_interval)
-        intervals.check(R.id.dash_tf1)
-        intervals.setOnCheckedChangeListener { _, selected ->
-            chart.selectInterval(when (selected) {
-                R.id.dash_tf5 -> 5
-                R.id.dash_tf15 -> 15
-                else -> 1
-            })
-            chartKey.text = chart.rangeLabel
+        historyButton = findViewById(R.id.dash_history)
+        val intervalButton = findViewById<Button>(R.id.dash_interval)
+        intervalButton.setOnClickListener {
+            val labels = chartIntervals.map { if (it == "1M") "1M · 1 bulan" else it }.toTypedArray()
+            AlertDialog.Builder(this).setTitle("Interval grafik BTC/USDT")
+                .setSingleChoiceItems(labels, chartIntervals.indexOf(chartFeed.state.interval)) { dialog, index ->
+                    chartFeed.select(chartIntervals[index])
+                    dialog.dismiss()
+                }.setNegativeButton("Tutup", null).show()
         }
+        savedInstanceState?.getString("chartInterval")?.takeIf { it in chartIntervals }?.let(chartFeed::select)
         val home = findViewById<android.widget.ScrollView>(R.id.page_home)
         for ((link, section) in listOf(R.id.jump_market to R.id.section_market,
             R.id.jump_strategy to R.id.section_strategy, R.id.jump_watch to R.id.section_watch,
@@ -101,12 +107,12 @@ class MainActivity : Activity() {
                 home.smoothScrollTo(0, bounds.top)
             }
         }
-        historyButton = findViewById(R.id.dash_history)
         historyButton.setOnClickListener { showCandleHistory() }
         findViewById<Button>(R.id.scan_stop).setOnClickListener { onStopClicked() }
         desk = TradingDesk(this, savedInstanceState?.getInt("deskTab") ?: 0, ::onStartClicked)
         desk.onTabSelected = {
             if (desk.tab != 0) depth.clear()
+            chartFeed.setVisible(visibleActivity && desk.tab == 0)
             refreshStatusText()
         }
         userRequestedStop = savedInstanceState?.getBoolean("userRequestedStop") ?: false
@@ -118,19 +124,24 @@ class MainActivity : Activity() {
         super.onSaveInstanceState(outState)
         outState.putBoolean("userRequestedStop", userRequestedStop)
         outState.putInt("deskTab", desk.tab)
+        outState.putString("chartInterval", chartFeed.state.interval)
     }
 
     override fun onStart() {
         super.onStart()
+        visibleActivity = true
+        chartFeed.setVisible(desk.tab == 0)
         pollRunnable.run()
     }
 
     override fun onStop() {
         super.onStop()
         pollHandler.removeCallbacks(pollRunnable)
+        visibleActivity = false
+        chartFeed.setVisible(false)
         depth.clear()
         desk.releaseDisplayData()
-        chart.show(emptyList())
+        chart.show(emptyList(), chartFeed.state.interval)
         // SENGAJA TIDAK stopService() di sini -- itu intinya Foreground Service:
         // tetap jalan walau Activity ditutup. Berhenti HANYA lewat tombol Stop.
     }
@@ -165,10 +176,7 @@ class MainActivity : Activity() {
 
     private fun refreshStatusText() {
         desk.update(BotForegroundService.latestScan, !userRequestedStop && BotForegroundService.isRunning)
-        if (desk.tab != 0) {
-            chart.show(emptyList())
-            return
-        }
+        if (desk.tab != 0) return
         if (userRequestedStop || !BotForegroundService.isRunning) {
             renderSignal(SmaSignal.waitFor(if (userRequestedStop) "Pemantauan dihentikan" else "Mulai pemantauan dari tab Scanner"))
             statusView.text = if (userRequestedStop) "Pemantauan dihentikan" else "Pemantauan belum dimulai"
@@ -176,11 +184,7 @@ class MainActivity : Activity() {
             askView.text = "—"
             findViewById<TextView>(R.id.desk_spread).text = "Spread —"
             quoteTimeView.text = "Belum ada pembaruan harga"
-            historyStatusView.text = "Belum ada data candle"
-            historyButton.visibility = View.GONE
-            chart.show(emptyList())
-            chart.visibility = View.GONE
-            chartKey.visibility = View.GONE
+            renderChartPrice(chartFeed.state)
             return
         }
         renderMarket(BotForegroundService.latestStatus, BotForegroundService.latestQuote,
@@ -194,22 +198,9 @@ class MainActivity : Activity() {
         clock: ExchangeClock,
         elapsed: Long,
     ) {
-        historyButton.visibility = View.VISIBLE
-        historyButton.isEnabled = history.candles.isNotEmpty()
         val stale = quote?.isStale(elapsed, clock) ?: true
         val exchangeTime = if (connection == ReconnectingWebSocket.ConnectionStatus.CONNECTED && !stale)
             clock.at(elapsed) else null
-        val historyStatus = history.statusAt(exchangeTime)
-        val lastOpen = history.candles.lastOrNull()?.openTime
-        historyStatusView.text = if (lastOpen == null) historyStatus else {
-            val start = quoteTime.format(Instant.ofEpochMilli(history.candles.first().openTime))
-            val end = quoteTime.format(Instant.ofEpochMilli(lastOpen))
-            "$historyStatus · ${history.candles.size} × 1 menit\n$start — $end"
-        }
-        chart.show(history.candles)
-        chart.visibility = if (history.candles.isEmpty()) View.GONE else View.VISIBLE
-        chartKey.visibility = chart.visibility
-        chartKey.text = chart.rangeLabel
         statusView.text = describeStatus(connection)
         val signal = when {
             connection != ReconnectingWebSocket.ConnectionStatus.CONNECTED -> SmaSignal.waitFor("Menunggu koneksi pasar")
@@ -259,17 +250,41 @@ class MainActivity : Activity() {
         }
     }
 
+    internal fun renderChart(state: PublicChart) {
+        findViewById<Button>(R.id.dash_interval).text = "Interval grafik · ${state.interval} ▾"
+        chart.show(state.bars, state.interval)
+        chart.visibility = if (state.bars.isEmpty()) View.GONE else View.VISIBLE
+        chartKey.visibility = chart.visibility
+        chartKey.text = chart.rangeLabel
+        historyButton.isEnabled = state.bars.size > 1
+        val at = state.updatedAt?.let { quoteTime.format(Instant.ofEpochMilli(it)) }
+        historyStatusView.text = if (at == null) state.status else "Data $at · ${state.status}"
+        if (!BotForegroundService.isRunning || userRequestedStop) renderChartPrice(state)
+    }
+
+    private fun renderChartPrice(state: PublicChart) {
+        val last = state.bars.lastOrNull()
+        findViewById<TextView>(R.id.dash_last_price).text = last?.close?.stripTrailingZeros()?.toPlainString() ?: "—"
+        findViewById<TextView>(R.id.dash_ticker_time).text = when {
+            last == null -> "Menunggu harga candle"
+            state.fresh -> "Harga candle · ${state.interval}"
+            else -> "Harga candle terakhir · ${state.interval} · belum diperbarui"
+        }
+    }
+
     private fun showCandleHistory() {
-        val candles = BotForegroundService.latestHistory.candles.asReversed()
+        val window = chartFeed.state
+        val chartTime = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss").withZone(ZoneId.systemDefault())
+        val candles = window.bars.dropLast(1).asReversed()
         val rows = candles.map { candle ->
-            val time = quoteTime.format(Instant.ofEpochMilli(candle.openTime))
+            val time = chartTime.format(Instant.ofEpochMilli(candle.openTime))
             "$time  ·  Tutup ${candle.close}"
         }
         AlertDialog.Builder(this)
-            .setTitle("BTC/USDT · Candle tertutup 1 menit")
+            .setTitle("BTC/USDT · Candle tertutup ${window.interval}")
             .setItems(rows.toTypedArray()) { _, index ->
                 val candle = candles[index]
-                val time = quoteTime.format(Instant.ofEpochMilli(candle.openTime))
+                val time = chartTime.format(Instant.ofEpochMilli(candle.openTime))
                 AlertDialog.Builder(this)
                     .setTitle("BTC/USDT · $time")
                     .setMessage("Buka ${candle.open}\nTinggi ${candle.high}\nRendah ${candle.low}\n" +

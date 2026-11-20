@@ -7,21 +7,8 @@ import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.View
 import com.mefuturesaibot.app.exchange.Candle
-import com.mefuturesaibot.app.exchange.CandleHistory
 import kotlin.math.max
 import kotlin.math.min
-
-internal fun chartCandles(candles: List<Candle>, minutes: Int): List<Candle> {
-    require(minutes in listOf(1, 5, 15))
-    if (minutes == 1) return candles
-    val minute = CandleHistory.INTERVAL_MS
-    return candles.groupBy { it.openTime / (minute * minutes) }.mapNotNull { (bucket, group) ->
-        if (group.size != minutes || group.first().openTime != bucket * minute * minutes ||
-            group.last().openTime != (bucket + 1) * minute * minutes - minute) return@mapNotNull null
-        Candle(group.first().openTime, group.first().open, group.maxOf { it.high }, group.minOf { it.low },
-            group.last().close, group.sumOf { it.volume })
-    }
-}
 
 class ClosePriceChart(context: Context, attrs: AttributeSet) : View(context, attrs) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -33,24 +20,15 @@ class ClosePriceChart(context: Context, attrs: AttributeSet) : View(context, att
     private var high = 0.0
     private var low = 0.0
     private var volume = 0.0
-    private var minutes = 1
+    private var interval = ""
     var rangeLabel = ""
         private set
 
-    fun selectInterval(value: Int) {
-        if (minutes == value) return
-        minutes = value
-        rebuild()
-    }
-
-    fun show(candles: List<Candle>) {
-        if (source === candles) return
+    fun show(candles: List<Candle>, timeframe: String) {
+        if (source === candles && interval == timeframe) return
         source = candles
-        rebuild()
-    }
-
-    private fun rebuild() {
-        bars = chartCandles(source, minutes).takeLast(60)
+        interval = timeframe
+        bars = source.takeLast(60)
         if (bars.isEmpty()) {
             rangeLabel = ""
             contentDescription = null
@@ -61,7 +39,7 @@ class ClosePriceChart(context: Context, attrs: AttributeSet) : View(context, att
             low = bottom.toDouble()
             volume = bars.maxOf { it.volume }.toDouble()
             rangeLabel = "Min ${bottom.stripTrailingZeros().toPlainString()} · Maks ${top.stripTrailingZeros().toPlainString()} USDT"
-            contentDescription = "${bars.size} candle $minutes menit dan volume BTC. $rangeLabel"
+            contentDescription = "${bars.size} candle $interval dan volume BTC. $rangeLabel"
         }
         invalidate()
     }

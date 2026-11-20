@@ -11,7 +11,7 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
 
-private class CandleScheduler : Scheduler {
+internal class CandleScheduler : Scheduler {
     val callbacks = LinkedBlockingQueue<() -> Unit>()
     val delayed = mutableListOf<Pair<Long, () -> Unit>>()
     override fun post(action: () -> Unit) { callbacks.add(action) }
