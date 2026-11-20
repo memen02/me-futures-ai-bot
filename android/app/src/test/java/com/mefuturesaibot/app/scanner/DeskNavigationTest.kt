@@ -59,6 +59,9 @@ class DeskNavigationTest {
             fun label(id: Int) = activity.findViewById<TextView>(id).text.toString()
             desk.update(scan, true)
             assertEquals("62,105.40", label(R.id.dash_last_price))
+            assertEquals("1,000.00", label(R.id.desk_balance))
+            assertTrue(label(R.id.desk_coverage).contains("2 turun"))
+            assertEquals(2, activity.findViewById<android.widget.LinearLayout>(R.id.desk_watch_rows).childCount)
             assertEquals("64,000.00", label(R.id.dash_high))
             assertEquals("61,000.00", label(R.id.dash_low))
             assertTrue(label(R.id.dash_change).contains("-2.00%"))
@@ -67,6 +70,7 @@ class DeskNavigationTest {
             desk.update(scan, false)
             assertEquals("—", label(R.id.dash_high))
             assertTrue(label(R.id.dash_ticker_time).contains("nonaktif"))
+            assertEquals(0, activity.findViewById<android.widget.LinearLayout>(R.id.desk_watch_rows).childCount)
             desk.close()
         } finally { controller.pause().stop().destroy() }
     }

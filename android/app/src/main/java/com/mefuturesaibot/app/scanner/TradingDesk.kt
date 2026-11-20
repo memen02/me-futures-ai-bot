@@ -14,6 +14,8 @@ import android.widget.ArrayAdapter
 import android.widget.BaseAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.ListView
 import android.widget.Spinner
 import android.widget.Switch
@@ -56,6 +58,7 @@ internal class TradingDesk(
     private var snapshot = Scan()
     private var btcTicker: Ticker? = null
     private var btcFresh = false
+    private var nextTerminalRefresh = Long.MAX_VALUE
     private var fresh = false
     private var running = false
     var onTabSelected: (() -> Unit)? = null
@@ -64,6 +67,7 @@ internal class TradingDesk(
 
     init {
         nav.forEachIndexed { index, id -> view<TextView>(id).setOnClickListener { select(index) } }
+        view<Button>(R.id.desk_history).setOnClickListener { select(2) }
         view<Button>(R.id.scan_start).setOnClickListener { start() }
         val list = view<ListView>(R.id.scan_list)
         list.adapter = adapter
@@ -98,7 +102,7 @@ internal class TradingDesk(
         pages.forEachIndexed { i, id -> view<View>(id).visibility = if (i == tab) View.VISIBLE else View.GONE }
         nav.forEachIndexed { i, id ->
             val button = view<TextView>(id)
-            val tint = if (i == tab) Color.rgb(255, 164, 118) else Color.rgb(175, 185, 198)
+            val tint = if (i == tab) Color.rgb(102, 202, 255) else Color.rgb(175, 185, 198)
             button.isSelected = i == tab
             button.setTextColor(tint)
             button.compoundDrawableTintList = ColorStateList.valueOf(tint)
@@ -116,7 +120,8 @@ internal class TradingDesk(
         val current = active && scan.fresh(elapsed)
         if (snapshot !== scan) btcTicker = scan.rows.firstOrNull { it.contract.symbol == "BTCUSDT" }?.ticker
         val tickerCurrent = current && btcTicker?.fresh(scan.time + (elapsed - scan.received)) == true
-        if (!force && snapshot === scan && current == fresh && running == active && btcFresh == tickerCurrent) return
+        if (!force && snapshot === scan && current == fresh && running == active && btcFresh == tickerCurrent &&
+            (tab != 0 || elapsed < nextTerminalRefresh)) return
         btcFresh = tickerCurrent
         snapshot = scan
         fresh = current
@@ -131,6 +136,7 @@ internal class TradingDesk(
         view<Button>(R.id.scan_start).visibility = if (active) View.GONE else View.VISIBLE
         view<Button>(R.id.scan_stop).visibility = if (active) View.VISIBLE else View.GONE
         renderBtcTicker(btcTicker.takeIf { btcFresh })
+        if (tab == 0) renderTerminal(elapsed)
         if (tab == 1) listTokens()
         if (tab == 2 || tab == 3) renderAccount()
     }
@@ -155,6 +161,94 @@ internal class TradingDesk(
         }
     }
 
+    private fun renderTerminal(elapsed: Long) {
+        val marketTime = snapshot.time + (elapsed - snapshot.received)
+        val rows = if (fresh) snapshot.rows.filter { it.ticker?.fresh(marketTime) == true } else emptyList()
+        nextTerminalRefresh = rows.minOfOrNull { elapsed + (it.ticker!!.time + 120_001 - marketTime) } ?: Long.MAX_VALUE
+        val btc = rows.firstOrNull { it.contract.symbol == "BTCUSDT" }
+        val (model, account) = store.read()
+        view<TextView>(R.id.desk_balance).text = money(account.balance)
+        view<TextView>(R.id.desk_bot).text = if (running) "Aktif" else "Berhenti"
+        view<TextView>(R.id.desk_volume).text = "Volume 24j · " + (btc?.ticker?.let { money(it.volume) + " USDT" } ?: "—")
+        val score = btc?.score
+        view<TextView>(R.id.desk_score).text = score?.let { "Skor arah naik  ${money(it * 100)}/100" } ?: "Skor arah naik  —"
+        view<ProgressBar>(R.id.desk_meter).apply {
+            visibility = if (score == null) View.GONE else View.VISIBLE
+            progress = ((score ?: 0.0) * 100).toInt()
+        }
+        view<TextView>(R.id.desk_model).text = if (model.rounds < MarketModel.WARMUP)
+            "Pemanasan model · ${model.rounds}/${MarketModel.WARMUP} ronde"
+        else "${modelLabel(score)} · ${model.rounds} ronde belajar"
+        val rising = rows.count { it.ticker!!.change > 0 }
+        val falling = rows.count { it.ticker!!.change < 0 }
+        view<TextView>(R.id.desk_breadth).text = when {
+            rows.isEmpty() -> "Menunggu data pasar"
+            rising > falling -> "Lebih banyak kontrak naik"
+            falling > rising -> "Lebih banyak kontrak turun"
+            else -> "Kenaikan dan penurunan seimbang"
+        }
+        view<TextView>(R.id.desk_coverage).text = if (rows.isEmpty()) "Belum ada ticker mutakhir" else
+            "$rising naik · $falling turun · ${rows.size - rising - falling} datar"
+        renderPerformance(account)
+        renderWatch(rows)
+    }
+
+    private fun renderPerformance(account: PaperAccount) {
+        val net = account.balance - PaperAccount.INITIAL_BALANCE
+        view<TextView>(R.id.desk_profit).apply {
+            text = "Perubahan saldo  ${money(net)} USDT"
+            setTextColor(when {
+                net > 0 -> Color.rgb(98, 225, 173)
+                net < 0 -> Color.rgb(255, 130, 152)
+                else -> Color.WHITE
+            })
+        }
+        view<TextView>(R.id.desk_trades).text = "${account.trades} transaksi selesai · Sejak awal"
+        view<TextView>(R.id.desk_winrate).text = if (account.ratedTrades == 0) "Rasio menang —" else
+            "Rasio menang ${money(100.0 * account.wins / account.ratedTrades)}% · ${account.wins}/${account.ratedTrades} tercatat"
+        val position = account.position
+        view<TextView>(R.id.desk_position).text = position?.let {
+            "${if (it.side > 0) "LONG" else "SHORT"} ${it.symbol} · Entry ${price(it.entry)}"
+        } ?: "Belum ada posisi terbuka"
+        view<TextView>(R.id.desk_risk).text = "Ukuran posisi ${money(PaperPosition.NOTIONAL)} USDT · Maks. 1 posisi\n" +
+            "Batas rugi ${money(PaperPosition.LOSS_LIMIT)} USDT · Target laba ${money(PaperPosition.PROFIT_TARGET)} USDT"
+        view<TextView>(R.id.desk_targets).text = "Evaluasi saat scan · Maks. ${PaperPosition.MAX_MINUTES} menit · Biaya 0,05% per sisi" +
+            if (position == null) "" else {
+                val stop = position.entry * (1 - position.side * PaperPosition.LOSS_LIMIT / PaperPosition.NOTIONAL)
+                val target = position.entry * (1 + position.side * PaperPosition.PROFIT_TARGET / PaperPosition.NOTIONAL)
+                "\nAmbang harga ${position.symbol} · SL ${price(stop)} · TP ${price(target)}"
+            }
+    }
+
+    private fun renderWatch(rows: List<MarketRow>) {
+        val stars = store.favorites
+        val selected = if (stars.isEmpty()) rows.filter { it.contract.quote == "USDT" }
+            .sortedByDescending { it.ticker!!.volume }.take(5)
+        else rows.filter { it.contract.symbol in stars }.sortedBy { it.contract.symbol }.take(5)
+        val source = if (stars.isEmpty()) "Top volume USDT · 24 jam" else "Kontrak favorit"
+        view<TextView>(R.id.desk_watch_source).text = if (selected.isEmpty()) "$source · Menunggu ticker" else source
+        val list = view<LinearLayout>(R.id.desk_watch_rows)
+        list.removeAllViews()
+        for (row in selected) {
+            val ticker = requireNotNull(row.ticker)
+            val cell = activity.layoutInflater.inflate(R.layout.market_row, list, false)
+            cell.findViewById<TextView>(R.id.row_symbol).text = row.contract.symbol
+            cell.findViewById<TextView>(R.id.row_price).text = price(ticker.price)
+            cell.findViewById<TextView>(R.id.row_model).text = modelLabel(row.score)
+            cell.findViewById<TextView>(R.id.row_change).apply {
+                text = pct(ticker.change)
+                setTextColor(when {
+                    ticker.change > 0 -> Color.rgb(98, 225, 173)
+                    ticker.change < 0 -> Color.rgb(255, 130, 152)
+                    else -> Color.LTGRAY
+                })
+            }
+            cell.isFocusable = true
+            cell.setOnClickListener { showToken(row) }
+            list.addView(cell)
+        }
+    }
+
     private fun configure(spinner: Spinner, options: List<String>) {
         spinner.adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item, options)
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
@@ -167,6 +261,7 @@ internal class TradingDesk(
         clearTokenList()
         snapshot = Scan()
         btcTicker = null
+        view<LinearLayout>(R.id.desk_watch_rows).removeAllViews()
     }
 
     private fun clearTokenList() {
@@ -222,7 +317,7 @@ internal class TradingDesk(
             .setPositiveButton("Tutup", null)
             .setNeutralButton(if (starred) "Hapus favorit" else "Tambah favorit") { _, _ ->
                 store.favorites = if (starred) store.favorites - symbol else store.favorites + symbol
-                listTokens()
+                if (tab == 0) renderTerminal(SystemClock.elapsedRealtime()) else listTokens()
             }.show()
     }
 

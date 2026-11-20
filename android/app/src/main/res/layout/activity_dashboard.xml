@@ -1,82 +1,136 @@
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent"
-    android:fillViewport="true" android:background="#0A0D12">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical" android:paddingHorizontal="16dp" android:paddingTop="14dp" android:paddingBottom="20dp">
-
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
-            <ImageView android:layout_width="32dp" android:layout_height="32dp" android:src="@drawable/falcon_emblem"
-                android:importantForAccessibility="no" />
-            <TextView style="@style/DashHeading" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_marginStart="8dp" android:text="@string/app_name" android:textSize="18sp" />
-            <TextView style="@style/DashLabel" android:text="Futures USDⓈ-M" android:textColor="#FFB58F" />
-        </LinearLayout>
-        <View style="@style/MarketDivider" />
-
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="16dp" android:gravity="center_vertical" android:baselineAligned="false">
-            <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                android:orientation="vertical">
-                <TextView style="@style/DeskTitle" android:text="BTC/USDT" />
-                <TextView style="@style/DashLabel" android:text="Perpetual · Harga terakhir (USDT)" />
-            </LinearLayout>
-            <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:layout_marginStart="8dp" android:orientation="vertical" android:gravity="end">
-                <TextView style="@style/DashLabel" android:text="SMA 20" />
-                <TextView android:id="@+id/dash_signal" style="@style/DashPrice" android:text="WAIT" />
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:background="#070F1B">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="12dp" android:paddingVertical="14dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:baselineAligned="false" android:gravity="center_vertical">
+            <ImageView android:layout_width="42dp" android:layout_height="42dp" android:src="@drawable/falcon_emblem" android:importantForAccessibility="no" />
+            <LinearLayout style="@style/MarketColumn" android:layout_marginStart="8dp">
+                <TextView style="@style/DeskTitle" android:text="ME Project" />
+                <TextView style="@style/TerminalNote" android:text="Binance Futures · USDⓈ-M" />
             </LinearLayout>
         </LinearLayout>
-        <TextView android:id="@+id/dash_last_price" style="@style/DashPrice" android:textSize="38sp" />
-        <TextView android:id="@+id/dash_change" style="@style/DashLabel" android:textSize="15sp" android:fontFamily="sans-serif-medium" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp">
-            <LinearLayout style="@style/MarketColumn">
-                <TextView style="@style/DashLabel" android:text="Tertinggi 24 jam" />
-                <TextView android:id="@+id/dash_high" style="@style/MarketValue" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:baselineAligned="false">
+            <LinearLayout style="@style/TerminalPanel" android:layout_width="0dp" android:layout_weight="1">
+                <TextView style="@style/TerminalTitle" android:text="Saldo simulasi" />
+                <TextView style="@style/DashPrice" android:id="@+id/desk_balance" />
+                <TextView style="@style/TerminalNote" android:text="USDT · Virtual" />
             </LinearLayout>
-            <LinearLayout style="@style/MarketColumn">
-                <TextView style="@style/DashLabel" android:text="Terendah 24 jam" />
-                <TextView android:id="@+id/dash_low" style="@style/MarketValue" />
+            <LinearLayout style="@style/TerminalPanel" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="6dp">
+                <TextView style="@style/TerminalTitle" android:text="Status bot" />
+                <TextView style="@style/MarketValue" android:id="@+id/desk_bot" />
+                <TextView style="@style/TerminalNote" android:id="@+id/dash_status" />
             </LinearLayout>
         </LinearLayout>
-        <TextView android:id="@+id/dash_ticker_time" style="@style/DashLabel" android:layout_marginTop="6dp" />
-
-        <LinearLayout style="@style/DashPanel">
-            <TextView style="@style/DashHeading" android:text="Grafik harga" />
-            <TextView style="@style/DashLabel" android:text="Penutupan · 1 menit · USDT" />
-            <com.mefuturesaibot.app.ClosePriceChart android:id="@+id/dash_chart" android:layout_width="match_parent"
-                android:layout_height="144dp" android:layout_marginTop="12dp" android:visibility="gone" />
-            <TextView android:id="@+id/dash_chart_key" style="@style/DashLabel" android:visibility="gone" />
-            <TextView android:id="@+id/dash_history_status" style="@style/DashLabel" android:layout_marginTop="10dp" />
-            <Button android:id="@+id/dash_history" style="?android:attr/borderlessButtonStyle"
-                android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp"
-                android:text="Riwayat candle" android:textColor="#FFB58F" android:textAllCaps="false" />
-        </LinearLayout>
-
-        <LinearLayout style="@style/DashPanel">
-            <TextView style="@style/DashHeading" android:text="Buku order" />
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" android:baselineAligned="false">
-                <LinearLayout style="@style/MarketColumn">
-                    <TextView style="@style/DashLabel" android:text="Bid tertinggi" />
-                    <TextView android:id="@+id/dash_bid" style="@style/DashPrice" android:textColor="#82E5BE" />
-                </LinearLayout>
-                <LinearLayout style="@style/MarketColumn">
-                    <TextView style="@style/DashLabel" android:text="Ask terendah" />
-                    <TextView android:id="@+id/dash_ask" style="@style/DashPrice" android:textColor="#FF9B8F" />
+        <HorizontalScrollView android:layout_width="match_parent" android:layout_height="wrap_content" android:scrollbars="none">
+            <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content">
+                <Button style="@style/TerminalLink" android:id="@+id/jump_market" android:text="Pasar" />
+                <Button style="@style/TerminalLink" android:id="@+id/jump_strategy" android:text="Strategi" />
+                <Button style="@style/TerminalLink" android:id="@+id/jump_watch" android:text="Watchlist" />
+                <Button style="@style/TerminalLink" android:id="@+id/jump_risk" android:text="Risiko" />
+            </LinearLayout>
+        </HorizontalScrollView>
+        <LinearLayout style="@style/TerminalRow">
+            <LinearLayout style="@style/TerminalColumn">
+                <LinearLayout style="@style/TerminalPanel" android:id="@+id/section_market">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+                        <TextView style="@style/TerminalTitle" android:layout_width="0dp" android:layout_weight="1" android:text="BTC/USDT · Perpetual" />
+                        <TextView style="@style/MarketValue" android:id="@+id/dash_signal_tag" android:text="WAIT" />
+                    </LinearLayout>
+                    <TextView style="@style/DashPrice" android:id="@+id/dash_last_price" android:textSize="32sp" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/dash_change" />
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:baselineAligned="false">
+                        <LinearLayout style="@style/MarketColumn">
+                            <TextView style="@style/TerminalNote" android:text="Tertinggi 24j" />
+                            <TextView style="@style/MarketValue" android:id="@+id/dash_high" />
+                        </LinearLayout>
+                        <LinearLayout style="@style/MarketColumn">
+                            <TextView style="@style/TerminalNote" android:text="Terendah 24j" />
+                            <TextView style="@style/MarketValue" android:id="@+id/dash_low" />
+                        </LinearLayout>
+                    </LinearLayout>
+                    <TextView style="@style/TerminalNote" android:id="@+id/desk_volume" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/dash_ticker_time" />
+                    <RadioGroup android:id="@+id/dash_interval" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+                        <RadioButton android:id="@+id/dash_tf1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp" android:buttonTint="#62C4FF" android:textColor="#DCEDFF" android:text="1m" />
+                        <RadioButton android:id="@+id/dash_tf5" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp" android:buttonTint="#62C4FF" android:textColor="#DCEDFF" android:text="5m" />
+                        <RadioButton android:id="@+id/dash_tf15" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp" android:buttonTint="#62C4FF" android:textColor="#DCEDFF" android:text="15m" />
+                    </RadioGroup>
+                    <com.mefuturesaibot.app.ClosePriceChart android:id="@+id/dash_chart" android:layout_width="match_parent" android:layout_height="164dp" android:visibility="gone" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/dash_chart_key" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/dash_history_status" />
+                    <Button style="@style/TerminalLink" android:id="@+id/dash_history" android:text="Riwayat candle" />
                 </LinearLayout>
             </LinearLayout>
-            <TextView android:id="@+id/dash_quote_time" style="@style/DashLabel" android:layout_marginTop="8dp" />
-        </LinearLayout>
-
-        <LinearLayout style="@style/DashPanel" android:background="@drawable/dashboard_signal">
-            <TextView style="@style/DashHeading" android:text="Sinyal SMA 20" />
-            <TextView android:id="@+id/dash_reason" style="@style/DashLabel" android:layout_marginTop="2dp" />
-            <LinearLayout android:id="@+id/dash_sma_panel" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:orientation="vertical" android:visibility="gone">
-                <View style="@style/MarketDivider" />
-                <TextView android:id="@+id/dash_sma_details" style="@style/DashLabel" android:lineSpacingExtra="2dp" android:layout_marginTop="8dp" />
+            <LinearLayout style="@style/TerminalColumn">
+                <LinearLayout style="@style/TerminalPanel">
+                    <TextView style="@style/TerminalTitle" android:text="Model AI · BTC/USDT" />
+                    <TextView style="@style/MarketValue" android:id="@+id/desk_score" />
+                    <ProgressBar android:id="@+id/desk_meter" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="8dp" android:max="100" android:progressTint="#58CEFD" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/desk_model" />
+                </LinearLayout>
+                <LinearLayout style="@style/TerminalPanel" android:id="@+id/section_strategy">
+                    <TextView style="@style/TerminalTitle" android:text="Sinyal strategi · SMA 20" />
+                    <TextView style="@style/DashPrice" android:id="@+id/dash_signal" android:text="WAIT" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/dash_reason" />
+                    <LinearLayout style="@style/TerminalColumn" android:layout_width="match_parent" android:layout_weight="0" android:id="@+id/dash_sma_panel" android:visibility="gone">
+                        <TextView style="@style/TerminalNote" android:id="@+id/dash_sma_details" />
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
-        <TextView android:id="@+id/dash_status" style="@style/DashLabel" android:layout_marginTop="12dp" />
+        <LinearLayout style="@style/TerminalCompactRow">
+            <LinearLayout style="@style/TerminalCompactColumn">
+                <LinearLayout style="@style/TerminalPanel">
+                    <TextView style="@style/TerminalTitle" android:text="Kondisi pasar · 24 jam" />
+                    <TextView style="@style/MarketValue" android:id="@+id/desk_breadth" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/desk_coverage" />
+                </LinearLayout>
+            </LinearLayout>
+            <LinearLayout style="@style/TerminalCompactColumn">
+                <LinearLayout style="@style/TerminalPanel">
+                    <TextView style="@style/TerminalTitle" android:text="Performa simulasi" />
+                    <TextView style="@style/MarketValue" android:id="@+id/desk_profit" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/desk_trades" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/desk_winrate" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/desk_position" />
+                    <Button style="@style/TerminalLink" android:id="@+id/desk_history" android:text="Lihat jurnal" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/TerminalCompactRow">
+            <LinearLayout style="@style/TerminalCompactColumn">
+                <LinearLayout style="@style/TerminalPanel">
+                    <TextView style="@style/TerminalTitle" android:text="Buku order · BTC/USDT" />
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:baselineAligned="false">
+                        <LinearLayout style="@style/MarketColumn">
+                            <TextView style="@style/TerminalNote" android:text="Bid tertinggi" />
+                            <TextView style="@style/MarketValue" android:id="@+id/dash_bid" android:textColor="#62E1AD" />
+                        </LinearLayout>
+                        <LinearLayout style="@style/MarketColumn">
+                            <TextView style="@style/TerminalNote" android:text="Ask terendah" />
+                            <TextView style="@style/MarketValue" android:id="@+id/dash_ask" android:textColor="#FF8298" />
+                        </LinearLayout>
+                    </LinearLayout>
+                    <TextView style="@style/TerminalNote" android:id="@+id/desk_spread" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/dash_quote_time" />
+                    <Button style="@style/TerminalLink" android:id="@+id/dash_depth_load" android:text="Muat 5 level" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/dash_depth_time" android:visibility="gone" />
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:baselineAligned="false">
+                        <TextView style="@style/TerminalNote" android:id="@+id/dash_depth_bids" android:layout_width="0dp" android:layout_weight="1" android:textColor="#62E1AD" />
+                        <TextView style="@style/TerminalNote" android:id="@+id/dash_depth_asks" android:layout_width="0dp" android:layout_weight="1" android:textColor="#FF8298" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+            <LinearLayout style="@style/TerminalCompactColumn">
+                <LinearLayout style="@style/TerminalPanel" android:id="@+id/section_watch">
+                    <TextView style="@style/TerminalTitle" android:text="Watchlist" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/desk_watch_source" />
+                    <LinearLayout android:id="@+id/desk_watch_rows" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/TerminalPanel" android:id="@+id/section_risk">
+            <TextView style="@style/TerminalTitle" android:text="Manajemen risiko · Simulasi" />
+            <TextView style="@style/TerminalNote" android:id="@+id/desk_risk" />
+            <TextView style="@style/TerminalNote" android:id="@+id/desk_targets" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

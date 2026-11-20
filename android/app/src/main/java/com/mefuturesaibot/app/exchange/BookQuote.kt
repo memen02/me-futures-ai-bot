@@ -9,6 +9,8 @@ data class BookQuote(
     val eventTimeMs: Long,
     val receivedElapsedMs: Long,
     val disconnected: Boolean = false,
+    val bidQuantity: String? = null,
+    val askQuantity: String? = null,
 ) {
     fun isStale(nowElapsedMs: Long, clock: ExchangeClock): Boolean {
         val exchangeMs = clock.at(nowElapsedMs) ?: return true
@@ -33,7 +35,8 @@ data class BookQuote(
             val askValue = ask.toBigDecimalOrNull() ?: return null
             val eventTime = data.optLong("E", 0L)
             if (bidValue.signum() <= 0 || askValue < bidValue || eventTime <= 0L) return null
-            return BookQuote(bid, ask, eventTime, receivedElapsedMs)
+            fun quantity(field: String) = data.optString(field).takeIf { (it.toBigDecimalOrNull()?.signum() ?: -1) >= 0 }
+            return BookQuote(bid, ask, eventTime, receivedElapsedMs, bidQuantity = quantity("B"), askQuantity = quantity("A"))
         }
     }
 }
