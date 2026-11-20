@@ -60,7 +60,7 @@ class DashboardTest {
             assertEquals("219.10", label(R.id.dash_bid))
             assertEquals("219.20", label(R.id.dash_ask))
             assertEquals(View.VISIBLE, visibility(R.id.dash_chart))
-            assertTrue(label(R.id.dash_chart_key).contains("219"))
+            assertTrue(label(R.id.dash_chart_key).contains("Maks 220"))
             assertTrue(label(R.id.desk_spread).contains("0.10 USDT"))
             assertTrue(label(R.id.dash_sma_details).contains("5 menit"))
             activity.renderMarket(ConnectionStatus.DISCONNECTED, quote.copy(disconnected = true), history, clock, 10_000)
