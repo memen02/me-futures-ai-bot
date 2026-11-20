@@ -1,5 +1,7 @@
 # PROJECT STATUS
 
+Nama aplikasi Android adalah **ME Project**. Nomor build terlihat di layar utama.
+
 **Fase saat ini:** pemantauan pasar publik di aplikasi Android mandiri.
 Pengujian Stop, notifikasi, jaringan, dan reboot pada HP untuk revisi ini masih tertunda.
 Lihat [skenario uji perangkat](TEST_PLAN.md#uji-pemantauan-di-hp).
@@ -35,8 +37,6 @@ Kotlin, paper trading, jurnal/PnL, dashboard lengkap. Rincian lengkap:
 
 ## Menunggu dari Anda
 
-- Ikon app kustom (sengaja belum dibuat).
-- Konfirmasi nama app final.
 - Mode Posisi (One-way/Hedge), pilihan database (Room).
 
 ## Yang TIDAK berubah

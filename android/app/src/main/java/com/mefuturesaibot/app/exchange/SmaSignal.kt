@@ -4,7 +4,16 @@ import java.math.BigDecimal
 
 enum class SignalSide { WAIT, BUY, SELL }
 
-data class SmaSignal(val side: SignalSide, val reason: String) {
+data class SmaInterval(
+    val minutes: Int,
+    val closedAtMs: Long,
+    val close: BigDecimal,
+    val sma: BigDecimal,
+) {
+    val direction: Int get() = close.compareTo(sma)
+}
+
+data class SmaSignal(val side: SignalSide, val reason: String, val intervals: List<SmaInterval> = emptyList()) {
     companion object {
         private const val PERIOD = 20
         fun waitFor(reason: String) = SmaSignal(SignalSide.WAIT, reason)
@@ -19,19 +28,20 @@ data class SmaSignal(val side: SignalSide, val reason: String) {
                 end % fiveMinuteMs == 0L && end - fiveMinuteMs >= first
             }
             if (fiveMinuteCloses.size < PERIOD) return waitFor("Menunggu 20 candle lengkap pada kedua interval")
-            val one = direction(candles)
-            val five = direction(fiveMinuteCloses)
+            val one = interval(candles, 1)
+            val five = interval(fiveMinuteCloses, 5)
+            val details = listOf(one, five)
             return when {
-                one > 0 && five > 0 -> SmaSignal(SignalSide.BUY, "Penutupan 1m dan 5m di atas SMA 20")
-                one < 0 && five < 0 -> SmaSignal(SignalSide.SELL, "Penutupan 1m dan 5m di bawah SMA 20")
-                else -> waitFor("Arah SMA 20 pada 1m dan 5m belum sejalan")
+                one.direction > 0 && five.direction > 0 -> SmaSignal(SignalSide.BUY, "Penutupan 1m dan 5m di atas SMA 20", details)
+                one.direction < 0 && five.direction < 0 -> SmaSignal(SignalSide.SELL, "Penutupan 1m dan 5m di bawah SMA 20", details)
+                else -> SmaSignal(SignalSide.WAIT, "Arah SMA 20 pada 1m dan 5m belum sejalan", details)
             }
         }
 
-        private fun direction(candles: List<Candle>): Int {
+        private fun interval(candles: List<Candle>, minutes: Int): SmaInterval {
             val closes = candles.takeLast(PERIOD).map { it.close }
             val sma = closes.reduce(BigDecimal::add).divide(BigDecimal.valueOf(PERIOD.toLong()))
-            return closes.last().compareTo(sma)
+            return SmaInterval(minutes, candles.last().openTime + CandleHistory.INTERVAL_MS - 1, closes.last(), sma)
         }
     }
 }

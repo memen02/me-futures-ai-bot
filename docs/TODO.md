@@ -14,8 +14,6 @@
 - [x] Izin notifikasi dipindah ke onCreate() (audit mandiri 2026-11-13) -- cegah race dengan startForegroundService().
 
 ## Menunggu keputusan/aset dari Anda
-- [ ] **Ikon app kustom** -- sengaja belum dibuat, Anda ingin ganti sendiri.
-- [ ] **Nama app** -- menunggu konfirmasi nama final (disebut "ME Project" di satu pesan, belum dikonfirmasi persis).
 - [ ] Mode Posisi Binance: One-way atau Hedge?
 - [ ] Database: Room (SQLite Android) sebagai pengganti `better-sqlite3`/`sql.js` yang dulu direncanakan untuk Node.js.
 

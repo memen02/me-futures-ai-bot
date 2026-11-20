@@ -15,8 +15,12 @@ android {
         applicationId = "com.mefuturesaibot.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0-fase10-foundation"
+        val run = providers.environmentVariable("GITHUB_RUN_NUMBER").orNull?.toIntOrNull()
+        val attempt = providers.environmentVariable("GITHUB_RUN_ATTEMPT").orNull?.toIntOrNull() ?: 1
+        versionCode = if (run == null) 2 else run * 100 + attempt
+        versionName = "0.2.0"
+        val build = if (run == null) "lokal" else "$run.$attempt"
+        resValue("string", "build_identity", "Versi 0.2.0 · Build $build")
     }
 
     buildTypes {

@@ -10,6 +10,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.SystemClock
 import com.mefuturesaibot.app.exchange.CandleHistory
+import com.mefuturesaibot.app.exchange.ExchangeClock
 import com.mefuturesaibot.app.exchange.CandleHistorySync
 import com.mefuturesaibot.app.exchange.BookQuote
 import android.os.IBinder
@@ -36,11 +37,12 @@ class BotForegroundService : Service() {
 
     private var socket: ReconnectingWebSocket? = null
 
-    private val candleSync = CandleHistorySync { latestHistory = it }
+    private val candleSync by lazy { CandleHistorySync(clock = exchangeClock) { latestHistory = it } }
     private var reconnecting = false
 
     override fun onCreate() {
         super.onCreate()
+        exchangeClock = ExchangeClock()
         latestHistory = CandleHistory()
         latestQuote = null
         latestStatus = ReconnectingWebSocket.ConnectionStatus.CONNECTING
@@ -111,7 +113,10 @@ class BotForegroundService : Service() {
             },
             onMessage = { message ->
                 BookQuote.parse(message, SystemClock.elapsedRealtime())?.let { quote ->
-                    if (quote.eventTimeMs >= (latestQuote?.eventTimeMs ?: 0L)) latestQuote = quote
+                    if (quote.eventTimeMs >= (latestQuote?.eventTimeMs ?: 0L)) {
+                        exchangeClock.observe(quote.eventTimeMs, quote.receivedElapsedMs)
+                        latestQuote = quote
+                    }
                 }
             },
         ).also { it.connect() }
@@ -120,7 +125,7 @@ class BotForegroundService : Service() {
     private fun ensureNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Status ME Futures AI Bot",
+            getString(R.string.channel_bot_status),
             NotificationManager.IMPORTANCE_LOW, // LOW: tidak bersuara/mengganggu, tetap persisten terlihat
         )
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
@@ -140,12 +145,9 @@ class BotForegroundService : Service() {
             PendingIntent.FLAG_IMMUTABLE,
         )
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("ME Futures AI Bot")
+            .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
-            // Placeholder: ikon stok platform, BUKAN ic_launcher_foreground (ikon
-            // berwarna penuh biasanya tampil aneh di status bar). Sengaja TIDAK
-            // dibuatkan ikon kustom dulu -- menunggu Anda, lihat TODO.md.
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(openAppIntent)
             .setOngoing(true)
             .build()
@@ -187,6 +189,9 @@ class BotForegroundService : Service() {
             private set
 
         @Volatile var latestStatus: ReconnectingWebSocket.ConnectionStatus = ReconnectingWebSocket.ConnectionStatus.CONNECTING
+            private set
+
+        var exchangeClock = ExchangeClock()
             private set
 
         @Volatile var latestHistory = CandleHistory()

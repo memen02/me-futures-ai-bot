@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "ME Futures AI Bot"
+rootProject.name = "ME Project"
 include(":app")

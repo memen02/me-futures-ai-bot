@@ -43,7 +43,7 @@ class CandleHistorySyncTest {
             .code(responseCode).message("fixture").header("Retry-After", "180")
             .body(rows(minute).joinToString(prefix = "[", postfix = "]").toResponseBody()).build()
     }.build()
-    private val sync = CandleHistorySync(client, scheduler, { now }, { 1500L }) { updates.add(it) }
+    private val sync = CandleHistorySync(client, scheduler, { now }, ExchangeClock().apply { observe(1500L, now) }) { updates.add(it) }
 
     @After fun tearDown() {
         sync.stop()

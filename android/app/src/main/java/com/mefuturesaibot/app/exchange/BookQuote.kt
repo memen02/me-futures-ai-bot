@@ -10,9 +10,11 @@ data class BookQuote(
     val receivedElapsedMs: Long,
     val disconnected: Boolean = false,
 ) {
-    fun isStale(nowElapsedMs: Long, nowEpochMs: Long): Boolean =
-        disconnected || nowElapsedMs - receivedElapsedMs >= MAX_AGE_MS ||
-            nowEpochMs - eventTimeMs >= MAX_AGE_MS
+    fun isStale(nowElapsedMs: Long, clock: ExchangeClock): Boolean {
+        val exchangeMs = clock.at(nowElapsedMs) ?: return true
+        return disconnected || nowElapsedMs - receivedElapsedMs >= MAX_AGE_MS ||
+            exchangeMs - eventTimeMs >= MAX_AGE_MS
+    }
 
     companion object {
         private const val MAX_AGE_MS = 10_000L

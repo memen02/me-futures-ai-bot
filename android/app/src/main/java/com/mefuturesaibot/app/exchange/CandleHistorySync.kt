@@ -12,7 +12,7 @@ class CandleHistorySync(
     private val client: Call.Factory = ReconnectingWebSocket.sharedHttpClient,
     private val scheduler: Scheduler = AndroidHandlerScheduler(),
     private val nowMs: () -> Long = android.os.SystemClock::elapsedRealtime,
-    private val epochMs: () -> Long = System::currentTimeMillis,
+    private val clock: ExchangeClock = ExchangeClock(),
     private val onUpdate: (CandleHistory) -> Unit,
 ) {
     private val request = Request.Builder()
@@ -55,7 +55,10 @@ class CandleHistorySync(
                         return
                     }
                     try {
-                        complete(call, CandleHistory.parseClosedCandles(it.body.string()))
+                        val received = nowMs()
+                        val date = it.headers.getDate("Date")?.time
+                        val candles = CandleHistory.parseClosedCandles(it.body.string())
+                        complete(call, candles, serverDateMs = date, receivedMs = received)
                     } catch (_: IOException) {
                         complete(call, error = "Unduhan riwayat terputus")
                     } catch (_: JSONException) {
@@ -68,10 +71,18 @@ class CandleHistorySync(
         })
     }
 
-    private fun complete(call: Call, candles: List<Candle>? = null, error: String = "", pause: Long = 0L) {
+    private fun complete(
+        call: Call,
+        candles: List<Candle>? = null,
+        error: String = "",
+        pause: Long = 0L,
+        serverDateMs: Long? = null,
+        receivedMs: Long = 0L,
+    ) {
         scheduler.post {
             if (current !== call) return@post
             current = null
+            if (serverDateMs != null) clock.observe(serverDateMs, receivedMs)
             retryAfterMs = nowMs() + pause
             val lastTime = history.candles.lastOrNull()?.openTime ?: -1L
             history = when {
@@ -81,7 +92,9 @@ class CandleHistorySync(
             }
             onUpdate(history)
             // Ambil sesaat setelah batas menit berikut, ketika candle baru telah ditutup.
-            val untilUpdate = CandleHistory.INTERVAL_MS - Math.floorMod(epochMs() - 1500L, CandleHistory.INTERVAL_MS)
+            val untilUpdate = clock.at(nowMs())?.let { exchangeMs ->
+                CandleHistory.INTERVAL_MS - Math.floorMod(exchangeMs - 1500L, CandleHistory.INTERVAL_MS)
+            } ?: CandleHistory.INTERVAL_MS
             val delayMs = if (history.syncOk) untilUpdate else maxOf(CandleHistory.INTERVAL_MS, pause)
             scheduler.postDelayed(delayMs) { refresh() }
         }
