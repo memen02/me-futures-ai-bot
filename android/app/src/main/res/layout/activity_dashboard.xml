@@ -1,77 +1,82 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="match_parent"
-    android:fillViewport="true" android:fitsSystemWindows="false" android:background="#0A0D12">
+    android:fillViewport="true" android:background="#0A0D12">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical" android:paddingHorizontal="16dp" android:paddingTop="16dp" android:paddingBottom="24dp">
+        android:orientation="vertical" android:paddingHorizontal="16dp" android:paddingTop="14dp" android:paddingBottom="20dp">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+            <ImageView android:layout_width="32dp" android:layout_height="32dp" android:src="@drawable/falcon_emblem"
+                android:importantForAccessibility="no" />
+            <TextView style="@style/DashHeading" android:layout_width="0dp" android:layout_weight="1"
+                android:layout_marginStart="8dp" android:text="@string/app_name" android:textSize="18sp" />
+            <TextView style="@style/DashLabel" android:text="Futures USDⓈ-M" android:textColor="#FFB58F" />
+        </LinearLayout>
+        <View style="@style/MarketDivider" />
 
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:gravity="center_vertical" android:baselineAligned="false">
-            <ImageView android:layout_width="44dp" android:layout_height="44dp" android:src="@drawable/falcon_emblem"
-                android:scaleType="fitCenter" android:importantForAccessibility="no"/>
+            android:layout_marginTop="16dp" android:gravity="center_vertical" android:baselineAligned="false">
             <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                android:layout_marginStart="10dp" android:orientation="vertical">
-                <TextView style="@style/DashHeading" android:text="@string/app_name" android:textAllCaps="true"
-                    android:textSize="22sp" android:fontFamily="sans-serif-condensed" android:textStyle="bold|italic" android:letterSpacing="0.05"/>
-                <TextView style="@style/DashLabel" android:text="@string/build_identity"/>
+                android:orientation="vertical">
+                <TextView style="@style/DeskTitle" android:text="BTC/USDT" />
+                <TextView style="@style/DashLabel" android:text="Perpetual · Harga terakhir (USDT)" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="8dp" android:orientation="vertical" android:gravity="end">
+                <TextView style="@style/DashLabel" android:text="SMA 20" />
+                <TextView android:id="@+id/dash_signal" style="@style/DashPrice" android:text="WAIT" />
             </LinearLayout>
         </LinearLayout>
+        <TextView android:id="@+id/dash_last_price" style="@style/DashPrice" android:textSize="38sp" />
+        <TextView android:id="@+id/dash_change" style="@style/DashLabel" android:textSize="15sp" android:fontFamily="sans-serif-medium" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp">
+            <LinearLayout style="@style/MarketColumn">
+                <TextView style="@style/DashLabel" android:text="Tertinggi 24 jam" />
+                <TextView android:id="@+id/dash_high" style="@style/MarketValue" />
+            </LinearLayout>
+            <LinearLayout style="@style/MarketColumn">
+                <TextView style="@style/DashLabel" android:text="Terendah 24 jam" />
+                <TextView android:id="@+id/dash_low" style="@style/MarketValue" />
+            </LinearLayout>
+        </LinearLayout>
+        <TextView android:id="@+id/dash_ticker_time" style="@style/DashLabel" android:layout_marginTop="6dp" />
 
-        <Button android:id="@+id/dash_market_summary" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:minHeight="48dp" android:layout_marginTop="10dp"
-            android:gravity="start|center_vertical" android:paddingHorizontal="14dp" android:textColor="#FFD0B6"
-            android:textAllCaps="false" android:backgroundTint="#30251F" android:text="Buka Scanner 24 jam  ›" />
+        <LinearLayout style="@style/DashPanel">
+            <TextView style="@style/DashHeading" android:text="Grafik harga" />
+            <TextView style="@style/DashLabel" android:text="Penutupan · 1 menit · USDT" />
+            <com.mefuturesaibot.app.ClosePriceChart android:id="@+id/dash_chart" android:layout_width="match_parent"
+                android:layout_height="144dp" android:layout_marginTop="12dp" android:visibility="gone" />
+            <TextView android:id="@+id/dash_chart_key" style="@style/DashLabel" android:visibility="gone" />
+            <TextView android:id="@+id/dash_history_status" style="@style/DashLabel" android:layout_marginTop="10dp" />
+            <Button android:id="@+id/dash_history" style="?android:attr/borderlessButtonStyle"
+                android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp"
+                android:text="Riwayat candle" android:textColor="#FFB58F" android:textAllCaps="false" />
+        </LinearLayout>
+
+        <LinearLayout style="@style/DashPanel">
+            <TextView style="@style/DashHeading" android:text="Buku order" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" android:baselineAligned="false">
+                <LinearLayout style="@style/MarketColumn">
+                    <TextView style="@style/DashLabel" android:text="Bid tertinggi" />
+                    <TextView android:id="@+id/dash_bid" style="@style/DashPrice" android:textColor="#82E5BE" />
+                </LinearLayout>
+                <LinearLayout style="@style/MarketColumn">
+                    <TextView style="@style/DashLabel" android:text="Ask terendah" />
+                    <TextView android:id="@+id/dash_ask" style="@style/DashPrice" android:textColor="#FF9B8F" />
+                </LinearLayout>
+            </LinearLayout>
+            <TextView android:id="@+id/dash_quote_time" style="@style/DashLabel" android:layout_marginTop="8dp" />
+        </LinearLayout>
 
         <LinearLayout style="@style/DashPanel" android:background="@drawable/dashboard_signal">
-            <TextView style="@style/DashLabel" android:text="BTC/USDT   ·   Sinyal SMA 20" android:textColor="#FFD4BC"/>
-            <TextView android:id="@+id/dash_signal" style="@style/DashHeading" android:text="WAIT"
-                android:fontFamily="sans-serif-condensed" android:textStyle="bold" android:textSize="44sp" android:includeFontPadding="false"/>
-            <TextView android:id="@+id/dash_reason" style="@style/DashLabel" android:textSize="15sp" android:layout_marginTop="4dp"/>
-        </LinearLayout>
-
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="8dp" android:gravity="center_vertical">
-            <Button android:id="@+id/dash_start" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:minHeight="50dp" android:text="Start" android:textAllCaps="false"
-                android:textColor="#1B120E" android:backgroundTint="#FF8655"/>
-            <Button android:id="@+id/dash_stop" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:minHeight="50dp" android:text="Stop" android:textAllCaps="false"
-                android:textColor="#F4ECE4" android:backgroundTint="#303740"/>
-        </LinearLayout>
-        <TextView android:id="@+id/dash_status" style="@style/DashLabel" android:layout_marginStart="4dp"/>
-
-        <LinearLayout style="@style/DashPanel">
-            <TextView style="@style/DashHeading" android:text="Harga pasar"/>
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:baselineAligned="false">
-                <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
-                    <TextView style="@style/DashLabel" android:text="Bid · beli tertinggi"/>
-                    <TextView android:id="@+id/dash_bid" style="@style/DashPrice" android:textColor="#82E5BE"/>
-                </LinearLayout>
-                <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp" android:orientation="vertical">
-                    <TextView style="@style/DashLabel" android:text="Ask · jual terendah"/>
-                    <TextView android:id="@+id/dash_ask" style="@style/DashPrice" android:textColor="#FFA88A"/>
-                </LinearLayout>
+            <TextView style="@style/DashHeading" android:text="Sinyal SMA 20" />
+            <TextView android:id="@+id/dash_reason" style="@style/DashLabel" android:layout_marginTop="2dp" />
+            <LinearLayout android:id="@+id/dash_sma_panel" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:visibility="gone">
+                <View style="@style/MarketDivider" />
+                <TextView android:id="@+id/dash_sma_details" style="@style/DashLabel" android:lineSpacingExtra="2dp" android:layout_marginTop="8dp" />
             </LinearLayout>
-            <TextView android:id="@+id/dash_quote_time" style="@style/DashLabel" android:layout_marginTop="10dp"/>
         </LinearLayout>
-
-        <LinearLayout style="@style/DashPanel">
-            <TextView style="@style/DashHeading" android:text="Harga penutupan · USDT"/>
-            <TextView android:id="@+id/dash_history_status" style="@style/DashLabel" android:layout_marginTop="4dp"/>
-            <com.mefuturesaibot.app.ClosePriceChart android:id="@+id/dash_chart" android:layout_width="match_parent"
-                android:layout_height="112dp" android:layout_marginTop="12dp" android:visibility="gone"/>
-            <TextView android:id="@+id/dash_chart_key" style="@style/DashLabel" android:visibility="gone"/>
-            <Button android:id="@+id/dash_history" style="?android:attr/borderlessButtonStyle"
-                android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp"
-                android:text="Lihat riwayat candle" android:textColor="#FFAB83" android:textAllCaps="false"/>
-        </LinearLayout>
-
-        <LinearLayout android:id="@+id/dash_sma_panel" style="@style/DashPanel" android:visibility="gone">
-            <TextView style="@style/DashHeading" android:text="Rincian SMA 20"/>
-            <TextView android:id="@+id/dash_sma_details" style="@style/DashLabel" android:textSize="15sp"
-                android:lineSpacingExtra="3dp" android:layout_marginTop="8dp"/>
-        </LinearLayout>
-        <Switch android:id="@+id/dash_auto_start" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:minHeight="52dp" android:layout_marginTop="10dp" android:text="Auto Start setelah reboot" android:textColor="#E4E1DD"/>
+        <TextView android:id="@+id/dash_status" style="@style/DashLabel" android:layout_marginTop="12dp" />
     </LinearLayout>
 </ScrollView>

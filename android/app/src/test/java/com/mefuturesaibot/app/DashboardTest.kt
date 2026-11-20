@@ -46,9 +46,12 @@ class DashboardTest {
             activity.renderMarket(ConnectionStatus.DISCONNECTED, quote.copy(disconnected = true), history, clock, 10_000)
             assertEquals("WAIT", label(R.id.dash_signal))
             assertTrue(label(R.id.dash_quote_time).contains("kedaluwarsa"))
-            activity.findViewById<Switch>(R.id.dash_auto_start).isChecked = true
+            activity.findViewById<View>(R.id.nav_account).performClick()
+            activity.findViewById<Switch>(R.id.account_autostart).isChecked = true
             assertTrue(BotPreferences.isAutoStartEnabled(activity))
-            activity.findViewById<View>(R.id.dash_stop).performClick()
+            activity.findViewById<View>(R.id.nav_scanner).performClick()
+            activity.findViewById<View>(R.id.scan_stop).performClick()
+            activity.findViewById<View>(R.id.nav_home).performClick()
             assertEquals(View.GONE, visibility(R.id.dash_chart))
             assertEquals(View.GONE, visibility(R.id.dash_sma_panel))
             assertEquals("—", label(R.id.dash_ask))

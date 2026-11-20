@@ -20,7 +20,7 @@ internal data class Ticker(
 internal data class MarketRow(val contract: Contract, val ticker: Ticker?, val score: Double?)
 internal data class Scan(
     val rows: List<MarketRow> = emptyList(), val time: Long = 0, val received: Long = 0,
-    val status: String = "Tekan Start untuk memindai pasar", val ok: Boolean = false,
+    val status: String = "Menunggu pemindaian pasar", val ok: Boolean = false,
 ) {
     fun fresh(elapsed: Long) = ok && elapsed - received in 0L..120_000L
 }

@@ -28,6 +28,9 @@ class DeskNavigationTest {
                 MarketRow(Contract("BTCUSDT", "USDT"), null, null))
             desk.update(Scan(rows, 1000, SystemClock.elapsedRealtime(), "Aktif", true), true)
             val list = activity.findViewById<ListView>(R.id.scan_list)
+            assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.scan_stop).visibility)
+            assertEquals(View.GONE, activity.findViewById<View>(R.id.scan_start).visibility)
+            assertEquals("—", activity.findViewById<TextView>(R.id.dash_last_price).text.toString())
             assertEquals(2, list.count)
             activity.findViewById<EditText>(R.id.scan_query).setText("eth")
             assertEquals(1, list.count)
@@ -39,11 +42,40 @@ class DeskNavigationTest {
         } finally { controller.pause().stop().destroy() }
     }
 
+    @Test fun btcSummaryUsesFreshBtcTickerAndClearsOnExpiryOrStop() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        try {
+            val activity = controller.get()
+            val desk = TradingDesk(activity, 0) {}
+            val btc = Ticker(62105.4, -2.0, 64000.0, 61000.0, 1_500_000.0, 62500.0, 200_000)
+            val rows = listOf(MarketRow(Contract("ETHUSDT", "USDT"), btc.copy(price = 1300.0), null),
+                MarketRow(Contract("BTCUSDT", "USDT"), btc, null))
+            val scan = Scan(rows, btc.time, SystemClock.elapsedRealtime(), "Aktif", true)
+            fun label(id: Int) = activity.findViewById<TextView>(id).text.toString()
+            desk.update(scan, true)
+            assertEquals("62,105.40", label(R.id.dash_last_price))
+            assertEquals("64,000.00", label(R.id.dash_high))
+            assertEquals("61,000.00", label(R.id.dash_low))
+            assertTrue(label(R.id.dash_change).contains("-2.00%"))
+            desk.update(scan.copy(time = btc.time + 120_001), true)
+            assertEquals("—", label(R.id.dash_last_price))
+            desk.update(scan, false)
+            assertEquals("—", label(R.id.dash_high))
+            assertTrue(label(R.id.dash_ticker_time).contains("nonaktif"))
+            desk.close()
+        } finally { controller.pause().stop().destroy() }
+    }
+
     @Test fun tabsLeadToScannerPaperAndLocalAccount() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         try {
             val activity = controller.get()
-            activity.findViewById<View>(R.id.dash_market_summary).performClick()
+            val home = activity.findViewById<View>(R.id.page_home)
+            assertNull(home.findViewById<View>(R.id.scan_start))
+            assertNull(home.findViewById<View>(R.id.scan_stop))
+            activity.findViewById<View>(R.id.nav_scanner).performClick()
+            assertTrue(activity.findViewById<View>(R.id.scan_start).isShown)
+            assertFalse(activity.findViewById<View>(R.id.scan_stop).isShown)
             assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.page_scanner).visibility)
             assertEquals(View.GONE, activity.findViewById<View>(R.id.page_home).visibility)
             assertEquals(0, activity.findViewById<ListView>(R.id.scan_list).count)

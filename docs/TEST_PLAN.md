@@ -75,7 +75,7 @@ dari pesan error build Gradle sungguhan, dicatat di `CHANGELOG.md`.
 ## Uji pemantauan di HP
 
 Hasil untuk revisi ini masih tertunda. Catat versi Android, model HP, commit APK,
-dan hasil tiap skenario. Gunakan stream publik BTC/USDT.
+dan hasil tiap skenario. Gunakan stream publik BTC/USDT. Kontrol Mulai bot dan Hentikan bot ada di tab Scanner. Auto Start ada di tab Akun.
 
 | Langkah | Hasil yang diharapkan |
 |---|---|
@@ -87,7 +87,7 @@ dan hasil tiap skenario. Gunakan stream publik BTC/USDT.
 
 ### Uji riwayat candle BTC/USDT
 
-1. Tekan Start dan buka **Riwayat tersinkron**. Periksa 120 candle 1 menit.
+1. Jalankan bot dari Scanner, lalu buka **Dasbor → Riwayat candle**. Periksa 120 candle 1 menit.
    Daftar menampilkan waktu buka di zona waktu HP, terbaru di atas. Ketuk
    satu candle untuk melihat harga buka, tertinggi, terendah, tutup, serta volume.
 2. Catat waktu candle terakhir dan tutup daftar. Matikan jaringan selama tiga
@@ -103,5 +103,5 @@ dan hasil tiap skenario. Gunakan stream publik BTC/USDT.
 2. Dengan internet mati, buka ulang aplikasi. Pemeriksaan berhenti setelah
    20 detik. Pulihkan jaringan lalu coba lagi, atau buka dasbor secara manual.
 3. Pindah ke aplikasi lain saat pemeriksaan, lalu kembali. Pemeriksaan dimulai
-   kembali. Jika layanan pemantauan sedang aktif, periksa bahwa tombol Stop
-   tetap berfungsi setelah masuk ke dasbor.
+   kembali. Jika layanan pemantauan sedang aktif, periksa bahwa tombol Hentikan bot
+   berfungsi saat tab Scanner dibuka.
