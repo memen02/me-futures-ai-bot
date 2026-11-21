@@ -49,6 +49,7 @@ internal class TradingDesk(
     private fun <T : View> view(id: Int): T = activity.findViewById(id)
     private val store = DeskStore(activity)
     private val accountPage = AccountPage(activity)
+    private val demo = com.mefuturesaibot.app.demo.DemoControls(activity, start)
     private val nav = listOf(R.id.nav_home, R.id.nav_scanner, R.id.nav_paper, R.id.nav_account)
     private val pages = listOf(R.id.page_home, R.id.page_scanner, R.id.page_paper, R.id.page_account)
     private val query = view<EditText>(R.id.scan_query)
@@ -93,7 +94,7 @@ internal class TradingDesk(
         select(initialTab)
     }
 
-    fun close() = accountPage.close()
+    fun close() { demo.close(); accountPage.close() }
 
     fun select(index: Int) {
         if (tab == 1 && index != tab) clearTokenList()
@@ -210,14 +211,21 @@ internal class TradingDesk(
         view<TextView>(R.id.desk_position).text = position?.let {
             "${if (it.side > 0) "LONG" else "SHORT"} ${it.symbol} · Entry ${price(it.entry)}"
         } ?: "Belum ada posisi terbuka"
-        view<TextView>(R.id.desk_risk).text = "Ukuran posisi ${money(PaperPosition.NOTIONAL)} USDT · Maks. 1 posisi\n" +
-            "Batas rugi ${money(PaperPosition.LOSS_LIMIT)} USDT · Target laba ${money(PaperPosition.PROFIT_TARGET)} USDT"
-        view<TextView>(R.id.desk_targets).text = "Evaluasi saat scan · Maks. ${PaperPosition.MAX_MINUTES} menit · Biaya 0,05% per sisi" +
-            if (position == null) "" else {
-                val stop = position.entry * (1 - position.side * PaperPosition.LOSS_LIMIT / PaperPosition.NOTIONAL)
-                val target = position.entry * (1 + position.side * PaperPosition.PROFIT_TARGET / PaperPosition.NOTIONAL)
-                "\nAmbang harga ${position.symbol} · SL ${price(stop)} · TP ${price(target)}"
-            }
+        view<TextView>(R.id.desk_risk).text = "Risiko 0,5% · 1 posisi · batas rugi harian 1,5% (UTC)"
+        val status = when {
+            !running -> "WAIT · pemantauan berhenti"
+            !fresh && snapshot.ok -> "WAIT · data kedaluwarsa"
+            else -> snapshot.status
+        }
+        view<TextView>(R.id.desk_targets).text = listOfNotNull(status,
+            position?.let { "SL ${price(it.stop)} · TP ${price(it.target)}" }).joinToString("\n")
+        if (account.measured > 0) {
+            val gain = if (account.measuredWins > 0) money(account.profits / account.measuredWins) else "—"
+            val loss = if (account.measuredLosses > 0) money(account.losses / account.measuredLosses) else "—"
+            view<TextView>(R.id.desk_winrate).append("\nModel + SMA · ${account.measured} transaksi terukur" +
+                "\nNet/trade ${money((account.profits - account.losses) / account.measured)} USDT · drawdown ${money(100 * account.drawdown)}%" +
+                "\nRata-rata laba $gain / rugi $loss USDT")
+        }
     }
 
     private fun renderWatch(rows: List<MarketRow>) {
@@ -331,10 +339,11 @@ internal class TradingDesk(
             append("Regresi logistik · ${model.rounds} ronde belajar\n")
             append(if (model.rounds < MarketModel.WARMUP) "Pemanasan ${model.rounds}/${MarketModel.WARMUP}. " else "Model siap menilai arah. ")
             append("Entry virtual memakai skor model dan konfirmasi SMA 20 pada 1m dan 5m.\n")
-            append("100 USDT per posisi · biaya simulasi 0,05% per sisi.")
+            append("Risiko 0,5% · fee 0,05% dan slippage 0,02% per sisi · funding menurut bursa.")
         }
         view<TextView>(R.id.paper_open).text = if (position == null) "Belum ada posisi terbuka" else buildString {
-            append("${if (position.side > 0) "LONG" else "SHORT"}  ${position.symbol} · 100 USDT\nEntry   ${price(position.entry)}\n")
+            append("${if (position.side > 0) "LONG" else "SHORT"}  ${position.symbol} · ${money(position.quantity * position.entry)} USDT\nEntry   ${price(position.entry)}\n")
+            append("SL ${price(position.stop)} · TP ${price(position.target)}\n")
             append("PnL berjalan   ${unrealized?.let(::money) ?: "menunggu harga"} USDT")
             if (!store.simulation) append("\nMenunggu harga valid untuk menutup posisi.")
         }
