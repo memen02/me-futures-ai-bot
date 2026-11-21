@@ -24,8 +24,10 @@ internal class CredentialVault(
     private val loadKey: (create: Boolean) -> SecretKey,
     private val eraseKey: () -> Unit,
 ) {
-    constructor(context: Context) : this(File(context.noBackupFilesDir, "binance-account.bin"),
-        ::androidKey, { keyStore().deleteEntry(ALIAS) })
+    constructor(context: Context, demo: Boolean = false) : this(
+        File(context.noBackupFilesDir, if (demo) "binance-demo.bin" else "binance-account.bin"),
+        { create -> androidKey(if (demo) DEMO_ALIAS else ALIAS, create) },
+        { keyStore().deleteEntry(if (demo) DEMO_ALIAS else ALIAS) })
 
     private val file = AtomicFile(location)
     fun exists() = file.baseFile.exists() || File(file.baseFile.path + ".bak").exists()
@@ -72,14 +74,15 @@ internal class CredentialVault(
 
     private companion object {
         const val ALIAS = "me_project_binance_account_v1"
+        const val DEMO_ALIAS = "me_project_binance_demo_v1"
         val lock = Any()
         fun keyStore(): KeyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        fun androidKey(create: Boolean): SecretKey {
-            val existing = keyStore().getKey(ALIAS, null) as? SecretKey
+        fun androidKey(alias: String, create: Boolean): SecretKey {
+            val existing = keyStore().getKey(alias, null) as? SecretKey
             if (existing != null) return existing
             check(create)
             val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
-            generator.init(KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            generator.init(KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256).build())

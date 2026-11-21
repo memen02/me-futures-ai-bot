@@ -46,33 +46,43 @@ class MarketDeskTest {
         assertEquals(next, confirmed.eligible(scan(next)))
     }
 
-    @Test fun virtualLedgerIsIdempotentAndBooksBothFees() {
+    @Test fun riskAndLedgerUseNetRewardAndBookFundingOnce() {
         val entry = row()
-        val book = PaperAccount()
-        assertSame(book, book.advance(scan(entry), entry, false))
-        val open = book.advance(scan(entry), entry, true)
-        assertEquals(999.95, open.balance, 0.000001)
-        assertSame(open, open.advance(scan(entry), entry, true))
-        val next = row(103.0, 120_000L)
-        val done = open.advance(scan(next), null, true)
+        val q = Quote(99.99,100.0,60_000)
+        val plan = RiskPlan.build(1,q,Levels(99.0,104.0),1000.0,60_000)
+        assertTrue(plan.quantity in 4.0..5.0)
+        assertThrows(IllegalArgumentException::class.java) { RiskPlan.build(1,q,Levels(99.0,102.0),1000.0,60_000) }
+        assertThrows(IllegalArgumentException::class.java) { RiskPlan.build(1,q.copy(bid=99.0),Levels(99.0,105.0),1000.0,60_000) }
+        val initial = PaperAccount()
+        val open = initial.advance(scan(entry),"ETHUSDT",plan,true,q)
+        assertEquals(initial.balance - plan.quantity * plan.entry * RiskPlan.FEE,open.balance,0.000001)
+        assertEquals(open,PaperAccount.read(open.json()))
+        val funding = listOf(Funding(90_000,0.001,100.0))
+        val middle = open.advance(scan(row(time=120_000)),null,null,true,q.copy(at=120_000),funding)
+        val done = middle.advance(scan(row(time=180_000)),null,null,true,Quote(104.1,104.11,180_000),funding)
+        val exit = 104.1 * (1 - RiskPlan.SLIP)
+        val net = plan.quantity * (exit-plan.entry - RiskPlan.FEE*(exit+plan.entry) - 0.1)
         assertNull(done.position)
-        assertEquals(1002.8985, done.balance, 0.000001)
-        assertEquals(1, done.trades)
-        assertEquals(1, done.ratedTrades)
-        assertEquals(done, PaperAccount.read(done.json()))
-        val legacy = done.json().apply { remove("rated"); remove("wins") }
-        assertEquals(0, PaperAccount.read(legacy).ratedTrades)
-        assertEquals(done, PaperAccount.read(done.json()))
-        assertEquals(open, PaperAccount.read(open.json()))
+        assertEquals(1000.0 + net,done.balance,0.000001)
+        assertEquals(net,done.profits,0.000001)
+        assertSame(done,done.advance(scan(row(time=180_000)),null,null,true,q))
+        assertEquals(done,PaperAccount.read(done.json()))
     }
 
-    @Test fun disabledBotClosesVirtualShortAtNextValidQuote() {
-        val entry = row(score = 0.3)
-        val open = PaperAccount().advance(scan(entry), entry, true)
-        assertEquals(-1, open.position!!.side)
-        val later = row(99.8, 120_000L)
-        val invalid = scan(later).copy(ok = false)
-        assertSame(open, open.advance(invalid, null, false))
-        assertNull(open.advance(scan(later), null, false).position)
+    @Test fun dayLockAndMigrationAndShortExit() {
+        val q = Quote(99.99,100.0,60_000)
+        val plan = RiskPlan.build(-1,q,Levels(96.0,101.0),1000.0,60_000)
+        val account = PaperAccount(balance=980.0,day=0,dayStart=1000.0)
+        assertSame(account,account.advance(scan(row()),contract.symbol,plan,true,q))
+        assertFalse(account.locked(86_400_000))
+        val open = PaperAccount().advance(scan(row()),contract.symbol,plan,true,q)
+        assertSame(open,open.advance(scan(row(time=120_000)),null,null,false,q))
+        val done = open.advance(scan(row(time=120_000)),null,null,false,q.copy(at=120_000))
+        assertNull(done.position)
+        assertEquals(1,done.measuredLosses)
+        val json = open.json()
+        json.getJSONObject("position").apply { remove("qty");remove("stop");remove("target") }
+        val legacy = PaperAccount.read(json).position!!
+        assertEquals(100.0,legacy.quantity * legacy.entry,0.000001)
     }
 }
