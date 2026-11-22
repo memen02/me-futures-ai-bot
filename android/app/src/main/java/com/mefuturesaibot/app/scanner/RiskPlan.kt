@@ -30,8 +30,9 @@ internal data class RiskPlan(val side: Int, val entry: Double, val stop: Double,
         const val RISK = 0.005
         const val DAY_LIMIT = 0.015
 
-        fun build(side: Int, q: Quote, levels: Levels, equity: Double, now: Long): RiskPlan {
+        fun build(side: Int, q: Quote, levels: Levels, equity: Double, now: Long, fee: Double = FEE): RiskPlan {
             require(side == 1 || side == -1)
+            require(fee.isFinite() && fee >= 0 && fee < 1) { "tarif transaksi tidak valid" }
             q.problem(now)?.let { throw IllegalArgumentException(it) }
             require(equity.isFinite() && equity > 0) { "ekuitas tidak tersedia" }
             val entry = (if (side == 1) q.ask else q.bid) * (1 + side * SLIP)
@@ -42,10 +43,10 @@ internal data class RiskPlan(val side: Int, val entry: Double, val stop: Double,
             }
             val exitStop = stop * (1 - side * SLIP)
             val exitTarget = target * (1 - side * SLIP)
-            val loss = abs(entry - exitStop) + FEE * (entry + exitStop)
-            val profit = side * (exitTarget - entry) - FEE * (entry + exitTarget)
+            val loss = abs(entry - exitStop) + fee * (entry + exitStop)
+            val profit = side * (exitTarget - entry) - fee * (entry + exitTarget)
             require(profit >= 2 * loss) { "rasio laba/rugi bersih di bawah 2" }
-            val qty = min(equity * RISK / loss, equity / (entry * (1 + FEE)))
+            val qty = min(equity * RISK / loss, equity / (entry * (1 + fee)))
             return RiskPlan(side, entry, stop, target, qty)
         }
     }

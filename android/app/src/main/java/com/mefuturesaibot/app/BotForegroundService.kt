@@ -99,7 +99,7 @@ class BotForegroundService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null // tidak dipakai, MainActivity poll companion object
 
-    private fun demoPrefs() = getSharedPreferences(com.mefuturesaibot.app.demo.DemoRunner.PREFS, MODE_PRIVATE)
+    private fun demoPrefs() = com.mefuturesaibot.app.demo.FuturesVenue.installed.prefs(this)
 
     private fun stopEverything() {
         BotPreferences.setShouldRun(this, false)

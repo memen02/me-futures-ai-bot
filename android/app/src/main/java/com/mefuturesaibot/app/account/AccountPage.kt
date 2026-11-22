@@ -21,6 +21,7 @@ internal class AccountPage(
     private val activity: Activity,
     private val vault: CredentialVault = CredentialVault(activity),
     private val checker: BinanceAccountCheck = BinanceAccountCheck(),
+    private val credentialsChanged: () -> Unit = {},
 ) {
     private val worker = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -88,13 +89,25 @@ internal class AccountPage(
         secret.error = null
     }
 
+    private fun changeCredentials(action: () -> Unit) {
+        synchronized(com.mefuturesaibot.app.demo.DemoRunner.entryLock) {
+            if (com.mefuturesaibot.app.BuildConfig.MAINNET_ORDERS) {
+                val live = com.mefuturesaibot.app.demo.FuturesVenue.REAL.prefs(activity)
+                if (live.getBoolean("enabled",false) || live.contains("intent"))
+                    throw AccountCheckError("Nonaktifkan trading dan tunggu konfirmasi posisi ditutup sebelum mengganti key.")
+                check(live.edit().remove("consentKey").commit())
+            }
+            action()
+        }
+    }
+
     private fun save() {
         val api = key.text.toString().trim()
         val signing = secret.text.toString().trim()
         if (!valid(api)) { key.error = "Masukkan API Key HMAC tanpa spasi."; key.requestFocus(); return }
         if (!valid(signing)) { secret.error = "Masukkan API Secret HMAC tanpa spasi."; secret.requestFocus(); return }
         run("Menyimpan di perangkat…", "Gagal menyimpan secara terenkripsi. Periksa perangkat lalu coba lagi.",
-            { vault.save(BinanceCredentials(api, signing)) }) {
+            { changeCredentials { vault.save(BinanceCredentials(api, signing)) } }) {
             clearFields()
             editing = false
             message = "Kredensial tersimpan · siap diuji"
@@ -118,7 +131,7 @@ internal class AccountPage(
     }
 
     private fun remove() {
-        run("Menghapus dari perangkat…", "Penghapusan gagal. Coba lagi.", { vault.remove() }) {
+        run("Menghapus dari perangkat…", "Penghapusan gagal. Coba lagi.", { changeCredentials { vault.remove() } }) {
             editing = false
             clearFields()
             message = null
@@ -139,6 +152,7 @@ internal class AccountPage(
                 if (disposed) return@post
                 busy = false
                 saved = vault.exists()
+                credentialsChanged()
                 result.fold(done) { e -> message = (e as? AccountCheckError)?.explanation ?: error }
                 render()
             }

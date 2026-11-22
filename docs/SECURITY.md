@@ -11,7 +11,19 @@ Tab Akun menyimpan pasangan HMAC milik pengguna dalam satu berkas privat di `noB
 
 Uji koneksi membaca waktu Binance dan menandatangani GET ke `/fapi/v1/accountConfig`. GET opsional ke `/sapi/v1/account/apiRestrictions` memeriksa izin Futures dan penarikan pada key. API Secret dipakai di perangkat untuk HMAC. Kegagalan membaca izin ditampilkan sebagai belum terverifikasi.
 
-Trading otomatis memakai portofolio simulasi. Menghubungkan akun hanya mengaktifkan pemeriksaan akses.
+Menyimpan key atau mengetuk Uji koneksi hanya memeriksa akses. Pada varian Real,
+mengaktifkan eksekusi memerlukan pemeriksaan akun One-way, alokasi USDT dan
+persetujuan terpisah di HP. Persetujuan terikat pada identitas API key.
+Gunakan akun Futures khusus untuk bot agar transaksi manual tidak bercampur
+dengan order dan perhitungan hasil strategi.
+
+Sesudah entry, aplikasi mengirim stop dan target ke bursa. Koneksi yang putus
+sebelum Binance menerima stop dapat membuat posisi terbuka tanpa proteksi.
+Periksa posisi dan order langsung di Binance jika HP kehilangan koneksi pada
+tahap itu. Ketika terhubung kembali, aplikasi memeriksa order yang dipersistenkan
+sebelum mengirim entry baru. Stop bot meminta penutupan dengan reduceOnly.
+Slippage, likuidasi dan kegagalan eksekusi dapat menimbulkan kerugian yang
+melampaui risiko terencana. Hasil simulasi lokal berada pada kartu terpisah.
 
 ## Apa yang TIDAK BOLEH masuk repo publik
 
