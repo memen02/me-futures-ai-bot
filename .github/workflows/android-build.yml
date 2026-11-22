@@ -58,3 +58,19 @@ jobs:
           name: me-project-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Build independently installable demo APK
+        run: |
+          gradle :app:assembleDemo --no-daemon
+          apk=app/build/outputs/apk/demo/app-demo.apk
+          aapt=$(ls -dv "$ANDROID_HOME"/build-tools/*/aapt | tail -n 1)
+          "$aapt" dump badging "$apk" > "$RUNNER_TEMP/me-project-demo-badging.txt"
+          grep -F "package: name='com.mefuturesaibot.app.demo'" "$RUNNER_TEMP/me-project-demo-badging.txt"
+          grep -Fx "application-label:'ME Project Demo'" "$RUNNER_TEMP/me-project-demo-badging.txt"
+
+      - name: Upload separately installable demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: me-project-demo-apk
+          path: android/app/build/outputs/apk/demo/app-demo.apk
+          if-no-files-found: error
