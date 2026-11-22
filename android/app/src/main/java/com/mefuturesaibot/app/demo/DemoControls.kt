@@ -44,9 +44,21 @@ internal class DemoControls(private val activity: Activity, private val start: (
         rendering = true
         val enabled = prefs.getBoolean("enabled",false)
         toggle.isChecked = enabled
-        toggle.isEnabled = vault.exists()
+        toggle.isEnabled = vault.exists() && (enabled || !prefs.contains("intent"))
         keys.isEnabled = !enabled && !prefs.contains("intent")
         label.text = prefs.getString("status", if (vault.exists()) "Key demo tersimpan" else "Masukkan key Binance Demo untuk mulai")
+        val n = prefs.getInt("n",0)
+        if (n > 0) {
+            val wins = prefs.getInt("wins",0)
+            val losing = prefs.getInt("losing",0)
+            fun value(key: String) = prefs.getString(key,"0")!!.toDouble()
+            fun average(key: String, count: Int) = if (count == 0) "—" else "%.2f".format(value(key)/count)
+            label.append("\nSMA Demo · $n transaksi · menang ${100 * wins / n}%" +
+                "\nNet/trade ${average("net",n)} USDT · drawdown tertutup ${"%.2f".format(value("maxDD"))} USDT" +
+                "\nRata-rata laba ${average("profit",wins)} / rugi ${average("loss",losing)} USDT")
+        }
+        val unrated = prefs.getInt("unrated",0)
+        if (unrated > 0) label.append("\n$unrated transaksi belum dinilai")
         rendering = false
     }
 

@@ -40,6 +40,10 @@ internal class DemoExchange(private val keys: BinanceCredentials, client: okhttp
     fun oneWay() = !JSONObject(request("GET","v1/positionSide/dual",emptyList(),true)).getBoolean("dualSidePosition")
     fun orders() = JSONArray(request("GET","v1/openOrders",listOf("symbol" to SYMBOL),true))
     fun algos() = JSONArray(request("GET","v1/openAlgoOrders",listOf("symbol" to SYMBOL),true))
+    fun tradeHistory(start: Long, end: Long) = JSONArray(request("GET","v1/userTrades",listOf(
+        "symbol" to SYMBOL, "startTime" to start.toString(),"endTime" to end.toString(),"limit" to "1000"),true))
+    fun fundingIncome(start: Long, end: Long) = JSONArray(request("GET","v1/income",listOf(
+        "symbol" to SYMBOL,"incomeType" to "FUNDING_FEE","startTime" to start.toString(),"endTime" to end.toString(),"limit" to "1000"),true))
     fun query(id: String) = JSONObject(request("GET","v1/order",listOf("symbol" to SYMBOL,"origClientOrderId" to id),true))
     fun market(side: String, qty: String, id: String, reduce: Boolean = false) = JSONObject(request("POST", "v1/order",
         listOf("symbol" to SYMBOL,"type" to "MARKET","side" to side,"quantity" to qty,"newClientOrderId" to id,

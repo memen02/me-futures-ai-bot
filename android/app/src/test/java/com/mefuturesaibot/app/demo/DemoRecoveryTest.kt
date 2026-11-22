@@ -24,6 +24,7 @@ class DemoRecoveryTest {
     private val writes = mutableListOf<String>()
     private var amount = 0.01
     private var rejectStop = false
+    private var historyVisible = true
     private val now = 100_000L
     private fun setup(): DemoExchange {
         val state = JSONObject().put("id","meD1").put("side",1).put("qty","0.01").put("created",now-20_000)
@@ -50,9 +51,14 @@ class DemoRecoveryTest {
                         order
                     }
                 }
+                "userTrades" -> JSONArray().apply {
+                    if (historyVisible) for (side in listOf("BUY","SELL")) put(JSONObject().put("side",side).put("qty",0.01)
+                        .put("commissionAsset","USDT").put("commission",0.01).put("realizedPnl",if (side=="BUY") 0 else 1))
+                }
+                "income" -> JSONArray().put(JSONObject().put("income",-0.03).put("asset","USDT"))
                 "order" -> {
                     if (req.method == "POST") { assertEquals("true",req.url.queryParameter("reduceOnly")); writes.add("exit"); amount=0.0 }
-                    JSONObject().put("status","FILLED")
+                    JSONObject().put("status","FILLED").put("executedQty",0.01)
                 }
                 else -> error("Unexpected request")
             }
@@ -71,6 +77,20 @@ class DemoRecoveryTest {
         runner.cycle(api)
         assertEquals("DELETEmeD1s",writes.last())
         assertFalse(prefs.contains("intent"))
+        assertEquals(0.95,prefs.getString("net",null)!!.toDouble(),1e-9)
+    }
+    @Test fun delayedFillHistoryPreservesPositionJournalAndCountsOnce() {
+        val api = setup()
+        amount = 0.0
+        historyVisible = false
+        DemoRunner(context).cycle(api)
+        assertTrue(prefs.contains("intent"))
+        assertEquals(0,prefs.getInt("n",0))
+        historyVisible = true
+        DemoRunner(context).cycle(api)
+        assertFalse(prefs.contains("intent"))
+        assertEquals(1,prefs.getInt("n",0))
+        assertEquals(0.95,prefs.getString("net",null)!!.toDouble(),1e-9)
     }
     @Test fun rejectedStopClosesReduceOnlyAndKeepsJournalUntilFlat() {
         val api = setup()
@@ -78,8 +98,10 @@ class DemoRecoveryTest {
         val runner = DemoRunner(context)
         runner.cycle(api)
         assertEquals(listOf("POSTmeD1s","exit"),writes)
+        assertFalse(prefs.getBoolean("enabled",true))
         assertTrue(prefs.contains("intent"))
         runner.cycle(api)
         assertFalse(prefs.contains("intent"))
+        assertEquals(0.95,prefs.getString("net",null)!!.toDouble(),1e-9)
     }
 }

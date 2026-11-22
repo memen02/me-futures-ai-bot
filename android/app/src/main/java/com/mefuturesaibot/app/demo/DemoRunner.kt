@@ -43,6 +43,7 @@ internal class DemoRunner(context: Context) {
         val existing = prefs.getString("intent", null)?.let(::JSONObject)
         if (existing != null) return reconcile(api, existing)
         val minute = api.now() / 60_000
+        if (minute == prefs.getLong("entryMinute",-1)) return "WAIT · candle ini telah diproses"
         if (minute == lastBar) return prefs.getString("status","WAIT").orEmpty()
         lastBar = minute
         if (!api.oneWay()) return "WAIT · pilih One-way Mode di akun demo khusus"
@@ -85,7 +86,7 @@ internal class DemoRunner(context: Context) {
             .put("qty",qty).put("budget",equity * RiskPlan.RISK)
         synchronized(entryLock) {
             if (closing || !prefs.getBoolean("enabled",false)) return "Demo nonaktif"
-            persist(intent)
+            check(prefs.edit().putString("intent",intent.toString()).putLong("entryMinute",minute).commit())
         }
         api.market(if (side == 1) "BUY" else "SELL",qty,id)
         return reconcile(api,intent)
@@ -110,6 +111,7 @@ internal class DemoRunner(context: Context) {
             if (order?.optString("status") == "FILLED" && api.now() - state.getLong("created") < 10_000)
                 return "WAIT · sinkronisasi posisi"
             owned.forEach { api.cancel(it.getString("clientAlgoId")) }
+            if ((order?.optDouble("executedQty",0.0) ?: 0.0) > 0) return settle(api,state,order!!)
             check(prefs.edit().remove("intent").commit())
             return "Demo · posisi kosong dan proteksi diperiksa"
         }
@@ -121,7 +123,8 @@ internal class DemoRunner(context: Context) {
         val loss = side * (entry - stopFill) + RiskPlan.FEE * (entry + stopFill)
         val gain = side * (targetFill - entry) - RiskPlan.FEE * (entry + targetFill)
         val fillOutsidePlan = loss <= 0 || gain < 2 * loss || loss * kotlin.math.abs(amount) > state.getDouble("budget")
-        val emergency = fillOutsidePlan || state.optBoolean("exit") || !prefs.getBoolean("enabled",false) ||
+        if (fillOutsidePlan) return stopAfterFailure(api,state,amount,exitSide)
+        val emergency = state.optBoolean("exit") || !prefs.getBoolean("enabled",false) ||
             api.now() - state.getLong("created") >= 30 * 60_000
         if (!emergency) {
             for ((suffix, field, type) in listOf(Triple("s","stop","STOP_MARKET"), Triple("t","target","TAKE_PROFIT_MARKET"))) {
@@ -131,14 +134,14 @@ internal class DemoRunner(context: Context) {
                     already.optDouble("triggerPrice") == state.getString(field).toDouble()) continue
                 if (already != null || state.optBoolean("sent"+suffix)) {
                     // An acknowledged trigger disappeared while a position remains.
-                    return flatten(api,state,amount,exitSide)
+                    return stopAfterFailure(api,state,amount,exitSide)
                 }
                 try {
                     api.protect(exitSide,state.getString(field),id+suffix,type)
                     state.put("sent"+suffix,true)
                     persist(state)
                 } catch (e: Rejection) {
-                    return flatten(api,state,amount,exitSide)
+                    return stopAfterFailure(api,state,amount,exitSide)
                 }
             }
             val verified = api.algos().objects().filter { it.optString("clientAlgoId") in setOf(id+"s",id+"t") }
@@ -147,10 +150,54 @@ internal class DemoRunner(context: Context) {
                     it.optString("side") == exitSide && it.optBoolean("closePosition") &&
                     it.optString("workingType") == "MARK_PRICE" && it.optDouble("triggerPrice") == state.getDouble(field) }
             }
-            if (!protected) return flatten(api,state,amount,exitSide)
+            if (!protected) return stopAfterFailure(api,state,amount,exitSide)
             return "Demo · ${if (side == 1) "LONG" else "SHORT"} BTC · SL ${state.getString("stop")} · TP ${state.getString("target")}"
         }
         return flatten(api,state,amount,exitSide)
+    }
+
+    private fun settle(api: DemoExchange, state: JSONObject, order: JSONObject): String {
+        val from = state.getLong("created")
+        val end = api.now()
+        val edit = prefs.edit().remove("intent")
+        if (end - from > 6 * 86_400_000L) {
+            check(edit.putInt("unrated",prefs.getInt("unrated",0)+1).commit())
+            return "Demo · posisi ditutup, riwayat panjang belum dinilai"
+        }
+        val fills = api.tradeHistory(from,end).objects()
+        val funding = api.fundingIncome(from,end).objects()
+        val buy = fills.filter { it.getString("side") == "BUY" }.sumOf { it.getDouble("qty") }
+        val sell = fills.filter { it.getString("side") == "SELL" }.sumOf { it.getDouble("qty") }
+        val quantity = order.getDouble("executedQty")
+        if (fills.isEmpty() || buy < quantity - 1e-10 || sell < quantity - 1e-10)
+            return "WAIT · menunggu riwayat fill Binance Demo"
+        if (kotlin.math.abs(buy-quantity) > 1e-10 || kotlin.math.abs(sell-quantity) > 1e-10 ||
+            fills.size == 1000 || funding.size == 1000 || fills.any { it.getString("commissionAsset") != "USDT" } ||
+            funding.any { it.getString("asset") != "USDT" }) {
+            check(edit.putInt("unrated",prefs.getInt("unrated",0)+1).commit())
+            return "Demo · hasil transaksi perlu rekonsiliasi manual"
+        }
+        val net = fills.sumOf { it.getDouble("realizedPnl") - it.getDouble("commission") } + funding.sumOf { it.getDouble("income") }
+        val pnl = prefs.getString("net","0")!!.toDouble() + net
+        val profit = prefs.getString("profit","0")!!.toDouble() + maxOf(net,0.0)
+        val loss = prefs.getString("loss","0")!!.toDouble() + maxOf(-net,0.0)
+        val peak = maxOf(prefs.getString("peak","0")!!.toDouble(),pnl)
+        val dd = maxOf(prefs.getString("maxDD","0")!!.toDouble(),peak-pnl)
+        val n = prefs.getInt("n",0)+1
+        val wins = prefs.getInt("wins",0)+(if (net > 0) 1 else 0)
+        val losing = prefs.getInt("losing",0)+(if (net < 0) 1 else 0)
+        check(edit.putInt("n",n).putInt("wins",wins).putInt("losing",losing).putString("net",pnl.toString())
+            .putString("profit",profit.toString()).putString("loss",loss.toString()).putString("peak",peak.toString())
+            .putString("maxDD",dd.toString()).commit())
+        return "Demo · posisi ditutup, hasil bersih tercatat"
+    }
+
+    private fun stopAfterFailure(api: DemoExchange, state: JSONObject, amount: Double, exitSide: String): String {
+        // Latch persists across app restarts. Re-arming is possible only once the position is reconciled.
+        state.put("exit",true)
+        check(prefs.edit().putBoolean("enabled",false).putString("intent",state.toString()).commit())
+        flatten(api,state,amount,exitSide)
+        return "Demo dijeda · proteksi atau fill di luar rencana · menunggu konfirmasi penutupan"
     }
 
     private fun flatten(api: DemoExchange, state: JSONObject, amount: Double, exitSide: String): String {
