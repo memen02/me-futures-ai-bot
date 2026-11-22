@@ -18,8 +18,11 @@ import com.mefuturesaibot.app.account.BinanceCredentials
 import com.mefuturesaibot.app.account.CredentialVault
 
 internal class DemoControls(private val activity: Activity, private val start: () -> Unit) {
-    private val vault = CredentialVault(activity, true)
-    private val prefs = activity.getSharedPreferences(DemoRunner.PREFS, Context.MODE_PRIVATE)
+    private val venue = FuturesVenue.installed
+    private val live = venue == FuturesVenue.REAL
+    private val vault = CredentialVault(activity, !live)
+    private val approval = if (live) LiveApproval(activity,vault,start) else null
+    private val prefs = venue.prefs(activity)
     private val toggle = activity.findViewById<Switch>(R.id.demo_enabled)
     private val label = activity.findViewById<TextView>(R.id.demo_status)
     private val keys = activity.findViewById<Button>(R.id.demo_keys)
@@ -27,11 +30,21 @@ internal class DemoControls(private val activity: Activity, private val start: (
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> render() }
 
     init {
+        if (live) {
+            activity.findViewById<TextView>(R.id.execution_heading).text = "Binance Futures Real · BTC/USDT"
+            activity.findViewById<TextView>(R.id.execution_help).text = "Bot memakai dana asli pada akun khusus One-way. Menonaktifkan bot meminta penutupan sisa posisi milik bot ketika terhubung."
+            activity.findViewById<TextView>(R.id.execution_note).text = "Saldo dan performa pada kartu simulasi tetap virtual. Hasil mainnet ditampilkan di bagian Real."
+            toggle.text = "Trading otomatis dengan dana asli"
+            keys.visibility = View.GONE
+        }
         keys.setOnClickListener { edit() }
         toggle.setOnCheckedChangeListener { _, enabled ->
-            if (!rendering) {
+            if (!rendering && enabled && live) {
+                render()
+                approval?.begin()
+            } else if (!rendering) {
                 synchronized(DemoRunner.entryLock) { prefs.edit().putBoolean("enabled", enabled).putString("status",
-                    if (enabled) "Menghubungi Binance Demo…" else "Demo nonaktif · memeriksa sisa posisi").apply() }
+                    if (enabled) "Menghubungi Binance Demo…" else "${venue.label} nonaktif · memeriksa sisa posisi").apply() }
                 if (enabled) start()
                 render()
             }
@@ -40,20 +53,21 @@ internal class DemoControls(private val activity: Activity, private val start: (
         render()
     }
 
-    private fun render() {
+    fun render() {
         rendering = true
         val enabled = prefs.getBoolean("enabled",false)
         toggle.isChecked = enabled
         toggle.isEnabled = vault.exists() && (enabled || !prefs.contains("intent"))
         keys.isEnabled = !enabled && !prefs.contains("intent")
-        label.text = prefs.getString("status", if (vault.exists()) "Key demo tersimpan" else "Masukkan key Binance Demo untuk mulai")
+        label.text = prefs.getString("status", if (vault.exists()) "Key ${venue.label} tersimpan" else "Masukkan key Binance ${venue.label} untuk mulai")
+        if (live && enabled) label.append("\nAlokasi maksimum ${prefs.getString("capital","—")} USDT")
         val n = prefs.getInt("n",0)
         if (n > 0) {
             val wins = prefs.getInt("wins",0)
             val losing = prefs.getInt("losing",0)
             fun value(key: String) = prefs.getString(key,"0")!!.toDouble()
             fun average(key: String, count: Int) = if (count == 0) "—" else "%.2f".format(value(key)/count)
-            label.append("\nSMA Demo · $n transaksi · menang ${100 * wins / n}%" +
+            label.append("\nSMA ${venue.label} · $n transaksi · menang ${100 * wins / n}%" +
                 "\nNet/trade ${average("net",n)} USDT · drawdown tertutup ${"%.2f".format(value("maxDD"))} USDT" +
                 "\nRata-rata laba ${average("profit",wins)} / rugi ${average("loss",losing)} USDT")
         }
@@ -100,5 +114,5 @@ internal class DemoControls(private val activity: Activity, private val start: (
         }
     }
 
-    fun close() { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    fun close() { approval?.close(); prefs.unregisterOnSharedPreferenceChangeListener(listener) }
 }

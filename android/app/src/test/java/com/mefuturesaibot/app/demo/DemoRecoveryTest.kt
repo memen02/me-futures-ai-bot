@@ -68,9 +68,9 @@ class DemoRecoveryTest {
     }
     @Test fun installationRecoveryAndOfflineTargetDoNotDuplicateOrders() {
         val api = setup()
-        val runner = DemoRunner(context)
+        val runner = DemoRunner(context,FuturesVenue.DEMO)
         assertTrue(runner.cycle(api).contains("LONG"))
-        DemoRunner(context).cycle(api)
+        DemoRunner(context,FuturesVenue.DEMO).cycle(api)
         assertEquals(listOf("POSTmeD1s","POSTmeD1t"),writes)
         amount = 0.0
         active.remove("meD1t")
@@ -83,11 +83,11 @@ class DemoRecoveryTest {
         val api = setup()
         amount = 0.0
         historyVisible = false
-        DemoRunner(context).cycle(api)
+        DemoRunner(context,FuturesVenue.DEMO).cycle(api)
         assertTrue(prefs.contains("intent"))
         assertEquals(0,prefs.getInt("n",0))
         historyVisible = true
-        DemoRunner(context).cycle(api)
+        DemoRunner(context,FuturesVenue.DEMO).cycle(api)
         assertFalse(prefs.contains("intent"))
         assertEquals(1,prefs.getInt("n",0))
         assertEquals(0.95,prefs.getString("net",null)!!.toDouble(),1e-9)
@@ -95,7 +95,7 @@ class DemoRecoveryTest {
     @Test fun rejectedStopClosesReduceOnlyAndKeepsJournalUntilFlat() {
         val api = setup()
         rejectStop = true
-        val runner = DemoRunner(context)
+        val runner = DemoRunner(context,FuturesVenue.DEMO)
         runner.cycle(api)
         assertEquals(listOf("POSTmeD1s","exit"),writes)
         assertFalse(prefs.getBoolean("enabled",true))

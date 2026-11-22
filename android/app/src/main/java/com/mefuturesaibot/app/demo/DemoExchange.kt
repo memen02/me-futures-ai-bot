@@ -10,9 +10,12 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-internal class Rejection(val code: Int) : IOException("Binance Demo $code")
+internal class Rejection(val code: Int) : IOException("Binance Futures $code")
 
-internal class DemoExchange(private val keys: BinanceCredentials, client: okhttp3.OkHttpClient = ReconnectingWebSocket.sharedHttpClient) {
+internal class DemoExchange(private val keys: BinanceCredentials, client: okhttp3.OkHttpClient = ReconnectingWebSocket.sharedHttpClient,
+    val venue: FuturesVenue = FuturesVenue.DEMO) {
+    init { require(venue != FuturesVenue.REAL || com.mefuturesaibot.app.BuildConfig.MAINNET_ORDERS) }
+    val accountId = FuturesVenue.keyId(keys.key)
     private val http = client.newBuilder().retryOnConnectionFailure(false)
         .followRedirects(false).followSslRedirects(false).callTimeout(8, TimeUnit.SECONDS).build()
     private var server = 0L
@@ -25,7 +28,7 @@ internal class DemoExchange(private val keys: BinanceCredentials, client: okhttp
     private fun request(method: String, path: String, params: List<Pair<String, String>>, signed: Boolean): String {
         val query = if (signed) Signer.signQueryString(params + listOf("recvWindow" to "5000", "timestamp" to now().toString()), keys.secret)
             else Signer.buildQueryString(params)
-        val req = Request.Builder().url("https://demo-fapi.binance.com/fapi/$path" + if (query.isEmpty()) "" else "?$query")
+        val req = Request.Builder().url("https://${venue.host}/fapi/$path" + if (query.isEmpty()) "" else "?$query")
         if (signed) req.header("X-MBX-APIKEY", keys.key)
         req.method(method, if (method == "POST") ByteArray(0).toRequestBody() else null)
         return http.newCall(req.build()).execute().use { r ->
@@ -35,6 +38,7 @@ internal class DemoExchange(private val keys: BinanceCredentials, client: okhttp
         }
     }
     fun public(path: String, vararg params: Pair<String, String>) = request("GET", "v1/$path", params.toList(), false)
+    fun commission() = JSONObject(request("GET","v1/commissionRate",listOf("symbol" to SYMBOL),true)).getDouble("takerCommissionRate")
     fun account() = JSONObject(request("GET","v3/account", emptyList(),true))
     fun positions() = JSONArray(request("GET","v3/positionRisk", emptyList(),true))
     fun oneWay() = !JSONObject(request("GET","v1/positionSide/dual",emptyList(),true)).getBoolean("dualSidePosition")

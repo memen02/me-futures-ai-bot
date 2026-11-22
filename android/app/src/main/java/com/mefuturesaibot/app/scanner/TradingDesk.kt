@@ -48,8 +48,8 @@ internal class TradingDesk(
 ) {
     private fun <T : View> view(id: Int): T = activity.findViewById(id)
     private val store = DeskStore(activity)
-    private val accountPage = AccountPage(activity)
     private val demo = com.mefuturesaibot.app.demo.DemoControls(activity, start)
+    private val accountPage = AccountPage(activity, credentialsChanged = demo::render)
     private val nav = listOf(R.id.nav_home, R.id.nav_scanner, R.id.nav_paper, R.id.nav_account)
     private val pages = listOf(R.id.page_home, R.id.page_scanner, R.id.page_paper, R.id.page_account)
     private val query = view<EditText>(R.id.scan_query)
@@ -169,7 +169,14 @@ internal class TradingDesk(
         val btc = rows.firstOrNull { it.contract.symbol == "BTCUSDT" }
         val (model, account) = store.read()
         view<TextView>(R.id.desk_balance).text = money(account.balance)
-        view<TextView>(R.id.desk_bot).text = if (running) "Aktif" else "Berhenti"
+        view<TextView>(R.id.desk_bot).text = if (com.mefuturesaibot.app.BuildConfig.MAINNET_ORDERS) {
+            val execution = com.mefuturesaibot.app.demo.FuturesVenue.REAL.prefs(activity)
+            when {
+                execution.contains("intent") -> "Real · posisi/order dipantau"
+                running && execution.getBoolean("enabled",false) -> "Real · aktif"
+                else -> "Real · nonaktif"
+            }
+        } else if (running) "Aktif" else "Berhenti"
         view<TextView>(R.id.desk_volume).text = "Volume 24j · " + (btc?.ticker?.let { money(it.volume) + " USDT" } ?: "—")
         val score = btc?.score
         view<TextView>(R.id.desk_score).text = score?.let { "Skor arah naik  ${money(it * 100)}/100" } ?: "Skor arah naik  —"

@@ -11,7 +11,10 @@ android {
     // compileSdk sampai 36, jadi tidak perlu naikkan versi AGP juga.
     compileSdk = 36
 
+    buildFeatures { buildConfig = true }
+
     defaultConfig {
+        buildConfigField("boolean", "MAINNET_ORDERS", "false")
         applicationId = "com.mefuturesaibot.app"
         minSdk = 26
         targetSdk = 36
@@ -26,6 +29,14 @@ android {
     testOptions.unitTests.isIncludeAndroidResources = true
 
     buildTypes {
+        create("real") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".real"
+            versionNameSuffix = "-real"
+            isDebuggable = false
+            buildConfigField("boolean", "MAINNET_ORDERS", "true")
+            matchingFallbacks += "release"
+        }
         create("demo") {
             initWith(getByName("debug"))
             applicationIdSuffix = ".demo"
