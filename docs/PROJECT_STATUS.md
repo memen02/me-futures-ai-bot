@@ -57,7 +57,7 @@ posisi, dan 75 catatan jurnal terakhir disimpan di HP.
 
 Pengujian jalan terus 24 jam di HP, penilaian model pada data di luar periode
 pelatihan, riwayat candle lintas sesi, dan rekonsiliasi akun Binance privat.
-Tab Akun menyimpan pasangan API HMAC secara terenkripsi di HP dan menguji akses baca Binance Futures. Eksekusi order uang asli masih dalam rencana.
+Tab Akun menyimpan pasangan API HMAC secara terenkripsi di HP dan menguji akses baca Binance Futures. Varian Real mendukung eksekusi BTC/USDT mainnet setelah persetujuan di HP. Pengujian dengan akun dan perangkat pengguna masih diperlukan.
 
 ## Menunggu dari Anda
 
