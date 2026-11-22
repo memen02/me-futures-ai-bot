@@ -26,6 +26,12 @@ android {
     testOptions.unitTests.isIncludeAndroidResources = true
 
     buildTypes {
+        create("demo") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".demo"
+            versionNameSuffix = "-demo"
+            matchingFallbacks += "debug"
+        }
         release {
             isMinifyEnabled = false
         }

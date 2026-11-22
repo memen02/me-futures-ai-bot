@@ -42,6 +42,9 @@ class BotForegroundService : Service() {
 
     private val candleSync by lazy { CandleHistorySync(clock = exchangeClock) { latestHistory = it } }
     private var reconnecting = false
+    private var demo: com.mefuturesaibot.app.demo.DemoRunner? = null
+    private val drain = android.os.Handler(android.os.Looper.getMainLooper())
+    private var draining = false
     private var scanner: MarketScanner? = null
 
     override fun onCreate() {
@@ -54,7 +57,7 @@ class BotForegroundService : Service() {
         isRunning = true
         ensureNotificationChannel()
         startForegroundCompat(buildNotification(ReconnectingWebSocket.ConnectionStatus.CONNECTING))
-        if (BotPreferences.shouldRun(this)) {
+        if (BotPreferences.shouldRun(this) || demoPrefs().contains("intent")) {
             connectSocket()
         }
     }
@@ -63,12 +66,12 @@ class BotForegroundService : Service() {
         if (intent?.action == ACTION_STOP) {
             BotPreferences.setShouldRun(this, false)
             stopEverything()
-            return START_NOT_STICKY
+            return if (demoPrefs().contains("intent")) START_STICKY else START_NOT_STICKY
         }
 
         if (!BotPreferences.shouldRun(this)) {
             stopEverything()
-            return START_NOT_STICKY
+            return if (demoPrefs().contains("intent")) START_STICKY else START_NOT_STICKY
         }
 
         if (socket == null) {
@@ -81,6 +84,9 @@ class BotForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        drain.removeCallbacksAndMessages(null)
+        demo?.close()
+        demo = null
         isRunning = false
         scanner?.close()
         scanner = null
@@ -93,8 +99,22 @@ class BotForegroundService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null // tidak dipakai, MainActivity poll companion object
 
+    private fun demoPrefs() = getSharedPreferences(com.mefuturesaibot.app.demo.DemoRunner.PREFS, MODE_PRIVATE)
+
     private fun stopEverything() {
         BotPreferences.setShouldRun(this, false)
+        val pending = synchronized(com.mefuturesaibot.app.demo.DemoRunner.entryLock) {
+            demoPrefs().edit().putBoolean("enabled", false).apply()
+            demoPrefs().contains("intent")
+        }
+        if (pending) {
+            if (demo == null) demo = com.mefuturesaibot.app.demo.DemoRunner(this).also { it.start() }
+            if (!draining) {
+                draining = true
+                drain.postDelayed({ draining = false; if (!BotPreferences.shouldRun(this)) stopEverything() }, 5000)
+            }
+            return
+        }
         scanner?.close()
         scanner = null
         latestScan = Scan()
@@ -107,6 +127,7 @@ class BotForegroundService : Service() {
     }
 
     private fun connectSocket() {
+        if (demo == null) demo = com.mefuturesaibot.app.demo.DemoRunner(this).also { it.start() }
         scanner = MarketScanner(DeskStore(this)) { latestScan = it }.also { it.start() }
         candleSync.start()
         socket = ReconnectingWebSocket(

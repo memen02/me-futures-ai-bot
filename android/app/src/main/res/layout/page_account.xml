@@ -32,6 +32,13 @@
                 <Button android:id="@+id/account_remove" style="@style/AccountSecondary" android:layout_width="0dp" android:layout_weight="1" android:textColor="#FFA392" android:text="Hapus dari HP" />
             </LinearLayout>
         </LinearLayout>
+        <LinearLayout style="@style/DashPanel">
+            <TextView style="@style/DashHeading" android:text="Binance Futures Demo · BTC/USDT"/>
+            <TextView style="@style/DashLabel" android:text="Gunakan akun Demo khusus dengan mode One-way. Sinyal SMA 1m/5m, stop dan target dipasang di bursa demo. Menonaktifkan demo menutup sisa posisi ketika terhubung."/>
+            <Button android:id="@+id/demo_keys" style="@style/AccountSecondary" android:text="Kelola key Demo"/>
+            <Switch android:id="@+id/demo_enabled" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="Jalankan dengan saldo Demo" android:textColor="#F7F1E9"/>
+            <TextView android:id="@+id/demo_status" style="@style/DashLabel"/>
+        </LinearLayout>
         <TextView style="@style/DashLabel" android:layout_marginTop="12dp" android:text="Trading otomatis pada build ini memakai saldo simulasi. Uji koneksi hanya membaca status akun dan izin key." />
         <LinearLayout style="@style/DashPanel">
             <TextView style="@style/DashHeading" android:text="Perangkat" />
