@@ -32,16 +32,10 @@ android {
         create("real") {
             initWith(getByName("release"))
             applicationIdSuffix = ".real"
-            versionNameSuffix = "-real"
+            versionNameSuffix = "-unified"
             isDebuggable = false
             buildConfigField("boolean", "MAINNET_ORDERS", "true")
             matchingFallbacks += "release"
-        }
-        create("demo") {
-            initWith(getByName("debug"))
-            applicationIdSuffix = ".demo"
-            versionNameSuffix = "-demo"
-            matchingFallbacks += "debug"
         }
         release {
             isMinifyEnabled = false

@@ -2,7 +2,16 @@
     android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="vertical" android:padding="20dp" android:focusableInTouchMode="true">
-        <TextView style="@style/DeskTitle" android:text="Akun Binance" />
+        <TextView style="@style/DeskTitle" android:text="Pengaturan" />
+        <LinearLayout style="@style/DashPanel">
+            <TextView style="@style/DashHeading" android:text="Mode trading" />
+            <RadioGroup android:id="@+id/venue_mode" android:layout_width="match_parent" android:layout_height="wrap_content" android:saveEnabled="false">
+                <RadioButton android:id="@+id/mode_demo" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:textColor="#F7F1E9" android:saveEnabled="false" android:text="Demo · saldo virtual"/>
+                <RadioButton android:id="@+id/mode_mainnet" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:textColor="#F7F1E9" android:saveEnabled="false" android:text="Mainnet · uang asli"/>
+            </RadioGroup>
+            <TextView android:id="@+id/mode_message" style="@style/DashLabel" android:accessibilityLiveRegion="polite" android:visibility="gone"/>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/mainnet_credentials" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content">
         <LinearLayout style="@style/DashPanel" android:background="@drawable/dashboard_signal">
             <TextView style="@style/DashLabel" android:text="BINANCE FUTURES" android:letterSpacing="0.10" android:textColor="#FFB58F" />
             <TextView style="@style/DashHeading" android:text="USDⓈ-M · Mainnet" android:textSize="23sp" android:layout_marginTop="4dp" />
@@ -32,11 +41,12 @@
                 <Button android:id="@+id/account_remove" style="@style/AccountSecondary" android:layout_width="0dp" android:layout_weight="1" android:textColor="#FFA392" android:text="Hapus dari HP" />
             </LinearLayout>
         </LinearLayout>
+        </LinearLayout>
         <LinearLayout style="@style/DashPanel">
             <TextView style="@style/DashHeading" android:id="@+id/execution_heading" android:text="Binance Futures Demo · BTC/USDT"/>
             <TextView style="@style/DashLabel" android:id="@+id/execution_help" android:text="Gunakan akun Demo khusus dengan mode One-way. Sinyal SMA 1m/5m, stop dan target dipasang di bursa demo. Menonaktifkan demo menutup sisa posisi ketika terhubung."/>
             <Button android:id="@+id/demo_keys" style="@style/AccountSecondary" android:text="Kelola key Demo"/>
-            <Switch android:id="@+id/demo_enabled" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="Jalankan dengan saldo Demo" android:textColor="#F7F1E9"/>
+            <Switch android:id="@+id/demo_enabled" android:saveEnabled="false" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="Jalankan dengan saldo Demo" android:textColor="#F7F1E9"/>
             <TextView android:id="@+id/demo_status" style="@style/DashLabel"/>
         </LinearLayout>
         <TextView style="@style/DashLabel" android:layout_marginTop="12dp" android:id="@+id/execution_note" android:text="Trading otomatis pada build ini memakai saldo simulasi. Uji koneksi hanya membaca status akun dan izin key." />

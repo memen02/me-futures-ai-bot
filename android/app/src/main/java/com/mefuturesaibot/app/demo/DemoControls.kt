@@ -18,7 +18,7 @@ import com.mefuturesaibot.app.account.BinanceCredentials
 import com.mefuturesaibot.app.account.CredentialVault
 
 internal class DemoControls(private val activity: Activity, private val start: () -> Unit) {
-    private val venue = FuturesVenue.installed
+    val venue = FuturesVenue.selected(activity)
     private val live = venue == FuturesVenue.REAL
     private val vault = CredentialVault(activity, !live)
     private val approval = if (live) LiveApproval(activity,vault,start) else null
@@ -26,6 +26,7 @@ internal class DemoControls(private val activity: Activity, private val start: (
     private val toggle = activity.findViewById<Switch>(R.id.demo_enabled)
     private val label = activity.findViewById<TextView>(R.id.demo_status)
     private val keys = activity.findViewById<Button>(R.id.demo_keys)
+    private var editor: AlertDialog? = null
     private var rendering = false
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> render() }
 
@@ -36,14 +37,23 @@ internal class DemoControls(private val activity: Activity, private val start: (
             activity.findViewById<TextView>(R.id.execution_note).text = "Saldo dan performa pada kartu simulasi tetap virtual. Hasil mainnet ditampilkan di bagian Real."
             toggle.text = "Trading otomatis dengan dana asli"
             keys.visibility = View.GONE
+        } else {
+            activity.findViewById<TextView>(R.id.execution_heading).text = "Binance Futures Demo · BTC/USDT"
+            activity.findViewById<TextView>(R.id.execution_help).text = "Gunakan key Binance Demo dari akun One-way. Order memakai saldo virtual bursa."
+            activity.findViewById<TextView>(R.id.execution_note).text = "Jurnal Demo mencatat transaksi virtual di Binance Demo."
+            toggle.text = "Jalankan dengan saldo Demo"
+            keys.visibility = View.VISIBLE
         }
+        activity.findViewById<View>(R.id.mainnet_credentials).visibility = if (live) View.VISIBLE else View.GONE
         keys.setOnClickListener { edit() }
         toggle.setOnCheckedChangeListener { _, enabled ->
             if (!rendering && enabled && live) {
                 render()
                 approval?.begin()
             } else if (!rendering) {
-                synchronized(DemoRunner.entryLock) { prefs.edit().putBoolean("enabled", enabled).putString("status",
+                synchronized(DemoRunner.entryLock) {
+                    if (FuturesVenue.selected(activity) != venue) return@setOnCheckedChangeListener
+                    prefs.edit().putBoolean("enabled", enabled).putString("status",
                     if (enabled) "Menghubungi Binance Demo…" else "${venue.label} nonaktif · memeriksa sisa posisi").apply() }
                 if (enabled) start()
                 render()
@@ -96,7 +106,8 @@ internal class DemoControls(private val activity: Activity, private val start: (
                 render()
             }.create()
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        dialog.setOnDismissListener { key.text.clear(); secret.text.clear() }
+        editor = dialog
+        dialog.setOnDismissListener { key.text.clear(); secret.text.clear(); editor = null }
         dialog.show()
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -114,5 +125,5 @@ internal class DemoControls(private val activity: Activity, private val start: (
         }
     }
 
-    fun close() { approval?.close(); prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    fun close() { editor?.dismiss(); approval?.close(); prefs.unregisterOnSharedPreferenceChangeListener(listener) }
 }

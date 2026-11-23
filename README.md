@@ -15,12 +15,11 @@ trading.
 **Pivot arsitektur (2026-11-07)**: dari "backend Node.js/Termux + APK
 terpisah" menjadi **satu app Android Kotlin mandiri**. Aplikasi sudah memiliki layanan pemantauan BTC/USDT,
 tombol Start/Stop, dan opsi mulai otomatis setelah reboot. GitHub Actions
-menjalankan unit test dan membuat APK debug. Pengujian perubahan terbaru
-di HP masih tertunda. Varian Demo mengirim order ke Binance Demo. Varian
-**ME Project Real** dapat mengirim order BTC/USDT ke Binance Futures mainnet
-setelah pemilik akun menyelesaikan pemeriksaan akun, menentukan alokasi USDT,
-dan menyetujui penggunaan dana asli di HP. Instalasi baru memulai trading real
-dalam keadaan nonaktif.
+menjalankan unit test dan membuat satu APK ME Project. Instalasi baru dimulai
+dalam mode Demo. Di **Pengaturan → Mode trading**, pilih Demo untuk saldo virtual
+atau Mainnet untuk dana asli. Key, order bot, dan hasil transaksi disimpan per mode.
+Mainnet memerlukan pemeriksaan akun, alokasi USDT, dan persetujuan di perangkat.
+Untuk berpindah, matikan trading aktif dan tunggu rekonsiliasi posisi serta order bot.
 Lihat [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) untuk status
 lengkap & alasan perubahan, dan [`docs/PROJECT_MASTER.md`](docs/PROJECT_MASTER.md)
 untuk arsitektur/fitur (sebagian besar masih berlaku, cuma bahasa
@@ -36,16 +35,11 @@ docs/      Dokumentasi master proyek
 
 ## Build (lewat GitHub Actions, bukan lokal)
 
-Karena tidak pakai PC/Termux, APK dibangun lewat GitHub Actions:
-
-1. Pilih cabang yang ingin diuji di GitHub.
-2. Cek tab **Actions** di github.com — workflow **Android Build**.
-3. Unduh APK dari hasil build (artifact `me-project-debug-apk`), install manual di HP.
-
-Untuk varian Real, CI menghasilkan artefak `me-project-real-unsigned`.
-APK perlu ditandatangani sebelum dipasang. Simpan kunci penandatanganan secara
-privat untuk pembaruan berikutnya. Paket Android `com.mefuturesaibot.app.real`
-dapat dipasang berdampingan dengan paket Demo.
+Workflow Android Build menghasilkan satu artefak `me-project-unified-unsigned`.
+Tandatangani APK dengan kunci ME Project sebelum memasang atau mendistribusikannya.
+Paket `com.mefuturesaibot.app.real` memperbarui ME Project Real yang memakai kunci
+yang sama. Pada pembaruan, eksekusi Mainnet aktif atau posisi yang sedang diproses
+tetap ditangani di Mainnet. Android menyimpan data dari APK Demo lama di paketnya sendiri.
 
 ## Dokumentasi
 

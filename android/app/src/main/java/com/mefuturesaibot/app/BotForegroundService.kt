@@ -43,12 +43,19 @@ class BotForegroundService : Service() {
     private val candleSync by lazy { CandleHistorySync(clock = exchangeClock) { latestHistory = it } }
     private var reconnecting = false
     private var demo: com.mefuturesaibot.app.demo.DemoRunner? = null
+    private val modeListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "venue" && demo != null) {
+            demo?.close()
+            demo = com.mefuturesaibot.app.demo.DemoRunner(this).also { it.start() }
+        }
+    }
     private val drain = android.os.Handler(android.os.Looper.getMainLooper())
     private var draining = false
     private var scanner: MarketScanner? = null
 
     override fun onCreate() {
         super.onCreate()
+        com.mefuturesaibot.app.demo.FuturesVenue.settings(this).registerOnSharedPreferenceChangeListener(modeListener)
         exchangeClock = ExchangeClock()
         latestHistory = CandleHistory()
         latestQuote = null
@@ -84,6 +91,7 @@ class BotForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        com.mefuturesaibot.app.demo.FuturesVenue.settings(this).unregisterOnSharedPreferenceChangeListener(modeListener)
         drain.removeCallbacksAndMessages(null)
         demo?.close()
         demo = null
@@ -99,7 +107,7 @@ class BotForegroundService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null // tidak dipakai, MainActivity poll companion object
 
-    private fun demoPrefs() = com.mefuturesaibot.app.demo.FuturesVenue.installed.prefs(this)
+    private fun demoPrefs() = com.mefuturesaibot.app.demo.FuturesVenue.selected(this).prefs(this)
 
     private fun stopEverything() {
         BotPreferences.setShouldRun(this, false)

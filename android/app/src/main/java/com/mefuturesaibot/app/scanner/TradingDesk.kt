@@ -1,5 +1,9 @@
 package com.mefuturesaibot.app.scanner
 
+import android.content.SharedPreferences
+import android.widget.RadioGroup
+import com.mefuturesaibot.app.demo.DemoControls
+import com.mefuturesaibot.app.demo.FuturesVenue
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.res.ColorStateList
@@ -48,8 +52,8 @@ internal class TradingDesk(
 ) {
     private fun <T : View> view(id: Int): T = activity.findViewById(id)
     private val store = DeskStore(activity)
-    private val demo = com.mefuturesaibot.app.demo.DemoControls(activity, start)
-    private val accountPage = AccountPage(activity, credentialsChanged = demo::render)
+    private var demo = DemoControls(activity, start)
+    private val accountPage = AccountPage(activity, credentialsChanged = { demo.render() })
     private val nav = listOf(R.id.nav_home, R.id.nav_scanner, R.id.nav_paper, R.id.nav_account)
     private val pages = listOf(R.id.page_home, R.id.page_scanner, R.id.page_paper, R.id.page_account)
     private val query = view<EditText>(R.id.scan_query)
@@ -65,6 +69,11 @@ internal class TradingDesk(
     var onTabSelected: (() -> Unit)? = null
     var tab = 0
         private set
+
+    private var changingMode = false
+    private val modeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "venue") renderMode()
+    }
 
     init {
         nav.forEachIndexed { index, id -> view<TextView>(id).setOnClickListener { select(index) } }
@@ -91,10 +100,46 @@ internal class TradingDesk(
         view<Switch>(R.id.account_autostart).setOnCheckedChangeListener { _, enabled ->
             BotPreferences.setAutoStartEnabled(activity, enabled)
         }
+        FuturesVenue.settings(activity).registerOnSharedPreferenceChangeListener(modeListener)
+        view<View>(R.id.mode_mainnet).isEnabled = com.mefuturesaibot.app.BuildConfig.MAINNET_ORDERS
+        view<RadioGroup>(R.id.venue_mode).setOnCheckedChangeListener { _, id ->
+            if (!changingMode) {
+                val target = if (id == R.id.mode_mainnet) FuturesVenue.REAL else FuturesVenue.DEMO
+                val ok = FuturesVenue.select(activity,target)
+                renderMode()
+                if (!ok) view<TextView>(R.id.mode_message).apply {
+                    text = "Nonaktifkan trading di mode aktif dan tunggu sampai posisi serta order bot selesai diperiksa."
+                    visibility = View.VISIBLE
+                }
+            }
+        }
+        renderMode()
         select(initialTab)
     }
 
-    fun close() { demo.close(); accountPage.close() }
+    private fun renderMode() {
+        val mode = FuturesVenue.selected(activity)
+        if (mode != demo.venue) {
+            accountPage.show(false)
+            demo.close()
+            demo = DemoControls(activity,start)
+            select(tab)
+        }
+        changingMode = true
+        view<RadioGroup>(R.id.venue_mode).check(if (mode == FuturesVenue.REAL) R.id.mode_mainnet else R.id.mode_demo)
+        changingMode = false
+        view<TextView>(R.id.active_venue).apply {
+            text = if (mode == FuturesVenue.REAL) "MAINNET · Uang asli" else "DEMO · Saldo virtual"
+            setTextColor(if (mode == FuturesVenue.REAL) Color.rgb(255,187,125) else Color.rgb(156,226,203))
+        }
+        view<View>(R.id.mode_message).visibility = View.GONE
+    }
+
+    fun close() {
+        FuturesVenue.settings(activity).unregisterOnSharedPreferenceChangeListener(modeListener)
+        demo.close()
+        accountPage.close()
+    }
 
     fun select(index: Int) {
         if (tab == 1 && index != tab) clearTokenList()
@@ -169,14 +214,13 @@ internal class TradingDesk(
         val btc = rows.firstOrNull { it.contract.symbol == "BTCUSDT" }
         val (model, account) = store.read()
         view<TextView>(R.id.desk_balance).text = money(account.balance)
-        view<TextView>(R.id.desk_bot).text = if (com.mefuturesaibot.app.BuildConfig.MAINNET_ORDERS) {
-            val execution = com.mefuturesaibot.app.demo.FuturesVenue.REAL.prefs(activity)
-            when {
-                execution.contains("intent") -> "Real · posisi/order dipantau"
-                running && execution.getBoolean("enabled",false) -> "Real · aktif"
-                else -> "Real · nonaktif"
-            }
-        } else if (running) "Aktif" else "Berhenti"
+        val execution = demo.venue.prefs(activity)
+        val state = when {
+            execution.contains("intent") -> "Posisi/order dipantau"
+            running && execution.getBoolean("enabled",false) -> "Trading aktif"
+            else -> "Trading nonaktif"
+        }
+        view<TextView>(R.id.desk_bot).text = "${demo.venue.label} · $state"
         view<TextView>(R.id.desk_volume).text = "Volume 24j · " + (btc?.ticker?.let { money(it.volume) + " USDT" } ?: "—")
         val score = btc?.score
         view<TextView>(R.id.desk_score).text = score?.let { "Skor arah naik  ${money(it * 100)}/100" } ?: "Skor arah naik  —"
