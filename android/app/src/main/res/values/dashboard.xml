@@ -1,12 +1,12 @@
 <resources>
     <style name="DashboardTheme" parent="StartupBase">
-        <item name="android:colorAccent">#FF8655</item>
+        <item name="android:colorAccent">@color/me_accent</item>
     </style>
     <style name="DashPanel">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_marginTop">12dp</item>
-        <item name="android:padding">16dp</item>
+        <item name="android:layout_marginTop">@dimen/me_section_gap</item>
+        <item name="android:padding">@dimen/me_panel_padding</item>
         <item name="android:background">@drawable/dashboard_panel</item>
         <item name="android:orientation">vertical</item>
     </style>
@@ -14,11 +14,11 @@
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textSize">13sp</item>
-        <item name="android:textColor">#C0C6D0</item>
+        <item name="android:textColor">@color/me_muted</item>
     </style>
     <style name="DashHeading" parent="DashLabel">
-        <item name="android:textColor">#F7F1E9</item>
-        <item name="android:textSize">18sp</item>
+        <item name="android:textColor">@color/me_text</item>
+        <item name="android:textSize">16sp</item>
         <item name="android:fontFamily">sans-serif-medium</item>
     </style>
     <style name="DashPrice" parent="DashHeading">
@@ -30,8 +30,8 @@
     <style name="MarketDivider">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">1dp</item>
-        <item name="android:layout_marginTop">12dp</item>
-        <item name="android:background">#303740</item>
+        <item name="android:layout_marginTop">@dimen/me_section_gap</item>
+        <item name="android:background">@color/me_border</item>
     </style>
     <style name="MarketColumn">
         <item name="android:layout_width">0dp</item>

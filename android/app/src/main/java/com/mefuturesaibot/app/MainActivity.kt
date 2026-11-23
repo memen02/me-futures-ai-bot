@@ -1,12 +1,12 @@
 package com.mefuturesaibot.app
 
+import com.mefuturesaibot.app.scanner.DeskTab
 import com.mefuturesaibot.app.scanner.TradingDesk
 import android.Manifest
 import android.app.AlertDialog
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -109,10 +109,10 @@ class MainActivity : Activity() {
         }
         historyButton.setOnClickListener { showCandleHistory() }
         findViewById<Button>(R.id.scan_stop).setOnClickListener { onStopClicked() }
-        desk = TradingDesk(this, savedInstanceState?.getInt("deskTab") ?: 0, ::onStartClicked)
+        desk = TradingDesk(this, DeskTab.restore(savedInstanceState), ::onStartClicked)
         desk.onTabSelected = {
-            if (desk.tab != 0) depth.clear()
-            chartFeed.setVisible(visibleActivity && desk.tab == 0)
+            if (desk.tab != DeskTab.HOME) depth.clear()
+            chartFeed.setVisible(visibleActivity && desk.tab == DeskTab.HOME)
             refreshStatusText()
         }
         userRequestedStop = savedInstanceState?.getBoolean("userRequestedStop") ?: false
@@ -123,14 +123,14 @@ class MainActivity : Activity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean("userRequestedStop", userRequestedStop)
-        outState.putInt("deskTab", desk.tab)
+        outState.putString(DeskTab.STATE_KEY, desk.tab.name)
         outState.putString("chartInterval", chartFeed.state.interval)
     }
 
     override fun onStart() {
         super.onStart()
         visibleActivity = true
-        chartFeed.setVisible(desk.tab == 0)
+        chartFeed.setVisible(desk.tab == DeskTab.HOME)
         pollRunnable.run()
     }
 
@@ -176,9 +176,9 @@ class MainActivity : Activity() {
 
     private fun refreshStatusText() {
         desk.update(BotForegroundService.latestScan, !userRequestedStop && BotForegroundService.isRunning)
-        if (desk.tab != 0) return
+        if (desk.tab != DeskTab.HOME) return
         if (userRequestedStop || !BotForegroundService.isRunning) {
-            renderSignal(SmaSignal.waitFor(if (userRequestedStop) "Pemantauan dihentikan" else "Mulai pemantauan dari tab Scanner"))
+            renderSignal(SmaSignal.waitFor(if (userRequestedStop) "Pemantauan dihentikan" else "Mulai pemantauan dari tab Pasar"))
             statusView.text = if (userRequestedStop) "Pemantauan dihentikan" else "Pemantauan belum dimulai"
             bidView.text = "—"
             askView.text = "—"
@@ -238,11 +238,11 @@ class MainActivity : Activity() {
                 "Tutup ${interval.close.stripTrailingZeros().toPlainString()}   SMA 20 ${interval.sma.stripTrailingZeros().toPlainString()}"
         }
         val color = when (signal.side) {
-            SignalSide.WAIT -> "#FFD19C"
-            SignalSide.BUY -> "#82E5BE"
-            SignalSide.SELL -> "#FF9B8F"
+            SignalSide.WAIT -> R.color.me_accent
+            SignalSide.BUY -> R.color.me_buy
+            SignalSide.SELL -> R.color.me_sell
         }
-        val tint = Color.parseColor(color)
+        val tint = getColor(color)
         signalView.setTextColor(tint)
         findViewById<TextView>(R.id.dash_signal_tag).apply {
             text = signal.side.name

@@ -2,7 +2,6 @@ package com.mefuturesaibot.app
 
 import android.app.Activity
 import android.content.Intent
-import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
@@ -52,12 +51,12 @@ class StartupActivity : Activity() {
             rows.forEachIndexed { i, row ->
                 details[i].text = row.detail
                 val (mark, color) = when (row.state) {
-                    CheckState.PASSED -> "✓" to "#78E2B5"
-                    CheckState.FAILED -> "×" to "#FF885B"
-                    CheckState.PENDING -> "…" to "#D5C7BC"
+                    CheckState.PASSED -> "✓" to R.color.me_buy
+                    CheckState.FAILED -> "×" to R.color.me_sell
+                    CheckState.PENDING -> "…" to R.color.me_muted
                 }
                 marks[i].text = mark
-                marks[i].setTextColor(Color.parseColor(color))
+                marks[i].setTextColor(getColor(color))
             }
             progress.progress = complete
             val ready = complete == rows.size
@@ -108,11 +107,11 @@ class StartupActivity : Activity() {
                 text = title
                 textSize = 16f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#F3EEE9"))
+                setTextColor(getColor(R.color.me_text))
             })
             val detail = TextView(this).apply {
                 textSize = 14f
-                setTextColor(Color.parseColor("#BBC0C8"))
+                setTextColor(getColor(R.color.me_muted))
             }
             labels.addView(detail)
             row.addView(labels)

@@ -6,20 +6,20 @@
         android:orientation="vertical" android:gravity="center_vertical"
         android:paddingStart="28dp" android:paddingEnd="28dp"
         android:paddingTop="24dp" android:paddingBottom="20dp">
-        <ImageView android:layout_width="152dp" android:layout_height="152dp"
-            android:layout_gravity="center_horizontal" android:src="@drawable/falcon_emblem"
+        <ImageView android:layout_width="64dp" android:layout_height="64dp"
+            android:layout_gravity="center_horizontal" android:src="@drawable/ic_falcon_mask" android:tint="@color/me_accent"
             android:importantForAccessibility="no" android:scaleType="fitCenter" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginTop="12dp" android:gravity="center" android:text="@string/app_name"
-            android:textAllCaps="true" android:textColor="#FFF3E7" android:fontFamily="sans-serif-condensed"
-            android:textStyle="bold|italic" android:textSize="36sp" android:letterSpacing="0.08" />
+            android:textAllCaps="true" android:textColor="@color/me_text" android:fontFamily="sans-serif-medium"
+            android:textStyle="bold" android:textSize="26sp" android:letterSpacing="0.08" />
         <TextView android:id="@+id/startup_summary" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:layout_marginTop="30dp"
-            android:textColor="#FFF3E7" android:textSize="18sp" android:textStyle="bold"
+            android:textColor="@color/me_text" android:textSize="18sp" android:textStyle="bold"
             android:accessibilityLiveRegion="polite" />
         <ProgressBar android:id="@+id/startup_progress" style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent" android:layout_height="8dp" android:layout_marginTop="10dp"
-            android:indeterminate="false" android:progressTint="#FF6329" android:progressBackgroundTint="#343841"
+            android:indeterminate="false" android:progressTint="@color/me_accent" android:progressBackgroundTint="@color/me_border"
             android:max="3" />
         <LinearLayout android:id="@+id/startup_rows" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="vertical" />
@@ -27,11 +27,11 @@
             android:layout_marginTop="12dp" android:orientation="vertical">
             <Button android:id="@+id/startup_retry" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:minHeight="48dp" android:text="Coba lagi"
-                android:textAllCaps="false" android:textColor="#140D08" android:backgroundTint="#FF783E"
+                android:textAllCaps="false" android:textColor="@color/me_background" android:backgroundTint="@color/me_accent"
                 android:visibility="gone" />
             <Button android:id="@+id/startup_open" style="?android:attr/borderlessButtonStyle"
                 android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp"
-                android:text="Buka dasbor" android:textAllCaps="false" android:textColor="#E1D5CB" />
+                android:text="Buka dasbor" android:textAllCaps="false" android:textColor="@color/me_text" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

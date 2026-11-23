@@ -1,7 +1,7 @@
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:background="#070F1B">
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:background="@color/me_background">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="12dp" android:paddingVertical="14dp">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:baselineAligned="false" android:gravity="center_vertical">
-            <ImageView android:layout_width="42dp" android:layout_height="42dp" android:src="@drawable/falcon_emblem" android:importantForAccessibility="no" />
+            <ImageView android:layout_width="42dp" android:layout_height="42dp" android:src="@drawable/ic_falcon_mask" android:tint="@color/me_accent" android:importantForAccessibility="no" />
             <LinearLayout style="@style/MarketColumn" android:layout_marginStart="8dp">
                 <TextView style="@style/DeskTitle" android:text="ME Project" />
                 <TextView style="@style/TerminalNote" android:text="Binance Futures · USDⓈ-M" />
@@ -59,7 +59,7 @@
                 <LinearLayout style="@style/TerminalPanel">
                     <TextView style="@style/TerminalTitle" android:text="Model AI · BTC/USDT" />
                     <TextView style="@style/MarketValue" android:id="@+id/desk_score" />
-                    <ProgressBar android:id="@+id/desk_meter" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="8dp" android:max="100" android:progressTint="#58CEFD" />
+                    <ProgressBar android:id="@+id/desk_meter" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="8dp" android:max="100" android:progressTint="@color/me_accent" />
                     <TextView style="@style/TerminalNote" android:id="@+id/desk_model" />
                 </LinearLayout>
                 <LinearLayout style="@style/TerminalPanel" android:id="@+id/section_strategy">
@@ -98,11 +98,11 @@
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:baselineAligned="false">
                         <LinearLayout style="@style/MarketColumn">
                             <TextView style="@style/TerminalNote" android:text="Bid tertinggi" />
-                            <TextView style="@style/MarketValue" android:id="@+id/dash_bid" android:textColor="#62E1AD" />
+                            <TextView style="@style/MarketValue" android:id="@+id/dash_bid" android:textColor="@color/me_buy" />
                         </LinearLayout>
                         <LinearLayout style="@style/MarketColumn">
                             <TextView style="@style/TerminalNote" android:text="Ask terendah" />
-                            <TextView style="@style/MarketValue" android:id="@+id/dash_ask" android:textColor="#FF8298" />
+                            <TextView style="@style/MarketValue" android:id="@+id/dash_ask" android:textColor="@color/me_sell" />
                         </LinearLayout>
                     </LinearLayout>
                     <TextView style="@style/TerminalNote" android:id="@+id/desk_spread" />
@@ -110,8 +110,8 @@
                     <Button style="@style/TerminalLink" android:id="@+id/dash_depth_load" android:text="Muat 5 level" />
                     <TextView style="@style/TerminalNote" android:id="@+id/dash_depth_time" android:visibility="gone" />
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:baselineAligned="false">
-                        <TextView style="@style/TerminalNote" android:id="@+id/dash_depth_bids" android:layout_width="0dp" android:layout_weight="1" android:textColor="#62E1AD" />
-                        <TextView style="@style/TerminalNote" android:id="@+id/dash_depth_asks" android:layout_width="0dp" android:layout_weight="1" android:textColor="#FF8298" />
+                        <TextView style="@style/TerminalNote" android:id="@+id/dash_depth_bids" android:layout_width="0dp" android:layout_weight="1" android:textColor="@color/me_buy" />
+                        <TextView style="@style/TerminalNote" android:id="@+id/dash_depth_asks" android:layout_width="0dp" android:layout_weight="1" android:textColor="@color/me_sell" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
