@@ -7,11 +7,11 @@
 
 ## Kredensial Binance di Android
 
-Tab Akun menyimpan pasangan HMAC milik pengguna dalam satu berkas privat di `noBackupFilesDir`. Android Keystore menyimpan kunci AES-256. Setiap penyimpanan mengenkripsi ulang pasangan dengan GCM dan IV baru. Kolom disamarkan, dikecualikan dari autofill dan penyimpanan state, serta dikosongkan saat pengguna meninggalkan tab. Tombol Hapus dari HP menghapus salinan perangkat. Pencabutan key dilakukan melalui API Management Binance.
+Pengaturan menyimpan pasangan HMAC milik pengguna dalam satu berkas privat di `noBackupFilesDir`. Android Keystore menyimpan kunci AES-256. Setiap penyimpanan mengenkripsi ulang pasangan dengan GCM dan IV baru. Kolom disamarkan, dikecualikan dari autofill dan penyimpanan state, serta dikosongkan saat pengguna meninggalkan tab. Tombol Hapus dari HP menghapus salinan perangkat. Pencabutan key dilakukan melalui API Management Binance.
 
 Uji koneksi membaca waktu Binance dan menandatangani GET ke `/fapi/v1/accountConfig`. GET opsional ke `/sapi/v1/account/apiRestrictions` memeriksa izin Futures dan penarikan pada key. API Secret dipakai di perangkat untuk HMAC. Kegagalan membaca izin ditampilkan sebagai belum terverifikasi.
 
-Menyimpan key atau mengetuk Uji koneksi hanya memeriksa akses. Pada varian Real,
+Menyimpan key atau mengetuk Uji koneksi hanya memeriksa akses. Dalam mode Mainnet di Pengaturan,
 mengaktifkan eksekusi memerlukan pemeriksaan akun One-way, alokasi USDT dan
 persetujuan terpisah di HP. Persetujuan terikat pada identitas API key.
 Gunakan akun Futures khusus untuk bot agar transaksi manual tidak bercampur

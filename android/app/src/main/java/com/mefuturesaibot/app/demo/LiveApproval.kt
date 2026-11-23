@@ -22,7 +22,7 @@ internal class LiveApproval(private val activity: Activity, private val vault: C
     private fun message(text: String) { prefs.edit().putString("status",text).apply() }
 
     fun begin() {
-        if (busy || closed || !vault.exists()) return
+        if (busy || closed || FuturesVenue.selected(activity) != FuturesVenue.REAL || !vault.exists()) return
         val panel = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
         val amount = EditText(activity).apply {
             hint = "Alokasi maksimum strategi (USDT)"
@@ -78,7 +78,7 @@ internal class LiveApproval(private val activity: Activity, private val vault: C
             .setMessage("Bot dapat membuka LONG atau SHORT BTC/USDT dengan alokasi maksimum $cap USDT. Risiko terencana hingga 0,5% per posisi. Harga eksekusi saat pasar bergerak cepat dapat membuat kerugian lebih besar. Stop bot meminta penutupan posisi.")
             .setNegativeButton("Batal",null).setPositiveButton("Aktifkan trading real") { _,_ ->
                 val armed = synchronized(DemoRunner.entryLock) {
-                    if (closed || prefs.contains("intent") || runCatching { FuturesVenue.keyId(vault.read().key) }.getOrNull() != keyId) false
+                    if (closed || FuturesVenue.selected(activity) != FuturesVenue.REAL || prefs.contains("intent") || runCatching { FuturesVenue.keyId(vault.read().key) }.getOrNull() != keyId) false
                     else prefs.edit().putString("capital",cap.toString()).putString("consentKey",keyId)
                         .putBoolean("enabled",true).putString("status","Real aktif · menunggu sinyal").commit()
                 }

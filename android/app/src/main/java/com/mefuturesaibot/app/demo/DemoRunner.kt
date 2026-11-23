@@ -18,7 +18,7 @@ internal fun JSONArray.objects() = (0 until length()).map { getJSONObject(it) }
 internal fun rounded(value: Double, step: BigDecimal, mode: RoundingMode): String =
     BigDecimal.valueOf(value).divide(step, 0, mode).multiply(step).stripTrailingZeros().toPlainString()
 
-internal class DemoRunner(context: Context, private val venue: FuturesVenue = FuturesVenue.installed) {
+internal class DemoRunner(private val context: Context, private val venue: FuturesVenue = FuturesVenue.selected(context)) {
     private val live = venue == FuturesVenue.REAL
     private val mode = venue.label
     private val vault = CredentialVault(context, !live)
@@ -41,6 +41,7 @@ internal class DemoRunner(context: Context, private val venue: FuturesVenue = Fu
     private fun status(s: String) { prefs.edit().putString("status",s).apply() }
     private fun persist(intent: JSONObject) { check(prefs.edit().putString("intent", intent.toString()).commit()) }
     internal fun cycle(api: DemoExchange = DemoExchange(vault.read(), venue = venue)): String {
+        if (FuturesVenue.selected(context) != venue) return "WAIT · mode telah berubah"
         require(api.venue == venue)
         val pending = prefs.getString("intent", null)?.let(::JSONObject)
         if (live) {
@@ -104,7 +105,7 @@ internal class DemoRunner(context: Context, private val venue: FuturesVenue = Fu
             .put("qty",qty).put("budget",minOf(available * RiskPlan.RISK,remaining)).put("fee",fee)
         if (live) intent.put("accountId",api.accountId)
         synchronized(entryLock) {
-            if (closing || !prefs.getBoolean("enabled",false) ||
+            if (closing || FuturesVenue.selected(context) != venue || !prefs.getBoolean("enabled",false) ||
                 live && (prefs.getString("consentKey",null) != api.accountId || prefs.getString("capital",null)?.toDoubleOrNull() != cap)) return "$mode nonaktif"
             check(prefs.edit().putString("intent",intent.toString()).putLong("entryMinute",minute).commit())
         }

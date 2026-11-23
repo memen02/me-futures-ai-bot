@@ -1,5 +1,6 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent"
     android:fitsSystemWindows="true" android:orientation="vertical" android:background="#0A0D12">
+    <TextView android:id="@+id/active_venue" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="16dp" android:paddingVertical="6dp" android:background="#14191F" android:textColor="#9CE2CB" android:textStyle="bold" android:accessibilityLiveRegion="polite"/>
     <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
             <include layout="@layout/activity_dashboard" android:id="@+id/page_home" android:layout_width="match_parent" android:layout_height="match_parent"/>
             <include layout="@layout/page_scanner" android:id="@+id/page_scanner" android:layout_width="match_parent" android:layout_height="match_parent"/>
@@ -11,6 +12,6 @@
         <TextView android:id="@+id/nav_home" style="@style/DeskTab" android:drawableTop="@drawable/nav_home" android:text="Dasbor" />
         <TextView android:id="@+id/nav_scanner" style="@style/DeskTab" android:drawableTop="@drawable/nav_scanner" android:text="Scanner" />
         <TextView android:id="@+id/nav_paper" style="@style/DeskTab" android:drawableTop="@drawable/nav_paper" android:text="Simulasi" />
-        <TextView android:id="@+id/nav_account" style="@style/DeskTab" android:drawableTop="@drawable/nav_account" android:text="Akun" />
+        <TextView android:id="@+id/nav_account" style="@style/DeskTab" android:drawableTop="@drawable/nav_account" android:text="Pengaturan" />
     </LinearLayout>
 </LinearLayout>

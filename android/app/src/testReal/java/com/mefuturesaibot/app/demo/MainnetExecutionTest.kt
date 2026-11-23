@@ -90,10 +90,12 @@ class MainnetExecutionTest {
     }).build()
     private val api = DemoExchange(credentials,http,FuturesVenue.REAL)
     private fun approve() {
+        assertTrue(FuturesVenue.select(context,FuturesVenue.REAL))
         prefs.edit().clear().putBoolean("enabled",true).putString("capital","250")
             .putString("consentKey",api.accountId).commit()
     }
     @Test fun demoPrefsOrDifferentKeyCannotArmReal() {
+        assertTrue(FuturesVenue.select(context,FuturesVenue.REAL))
         FuturesVenue.DEMO.prefs(context).edit().putBoolean("enabled",true).commit()
         prefs.edit().clear().commit()
         val runner=DemoRunner(context)

@@ -39,55 +39,19 @@ jobs:
       - name: Run unit tests (JUnit, JVM murni -- Signer & backoff calculator)
         run: gradle test --no-daemon --stacktrace
 
-      - name: Build debug APK
-        run: gradle assembleDebug --no-daemon --stacktrace
-
-      - name: Verify packaged ME Project identity
-        run: |
-          apk=app/build/outputs/apk/debug/app-debug.apk
-          aapt=$(ls -dv "$ANDROID_HOME"/build-tools/*/aapt | tail -n 1)
-          "$aapt" dump badging "$apk" > "$RUNNER_TEMP/me-project-badging.txt"
-          grep -Fx "application-label:'ME Project'" "$RUNNER_TEMP/me-project-badging.txt"
-          "$aapt" dump --values resources "$apk" > "$RUNNER_TEMP/me-project-resources.txt"
-          grep -F "Build ${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" "$RUNNER_TEMP/me-project-resources.txt"
-          grep -F '/ic_launcher:' "$RUNNER_TEMP/me-project-resources.txt"
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: me-project-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-
-      - name: Build independently installable demo APK
-        run: |
-          gradle :app:assembleDemo --no-daemon
-          apk=app/build/outputs/apk/demo/app-demo.apk
-          aapt=$(ls -dv "$ANDROID_HOME"/build-tools/*/aapt | tail -n 1)
-          "$aapt" dump badging "$apk" > "$RUNNER_TEMP/me-project-demo-badging.txt"
-          grep -F "package: name='com.mefuturesaibot.app.demo'" "$RUNNER_TEMP/me-project-demo-badging.txt"
-          grep -Fx "application-label:'ME Project Demo'" "$RUNNER_TEMP/me-project-demo-badging.txt"
-
-      - name: Upload separately installable demo
-        uses: actions/upload-artifact@v4
-        with:
-          name: me-project-demo-apk
-          path: android/app/build/outputs/apk/demo/app-demo.apk
-          if-no-files-found: error
-
-      - name: Assemble real APK for offline signing
+      - name: Assemble ME Project APK for offline signing
         run: |
           gradle :app:assembleReal --no-daemon
           apk=app/build/outputs/apk/real/app-real-unsigned.apk
           aapt=$(ls -dv "$ANDROID_HOME"/build-tools/*/aapt | tail -n 1)
           "$aapt" dump badging "$apk" > "$RUNNER_TEMP/me-project-real.txt"
           grep -F "package: name='com.mefuturesaibot.app.real'" "$RUNNER_TEMP/me-project-real.txt"
-          grep -Fx "application-label:'ME Project Real'" "$RUNNER_TEMP/me-project-real.txt"
+          grep -Fx "application-label:'ME Project'" "$RUNNER_TEMP/me-project-real.txt"
           if grep -Fx "application-debuggable" "$RUNNER_TEMP/me-project-real.txt"; then exit 1; fi
 
-      - name: Upload unsigned real APK
+      - name: Upload ME Project APK for offline signing
         uses: actions/upload-artifact@v4
         with:
-          name: me-project-real-unsigned
+          name: me-project-unified-unsigned
           path: android/app/build/outputs/apk/real/app-real-unsigned.apk
           if-no-files-found: error
