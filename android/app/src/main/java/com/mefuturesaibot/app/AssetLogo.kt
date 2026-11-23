@@ -30,5 +30,6 @@ internal object AssetLogo {
             text = base.take(2)
             visibility = if (bitmap == null) View.VISIBLE else View.INVISIBLE
         }
+        BinanceLogo.bind(view, base, bitmap == null)
     }
 }

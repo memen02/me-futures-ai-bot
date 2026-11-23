@@ -277,11 +277,12 @@ internal class TradingDesk(
             isSelected = i == watchMode
             setTextColor(activity.getColor(if (isSelected) R.color.me_accent else R.color.me_muted))
         }
+        view<View>(R.id.watch_price_heading).visibility = if (selected.isEmpty()) View.GONE else View.VISIBLE
         view<TextView>(R.id.desk_watch_source).text = when {
             rows.isEmpty() -> snapshot.status
             selected.isEmpty() && watchMode == 0 -> "Buka token di Pasar lalu ketuk bintang."
             selected.isEmpty() -> "Belum ada kontrak yang sesuai"
-            else -> "Kontrak / SMA 1m + 5m                         Harga / 24j"
+            else -> "Kontrak / SMA 1m + 5m"
         }
         val list = view<LinearLayout>(R.id.desk_watch_rows)
         list.removeAllViews()

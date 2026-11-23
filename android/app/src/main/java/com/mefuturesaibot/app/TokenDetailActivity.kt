@@ -51,6 +51,7 @@ class TokenDetailActivity : Activity() {
         contract = Contract(symbol, quote, base)
         store = DeskStore(this)
         setContentView(R.layout.activity_token)
+        AssetLogo.bind(findViewById(R.id.token_identity), base)
         chart = findViewById(R.id.dash_chart)
         chart.onSelect = ::candle
         feed = PublicChartFeed(symbol = symbol, publish = ::renderChart)
