@@ -1,0 +1,40 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:fitsSystemWindows="true" android:background="@color/me_background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:paddingHorizontal="6dp">
+        <Button android:id="@+id/token_back" style="@style/TerminalLink" android:text="‹" android:textSize="28sp" android:contentDescription="Kembali"/>
+        <Button android:id="@+id/token_switch" style="@style/TerminalLink" android:layout_width="0dp" android:layout_weight="1" android:gravity="start|center_vertical" android:textSize="19sp" android:textColor="@color/me_text"/>
+        <Button android:id="@+id/token_star" style="@style/TerminalLink" android:textSize="22sp"/>
+    </LinearLayout>
+    <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="14dp" android:paddingBottom="18dp" android:orientation="vertical">
+            <TextView style="@style/DashLabel" android:text="USDⓈ-M Perpetual · Pasar publik Binance"/>
+            <TextView android:id="@+id/token_price" style="@style/DashPrice" android:textSize="30sp"/>
+            <TextView android:id="@+id/token_stats" style="@style/TerminalNote"/>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+                <Button android:id="@+id/dash_interval" style="@style/TerminalLink" android:text="1m ▾"/>
+                <Switch android:id="@+id/token_overlay" style="@style/DashLabel" android:minHeight="48dp" android:checked="true" android:text="Struktur + Fib  " android:saveEnabled="false"/>
+            </LinearLayout>
+            <com.mefuturesaibot.app.ClosePriceChart android:id="@+id/dash_chart" android:layout_width="match_parent" android:layout_height="270dp" android:focusable="true"/>
+            <TextView android:id="@+id/dash_history_status" style="@style/TerminalNote"/>
+            <Button android:id="@+id/token_candle_picker" style="@style/TerminalLink" android:text="Pilih candle ▾"/>
+            <TextView android:id="@+id/token_candle" style="@style/TerminalNote" android:textIsSelectable="true"/>
+            <View style="@style/MarketDivider"/>
+            <TextView style="@style/TerminalTitle" android:layout_marginTop="12dp" android:text="Analisis strategi"/>
+            <TextView android:id="@+id/dash_signal" style="@style/DashPrice" android:text="WAIT"/>
+            <TextView android:id="@+id/token_strategy" style="@style/TerminalNote"/>
+            <TextView android:id="@+id/token_model" style="@style/TerminalNote"/>
+            <View style="@style/MarketDivider"/>
+            <TextView style="@style/TerminalTitle" android:layout_marginTop="12dp" android:text="Buku order"/>
+            <TextView android:id="@+id/book_status" style="@style/TerminalNote"/>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:baselineAligned="false">
+                <LinearLayout style="@style/MarketColumn">
+                    <TextView style="@style/TerminalNote" android:text="Bid · Harga × jumlah"/>
+                    <TextView android:id="@+id/book_bids" style="@style/MarketValue" android:textSize="13sp" android:textColor="@color/me_buy"/>
+                </LinearLayout>
+                <LinearLayout style="@style/MarketColumn">
+                    <TextView style="@style/TerminalNote" android:text="Ask · Harga × jumlah"/>
+                    <TextView android:id="@+id/book_asks" style="@style/MarketValue" android:textSize="13sp" android:textColor="@color/me_sell"/>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

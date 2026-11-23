@@ -23,6 +23,7 @@ internal class PublicChartFeed(
     private val client: Call.Factory = ReconnectingWebSocket.sharedHttpClient,
     private val scheduler: Scheduler = AndroidHandlerScheduler(),
     private val elapsed: () -> Long = android.os.SystemClock::elapsedRealtime,
+    private val symbol: String = "BTCUSDT",
     private val publish: (PublicChart) -> Unit,
 ) {
     var state = PublicChart("1m")
@@ -69,7 +70,7 @@ internal class PublicChartFeed(
         }
         val interval = state.interval
         val request = Request.Builder()
-            .url("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=$interval&limit=61").build()
+            .url("https://fapi.binance.com/fapi/v1/klines?symbol=${java.net.URLEncoder.encode(symbol, "UTF-8")}&interval=$interval&limit=61").build()
         val call = client.newCall(request)
         pending = call
         call.enqueue(object : Callback {

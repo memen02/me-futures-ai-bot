@@ -17,6 +17,20 @@
             <Switch android:id="@+id/paper_enabled" android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:minHeight="@dimen/me_touch_target" android:saveEnabled="false" android:text="Aktifkan transaksi Paper" android:textColor="@color/me_text"/>
         </LinearLayout>
+                <LinearLayout style="@style/TerminalPanel">
+                    <TextView style="@style/TerminalTitle" android:text="Performa simulasi" />
+                    <TextView style="@style/MarketValue" android:id="@+id/desk_profit" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/desk_trades" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/desk_winrate" />
+                    <TextView style="@style/TerminalNote" android:id="@+id/desk_position" />
+                    <Button style="@style/TerminalLink" android:id="@+id/desk_history" android:text="Lihat jurnal" />
+                </LinearLayout>
+        <LinearLayout style="@style/TerminalPanel" android:id="@+id/section_risk">
+            <TextView style="@style/TerminalTitle" android:text="Manajemen risiko · Simulasi" />
+            <TextView style="@style/TerminalNote" android:id="@+id/desk_risk" />
+            <TextView style="@style/TerminalNote" android:id="@+id/desk_targets" />
+        </LinearLayout>
+
         <LinearLayout android:id="@+id/mainnet_credentials" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content">
         <LinearLayout style="@style/DashPanel" android:background="@drawable/dashboard_panel">
             <TextView style="@style/DashLabel" android:text="BINANCE FUTURES" android:letterSpacing="0.10" android:textColor="@color/me_accent" />

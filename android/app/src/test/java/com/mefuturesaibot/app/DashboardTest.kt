@@ -1,95 +1,65 @@
 package com.mefuturesaibot.app
 
-import com.mefuturesaibot.app.exchange.PublicChartFeed
-import com.mefuturesaibot.app.exchange.CandleScheduler
-import okhttp3.OkHttpClient
-import okhttp3.Protocol
-import okhttp3.Response
-import okhttp3.ResponseBody.Companion.toResponseBody
 import android.view.View
-import android.widget.Switch
 import android.widget.TextView
-import com.mefuturesaibot.app.exchange.BookQuote
+import com.mefuturesaibot.app.scanner.Contract
+import com.mefuturesaibot.app.scanner.DeskStore
 import com.mefuturesaibot.app.exchange.Candle
-import com.mefuturesaibot.app.exchange.CandleHistory
-import com.mefuturesaibot.app.exchange.ExchangeClock
-import com.mefuturesaibot.app.exchange.ReconnectingWebSocket.ConnectionStatus
 import java.math.BigDecimal
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], qualifiers = "w320dp-h640dp")
 class DashboardTest {
-    @Test fun dashboardRendersOnlyAvailableDataAndClearsItOnStop() {
-        val controller = Robolectric.buildActivity(MainActivity::class.java).create()
-        val callbacks = CandleScheduler()
-        val fixture = """[[0,"200","205","195","203","7",59999],[60000,"203","220","200","219","2",119999]]"""
-        val client = OkHttpClient.Builder().addInterceptor { chain ->
-            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("OK")
-                .body(fixture.toResponseBody()).build()
-        }.build()
-        val screen = controller.get()
-        screen.chartFeed = PublicChartFeed(client, callbacks, { 0L }, screen::renderChart)
-        controller.start().resume().visible()
+    @Test fun tokenOwnsChartAndFavoriteWhileAccountOwnsPaperStats() {
+        val home = Robolectric.buildActivity(MainActivity::class.java).create()
+        val app = RuntimeEnvironment.getApplication<android.app.Application>()
+        val detail = Robolectric.buildActivity(TokenDetailActivity::class.java,
+            TokenDetailActivity.intent(app, Contract("SOLUSDT", "USDT"))).create()
         try {
-            val activity = controller.get()
-            fun label(id: Int) = activity.findViewById<TextView>(id).text.toString()
-            fun visibility(id: Int) = activity.findViewById<View>(id).visibility
-            assertEquals("WAIT", label(R.id.dash_signal))
-            assertEquals("—", label(R.id.dash_bid))
-            assertEquals(View.GONE, visibility(R.id.dash_chart))
-            callbacks.nextCallback().invoke()
-            assertEquals(View.VISIBLE, visibility(R.id.dash_chart))
-            assertEquals("219", label(R.id.dash_last_price))
+            val root = home.get().findViewById<View>(R.id.page_home)
+            assertNull(root.findViewById<View>(R.id.dash_chart))
+            assertNull(root.findViewById<View>(R.id.desk_risk))
+            assertNull(root.findViewById<View>(R.id.desk_profit))
+            assertNotNull(home.get().findViewById<View>(R.id.page_account).findViewById<View>(R.id.desk_profit))
+            val activity = detail.get()
+            assertTrue(activity.findViewById<TextView>(R.id.token_switch).text.contains("SOL/USDT"))
+            assertNotNull(activity.findViewById<View>(R.id.dash_chart))
+            activity.findViewById<View>(R.id.token_star).performClick()
+            assertTrue("SOLUSDT" in DeskStore(app).favorites)
+            activity.findViewById<View>(R.id.token_switch).performClick()
+            assertTrue(activity.isFinishing)
             assertFalse(BotPreferences.shouldRun(activity))
-            val candles = (0 until 120).map { i ->
-                val price = BigDecimal.valueOf(100L + i)
-                Candle(i * 60_000L, price, price, price, price, BigDecimal.ONE)
-            }
-            val now = 120 * 60_000L
-            val history = CandleHistory(candles, "Riwayat tersinkron", true)
-            val clock = ExchangeClock().apply { observe(now, 0) }
-            val quote = BookQuote("219.10", "219.20", now, 0)
-            activity.renderMarket(ConnectionStatus.CONNECTED, quote, history, clock, 1)
-            assertEquals("BUY", label(R.id.dash_signal))
-            assertEquals("219.10", label(R.id.dash_bid))
-            assertEquals("219.20", label(R.id.dash_ask))
-            assertEquals(View.VISIBLE, visibility(R.id.dash_chart))
-            assertTrue(label(R.id.dash_chart_key).contains("Maks 220"))
-            assertTrue(label(R.id.desk_spread).contains("0.10 USDT"))
-            assertTrue(label(R.id.dash_sma_details).contains("5 menit"))
-            activity.renderMarket(ConnectionStatus.DISCONNECTED, quote.copy(disconnected = true), history, clock, 10_000)
-            assertEquals("WAIT", label(R.id.dash_signal))
-            assertTrue(label(R.id.dash_quote_time).contains("kedaluwarsa"))
-            activity.findViewById<View>(R.id.nav_account).performClick()
-            activity.findViewById<Switch>(R.id.account_autostart).isChecked = true
-            assertTrue(BotPreferences.isAutoStartEnabled(activity))
-            activity.findViewById<View>(R.id.nav_market).performClick()
-            activity.findViewById<View>(R.id.scan_stop).performClick()
-            activity.findViewById<View>(R.id.nav_home).performClick()
-            assertEquals(View.VISIBLE, visibility(R.id.dash_chart))
-            assertEquals("219", label(R.id.dash_last_price))
-            assertFalse(BotPreferences.shouldRun(activity))
-            assertEquals(View.GONE, visibility(R.id.dash_sma_panel))
-            assertEquals("—", label(R.id.dash_ask))
-            activity.findViewById<View>(R.id.dash_interval).performClick()
-            val picker = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog()
-            assertEquals(16, picker.listView.count)
-            val monthly = picker.listView.count - 1
-            picker.listView.performItemClick(picker.listView.adapter.getView(monthly, null, picker.listView), monthly, monthly.toLong())
-            assertEquals("1M", screen.chartFeed.state.interval)
-            while (!screen.chartFeed.state.fresh) callbacks.nextCallback().invoke()
-            assertTrue(label(R.id.dash_interval).contains("1M"))
-            assertEquals(View.VISIBLE, visibility(R.id.dash_chart))
-        } finally {
-            controller.pause().stop().destroy()
-            client.dispatcher.executorService.shutdown()
-            client.connectionPool.evictAll()
+        } finally { detail.destroy(); home.destroy() }
+    }
+
+    @Test fun readingUsesOnlyPrecedingBarsAndExcludesOpenCandle() {
+        fun bar(i: Int, p: Int): Candle {
+            val v = BigDecimal.valueOf(p.toLong())
+            return Candle(i * 60_000L, v, v + BigDecimal.ONE, v - BigDecimal.ONE, v, BigDecimal.TEN)
         }
+        val bars = (0..21).map { bar(it, 10 + it * 2) }
+        val reading = CandleReading.at(bars, 20)!!
+        assertEquals("Breakout naik", reading.label)
+        assertEquals(BigDecimal("49"), reading.resistance)
+        assertEquals(reading, CandleReading.at(bars.dropLast(1) + bar(21, 1_000_000), 20))
+        assertNull(CandleReading.at(bars, bars.lastIndex))
+    }
+
+    @Test fun depthBridgesSnapshotAppliesDeletionsAndRejectsSequenceGaps() {
+        val book = DepthBook(JSONObject("""{"T":100,"lastUpdateId":10,"bids":[["8","1"],["7","1"],["6","1"],["5","1"],["4","1"],["3","1"]],"asks":[["10","1"],["11","1"],["12","1"],["13","1"],["14","1"]]}"""))
+        fun diff(first: Int, last: Int, previous: Int) = JSONObject("""{"T":101,"U":$first,"u":$last,"pu":$previous,"b":[["8","0"]],"a":[]}""")
+        assertFalse(book.apply(diff(1, 9, 0)))
+        assertTrue(book.apply(diff(9, 12, 8)))
+        assertEquals(BigDecimal("7"), book.bids.firstKey())
+        assertTrue(book.apply(diff(13, 15, 12)))
+        assertThrows(IllegalArgumentException::class.java) { book.apply(diff(18, 20, 17)) }
     }
 }
