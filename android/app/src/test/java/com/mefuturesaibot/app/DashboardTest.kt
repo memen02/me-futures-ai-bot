@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config
 class DashboardTest {
     @Test fun tokenOwnsChartAndFavoriteWhileAccountOwnsPaperStats() {
         val home = Robolectric.buildActivity(MainActivity::class.java).create()
-        val app = RuntimeEnvironment.getApplication<android.app.Application>()
+        val app = RuntimeEnvironment.getApplication()
         val detail = Robolectric.buildActivity(TokenDetailActivity::class.java,
             TokenDetailActivity.intent(app, Contract("SOLUSDT", "USDT"))).create()
         try {

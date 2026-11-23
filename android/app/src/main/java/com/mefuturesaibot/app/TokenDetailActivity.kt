@@ -85,7 +85,7 @@ class TokenDetailActivity : Activity() {
             AlertDialog.Builder(this).setTitle("Candle · $symbol").setItems(options) { _, i ->
                 val selectedTime = bars[bars.lastIndex - i].openTime
                 val current = feed.state.bars.indexOfFirst { it.openTime == selectedTime }
-                if (current >= 0) { chart.selected = current; chart.invalidate(); candle(current) }
+                chart.selectCandle(current)
             }.show()
         }
         state?.getString("interval")?.takeIf { it in chartIntervals }?.let(feed::select)

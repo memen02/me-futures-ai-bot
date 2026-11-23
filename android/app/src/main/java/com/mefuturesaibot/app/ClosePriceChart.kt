@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import com.mefuturesaibot.app.exchange.Candle
 import kotlin.math.max
@@ -37,19 +38,52 @@ class ClosePriceChart(context: Context, attrs: AttributeSet) : View(context, att
         }
     }
     private var tapX = 0f
+    private var lastX = 0f
+    private var dragged = false
+    private var visibleCount = 60
+    private var endOffset = 0
+    private var offsetAtTouch = 0
+    private var firstVisible = 0
+    private var pinned = false
+    private var scaleStart = 60
+    private var scaleAmount = 1f
+    private val scale = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+            dragged = true
+            scaleStart = visibleCount
+            scaleAmount = 1f
+            parent?.requestDisallowInterceptTouchEvent(true)
+            return true
+        }
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+            scaleAmount *= detector.scaleFactor
+            visibleCount = (scaleStart / scaleAmount).toInt().coerceIn(12, 60)
+            window()
+            return true
+        }
+    })
     private var readings = emptyList<CandleReading?>()
     var rangeLabel = ""
         private set
 
     fun show(candles: List<Candle>, timeframe: String) {
         if (source === candles && interval == timeframe) return
-        val previous = if (interval == timeframe) source.getOrNull(selected)?.openTime else null
+        val previous = if (pinned && interval == timeframe) source.getOrNull(selected)?.openTime else null
+        if (interval != timeframe) { endOffset = 0; visibleCount = 60 }
         source = candles
         interval = timeframe
-        bars = source.takeLast(60)
         selected = previous?.let { at -> source.indexOfFirst { it.openTime == at } } ?: -1
-        if (selected !in (source.size - bars.size) until source.size) selected = source.lastIndex - 1
+        pinned = selected >= 0
+        if (!pinned) selected = (source.lastIndex - 1).coerceAtLeast(0)
         readings = source.indices.map { CandleReading.at(source, it) }
+        window()
+    }
+
+    private fun window() {
+        endOffset = endOffset.coerceIn(0, maxOf(0, source.size - visibleCount))
+        val end = source.size - endOffset
+        firstVisible = maxOf(0, end - visibleCount)
+        bars = source.subList(firstVisible, end)
         if (bars.isEmpty()) {
             rangeLabel = ""
             contentDescription = null
@@ -59,29 +93,54 @@ class ClosePriceChart(context: Context, attrs: AttributeSet) : View(context, att
             high = top.toDouble()
             low = bottom.toDouble()
             volume = bars.maxOf { it.volume }.toDouble()
-            rangeLabel = "Min ${bottom.stripTrailingZeros().toPlainString()} · Maks ${top.stripTrailingZeros().toPlainString()}"
+            rangeLabel = "Min ${bottom.plain()} · Maks ${top.plain()}"
             contentDescription = "${bars.size} candle $interval dan volume. $rangeLabel"
         }
         invalidate()
     }
 
+    fun selectCandle(index: Int) {
+        if (index !in source.indices) return
+        pinned = true
+        selected = index
+        if (index !in firstVisible until firstVisible + bars.size) {
+            endOffset = (source.lastIndex - index - visibleCount / 2).coerceAtLeast(0)
+            window()
+        }
+        onSelect?.invoke(index)
+        invalidate()
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.action == MotionEvent.ACTION_DOWN) { tapX = event.x; return true }
-        if (event.action == MotionEvent.ACTION_UP && bars.isNotEmpty()) {
-            val pad = 4 * dp
-            val index = ((event.x - pad) * bars.size / (width - 2 * pad)).toInt().coerceIn(0, bars.lastIndex)
-            if (kotlin.math.abs(event.x - tapX) < 16 * dp) {
-                selected = source.size - bars.size + index
-                performClick()
-                invalidate()
+        scale.onTouchEvent(event)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> { tapX = event.x; lastX = event.y; offsetAtTouch = endOffset; dragged = false }
+            MotionEvent.ACTION_MOVE -> if (!scale.isInProgress && event.pointerCount == 1) {
+                val dx = event.x - tapX
+                if (kotlin.math.abs(dx) > 8 * dp && kotlin.math.abs(dx) > kotlin.math.abs(event.y - lastX)) {
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                    dragged = true
+                    endOffset = offsetAtTouch + (dx / maxOf(1, width) * bars.size).toInt()
+                    window()
+                }
             }
+            MotionEvent.ACTION_UP -> {
+                if (!dragged && bars.isNotEmpty()) {
+                    val pad = 4 * dp
+                    val index = ((event.x - pad) * bars.size / (width - 2 * pad)).toInt().coerceIn(0, bars.lastIndex)
+                    selected = firstVisible + index
+                    performClick()
+                }
+                parent?.requestDisallowInterceptTouchEvent(false)
+            }
+            MotionEvent.ACTION_CANCEL -> parent?.requestDisallowInterceptTouchEvent(false)
         }
         return true
     }
 
     override fun performClick(): Boolean {
         super.performClick()
-        if (selected in source.indices) onSelect?.invoke(selected)
+        selectCandle(selected)
         return true
     }
 
@@ -107,7 +166,7 @@ class ClosePriceChart(context: Context, attrs: AttributeSet) : View(context, att
             paint.color = if (bar.close >= bar.open) up else down
             canvas.drawLine(x, y(bar.high.toDouble()), x, y(bar.low.toDouble()), paint)
             canvas.drawRect(x - half, min(open, close), x + half, max(max(open, close), min(open, close) + dp), paint)
-            val original = source.size - bars.size + index
+            val original = firstVisible + index
             if (overlays) {
                 val label = readings[original]?.label
                 if (label == "Breakout naik" || label == "Breakout turun") {
@@ -142,9 +201,9 @@ class ClosePriceChart(context: Context, attrs: AttributeSet) : View(context, att
                 paint.color = context.getColor(if (name.startsWith("Fib")) R.color.me_accent else R.color.me_muted)
                 paint.alpha = 150
                 val fy = y(value)
-                val start = pad + step * (selected - (source.size - bars.size) + 0.5f)
+                val start = pad + step * (selected - 20 - firstVisible + 0.5f).coerceIn(0f, bars.size.toFloat())
                 canvas.drawLine(start, fy, width - pad, fy, paint)
-                canvas.drawText(name, pad, fy.coerceAtLeast(12 * dp), paint)
+                canvas.drawText("$name ${level.plain()}", pad, fy.coerceAtLeast(12 * dp), paint)
                 paint.alpha = 255
             }
         }

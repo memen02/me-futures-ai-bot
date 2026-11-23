@@ -21,12 +21,13 @@ class ChartIntervalTest {
         val body = """[[$january,"10","13","9","12","4",${february - 1}],[$february,"12","13","11","12","8",${march - 1}]]"""
         var code = 200
         val client = OkHttpClient.Builder().addInterceptor { chain ->
+            assertEquals("SOLUSDT", chain.request().url.queryParameter("symbol"))
             requests.add(chain.request().url.queryParameter("interval")!!)
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(code).message("fixture")
                 .header("Retry-After", "60").body(body.toResponseBody()).build()
         }.build()
         var elapsed = 0L
-        val feed = PublicChartFeed(client, scheduler, { elapsed }) {}
+        val feed = PublicChartFeed(client, scheduler, { elapsed }, symbol = "SOLUSDT") {}
         try {
             assertEquals(16, chartIntervals.distinct().size)
             feed.setVisible(true)
