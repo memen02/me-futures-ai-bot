@@ -1,99 +1,138 @@
 package com.mefuturesaibot.app
 
-import android.app.Activity
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.view.View
-import android.widget.Button
-import android.widget.TextView
+import com.mefuturesaibot.app.exchange.PublicReader
 import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
-import java.io.IOException
-import java.text.DateFormat
-import java.util.Date
-import okhttp3.Call
-import okhttp3.Callback
 import okhttp3.Request
 import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import org.json.JSONArray
 import org.json.JSONObject
+import java.math.BigDecimal
+import java.util.TreeMap
+import java.util.Locale
 
-/** One public depth snapshot per tap. Only the visible dashboard holds the result. */
-internal class DashboardDepth(activity: Activity) {
-    private val load = activity.findViewById<Button>(R.id.dash_depth_load)
-    private val stamp = activity.findViewById<TextView>(R.id.dash_depth_time)
-    private val buy = activity.findViewById<TextView>(R.id.dash_depth_bids)
-    private val sell = activity.findViewById<TextView>(R.id.dash_depth_asks)
-    private val main = Handler(Looper.getMainLooper())
-    private var call: Call? = null
-    private var retryAt = 0L
+/** Synchronize USDⓈ-M diff depth using the exchange update IDs, retaining the snapshot's covered prices. */
+internal class DepthBook(snapshot: JSONObject) {
+    val bids = TreeMap<BigDecimal, BigDecimal>(reverseOrder())
+    val asks = TreeMap<BigDecimal, BigDecimal>()
+    private var last = snapshot.getLong("lastUpdateId")
+    private var bridged = false
+    private val floor: BigDecimal
+    private val ceiling: BigDecimal
+    var time = snapshot.getLong("T")
+        private set
 
-    init { load.setOnClickListener { fetch() } }
+    init {
+        levels(snapshot.getJSONArray("bids"), bids) { true }
+        levels(snapshot.getJSONArray("asks"), asks) { true }
+        floor = bids.lastKey()
+        ceiling = asks.lastKey()
+    }
 
-    private fun fetch() {
-        if (call != null) return
-        stamp.visibility = View.VISIBLE
-        if (SystemClock.elapsedRealtime() < retryAt) {
-            stamp.text = "Tunggu sejenak sebelum memuat ulang."
-            return
+    private fun levels(rows: JSONArray, side: MutableMap<BigDecimal, BigDecimal>, covered: (BigDecimal) -> Boolean) {
+        for (i in 0 until rows.length()) {
+            val row = rows.getJSONArray(i)
+            val p = row.getString(0).toBigDecimal()
+            val q = row.getString(1).toBigDecimal()
+            require(p.signum() > 0 && q.signum() >= 0)
+            if (covered(p)) {
+                if (q.signum() == 0) side.remove(p) else side[p] = q
+            }
         }
-        retryAt = SystemClock.elapsedRealtime() + 3000
-        stamp.text = "Memuat kedalaman pasar…"
-        buy.text = ""
-        sell.text = ""
-        load.isEnabled = false
-        val request = Request.Builder().url("https://fapi.binance.com/fapi/v1/depth?symbol=BTCUSDT&limit=5").build()
-        val pending = ReconnectingWebSocket.sharedHttpClient.newCall(request)
-        call = pending
-        pending.enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) = finish(call, "Koneksi gagal. Coba muat ulang.")
+    }
 
-            override fun onResponse(call: Call, response: Response) {
-                response.use {
-                    if (!it.isSuccessful) {
-                        val delay = if (it.code == 429 || it.code == 418)
-                            (it.header("Retry-After")?.toLongOrNull() ?: 60L).coerceIn(1, 86400) else 0
-                        finish(call, "Kedalaman belum tersedia (HTTP ${it.code}).", pauseSeconds = delay)
-                        return
-                    }
-                    try {
-                        val data = JSONObject(it.body.string())
-                        val instant = data.getLong("T")
-                        require(instant > 0)
-                        val time = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(Date(instant))
-                        fun levels(side: String): String {
-                            val rows = data.getJSONArray(side)
-                            return (0 until minOf(5, rows.length())).joinToString("\n") { index ->
-                                val entry = rows.getJSONArray(index)
-                                "${entry.getString(0)}  ×  ${entry.getString(1)}"
-                            }.ifEmpty { "—" }
-                        }
-                        finish(call, "Snapshot bursa · $time\nHarga USDT × jumlah BTC", levels("bids"), levels("asks"))
-                    } catch (_: Exception) {
-                        finish(call, "Snapshot belum tersedia. Coba muat ulang.")
+    fun apply(event: JSONObject): Boolean {
+        val end = event.getLong("u")
+        if (end < last || bridged && end == last) return false
+        require(if (bridged) event.getLong("pu") == last else event.getLong("U") <= last)
+        levels(event.getJSONArray("b"), bids) { it >= floor }
+        levels(event.getJSONArray("a"), asks) { it <= ceiling }
+        require(bids.size >= 5 && asks.size >= 5 && bids.firstKey() < asks.firstKey())
+        last = end
+        time = event.getLong("T")
+        bridged = true
+        return true
+    }
+}
+
+internal class DashboardDepth(private val symbol: String, private val publish: (DepthBook?, String) -> Unit) {
+    private val main = Handler(Looper.getMainLooper())
+    private val reader = PublicReader()
+    private var socket: WebSocket? = null
+    private var book: DepthBook? = null
+    private val buffer = ArrayDeque<JSONObject>()
+    private var lastMessage = 0L
+    private var backoff = 2000L
+    private val watchdog = object : Runnable {
+        override fun run() {
+            if (SystemClock.elapsedRealtime() - lastMessage > 15_000) restart("Data kedaluwarsa")
+            else main.postDelayed(this, 5000)
+        }
+    }
+
+    fun start() {
+        publish(null, "Menyinkronkan buku order…")
+        lastMessage = SystemClock.elapsedRealtime()
+        val stream = PublicReader.encode(symbol.lowercase(Locale.ROOT))
+        val request = Request.Builder().url("wss://fstream.binance.com/public/stream?streams=$stream@depth@500ms").build()
+        socket = ReconnectingWebSocket.sharedHttpClient.newWebSocket(request, object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                main.post {
+                    if (socket !== webSocket) return@post
+                    reader.read("depth?symbol=${PublicReader.encode(symbol)}&limit=100") { body, _, error ->
+                        try {
+                            val next = DepthBook(JSONObject(requireNotNull(body)))
+                            book = next
+                            while (buffer.isNotEmpty()) apply(next, buffer.removeFirst())
+                        } catch (_: Exception) { restart(error.ifEmpty { "Snapshot tidak valid" }) }
                     }
                 }
             }
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                main.post {
+                    if (socket !== webSocket) return@post
+                    try {
+                        val event = JSONObject(text).getJSONObject("data")
+                        require(event.getString("s") == symbol && event.getString("e") == "depthUpdate")
+                        val current = book
+                        if (current == null) { require(buffer.size < 128); buffer.addLast(event) }
+                        else apply(current, event)
+                    } catch (_: Exception) { restart("Urutan pembaruan tidak valid") }
+                }
+            }
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = disconnected(webSocket)
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = disconnected(webSocket)
         })
+        main.postDelayed(watchdog, 5000)
     }
 
-    private fun finish(source: Call, message: String, bids: String = "", asks: String = "", pauseSeconds: Long = 0) {
-        main.post {
-            if (call !== source) return@post
-            call = null
-            if (pauseSeconds > 0) retryAt = SystemClock.elapsedRealtime() + pauseSeconds * 1000
-            stamp.text = message
-            buy.text = bids
-            sell.text = asks
-            load.isEnabled = true
+    private fun apply(current: DepthBook, event: JSONObject) {
+        if (current.apply(event)) {
+            lastMessage = SystemClock.elapsedRealtime()
+            backoff = 2000
+            publish(current, "Tersinkron")
         }
     }
-
-    fun clear() {
-        call?.cancel()
-        call = null
-        stamp.visibility = View.GONE
-        buy.text = ""
-        sell.text = ""
-        load.isEnabled = true
+    private fun disconnected(source: WebSocket) {
+        main.post { if (source === socket) restart("Koneksi terputus") }
+    }
+    private fun restart(reason: String) {
+        stop()
+        publish(null, "$reason · menyambung ulang")
+        main.postDelayed(::start, backoff)
+        backoff = minOf(60_000, backoff * 2)
+    }
+    fun stop() {
+        main.removeCallbacksAndMessages(null)
+        reader.cancel()
+        val old = socket
+        socket = null
+        old?.cancel()
+        buffer.clear()
+        book = null
     }
 }

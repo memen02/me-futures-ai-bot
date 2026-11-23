@@ -5,7 +5,7 @@ import org.json.JSONObject
 import kotlin.math.exp
 import kotlin.math.abs
 
-internal data class Contract(val symbol: String, val quote: String)
+internal data class Contract(val symbol: String, val quote: String, val base: String = symbol.removeSuffix(quote), val listedAt: Long = 0)
 internal data class Ticker(
     val price: Double, val change: Double, val high: Double, val low: Double,
     val volume: Double, val average: Double, val time: Long,
@@ -32,7 +32,8 @@ internal object MarketData {
         for (i in 0 until entries.length()) {
             val item = entries.getJSONObject(i)
             if (item.optString("contractType") == "PERPETUAL" && item.optString("status") == "TRADING") {
-                result.add(Contract(item.getString("symbol"), item.getString("quoteAsset")))
+                result.add(Contract(item.getString("symbol"), item.getString("quoteAsset"),
+                    item.optString("baseAsset", item.getString("symbol").removeSuffix(item.getString("quoteAsset"))), item.optLong("onboardDate")))
             }
         }
         require(result.isNotEmpty()) { "Daftar kontrak kosong" }

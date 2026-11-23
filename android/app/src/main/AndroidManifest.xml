@@ -35,6 +35,7 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".TokenDetailActivity" android:theme="@style/DashboardTheme" android:exported="false" />
         <activity android:name=".MainActivity" android:theme="@style/DashboardTheme" android:exported="false" />
 
         <service

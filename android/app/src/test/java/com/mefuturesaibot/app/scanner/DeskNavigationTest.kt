@@ -31,7 +31,7 @@ class DeskNavigationTest {
                     assertEquals(it == target, activity.findViewById<View>(it.buttonId).isSelected)
                 }
             }
-            activity.findViewById<View>(R.id.nav_home).performClick()
+            activity.findViewById<View>(R.id.nav_account).performClick()
             activity.findViewById<View>(R.id.desk_history).performClick()
             controller.recreate()
             assertTrue(controller.get().findViewById<View>(R.id.page_history).isShown)
@@ -68,7 +68,6 @@ class DeskNavigationTest {
             val list = activity.findViewById<ListView>(R.id.scan_list)
             assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.scan_stop).visibility)
             assertEquals(View.GONE, activity.findViewById<View>(R.id.scan_start).visibility)
-            assertEquals("—", activity.findViewById<TextView>(R.id.dash_last_price).text.toString())
             assertEquals(2, list.count)
             activity.findViewById<EditText>(R.id.scan_query).setText("eth")
             assertEquals(1, list.count)
@@ -78,38 +77,30 @@ class DeskNavigationTest {
             desk.update(scan, true)
             assertEquals("ETHUSDT", (list.getItemAtPosition(0) as MarketRow).contract.symbol)
             list.performItemClick(list.adapter.getView(0, null, list), 0, 0)
-            val dialog = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog()
-            assertTrue(dialog.isShowing)
-            assertTrue(dialog.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).text.toString().contains("Hapus"))
+            val opened = org.robolectric.Shadows.shadowOf(activity).nextStartedActivity
+            assertEquals("ETHUSDT", opened.getStringExtra("symbol"))
+            assertEquals("ETH", opened.getStringExtra("base"))
+            desk.close()
         } finally { controller.pause().stop().destroy() }
     }
 
-    @Test fun btcSummaryUsesFreshBtcTickerAndClearsOnExpiryOrStop() {
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+    @Test fun homeShowsMarketRowsWithoutBotAndRemovesExpiredPrices() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).create()
         try {
             val activity = controller.get()
             val desk = TradingDesk(activity, DeskTab.HOME) {}
-            val btc = Ticker(62105.4, -2.0, 64000.0, 61000.0, 1_500_000.0, 62500.0, 200_000)
-            val rows = listOf(MarketRow(Contract("ETHUSDT", "USDT"), btc.copy(price = 1300.0), null),
-                MarketRow(Contract("BTCUSDT", "USDT"), btc, null))
-            val scan = Scan(rows, btc.time, SystemClock.elapsedRealtime(), "Aktif", true)
-            fun label(id: Int) = activity.findViewById<TextView>(id).text.toString()
-            desk.update(scan, true)
-            assertEquals("62,105.40", label(R.id.dash_last_price))
-            assertEquals("1,000.00", label(R.id.desk_balance))
-            assertTrue(label(R.id.desk_coverage).contains("2 turun"))
-            assertEquals(2, activity.findViewById<android.widget.LinearLayout>(R.id.desk_watch_rows).childCount)
-            assertEquals("64,000.00", label(R.id.dash_high))
-            assertEquals("61,000.00", label(R.id.dash_low))
-            assertTrue(label(R.id.dash_change).contains("-2.00%"))
-            desk.update(scan.copy(time = btc.time + 120_001), true)
-            assertEquals("—", label(R.id.dash_last_price))
+            val ticker = Ticker(10.0, -2.0, 11.0, 9.0, 2e6, 10.0, 200_000)
+            val rows = listOf(MarketRow(Contract("ETHUSDT", "USDT"), ticker, null))
+            val scan = Scan(rows, ticker.time, SystemClock.elapsedRealtime(), "Pasar publik", true)
             desk.update(scan, false)
-            assertEquals("—", label(R.id.dash_high))
-            assertTrue(label(R.id.dash_ticker_time).contains("nonaktif"))
-            assertEquals(0, activity.findViewById<android.widget.LinearLayout>(R.id.desk_watch_rows).childCount)
+            val list = activity.findViewById<android.widget.LinearLayout>(R.id.desk_watch_rows)
+            assertEquals(1, list.childCount)
+            assertEquals("WAIT", list.getChildAt(0).findViewById<TextView>(R.id.row_model).text)
+            assertTrue(activity.findViewById<TextView>(R.id.desk_coverage).text.contains("1 turun"))
+            desk.update(scan.copy(time = ticker.time + 120_001), false)
+            assertEquals(0, list.childCount)
             desk.close()
-        } finally { controller.pause().stop().destroy() }
+        } finally { controller.destroy() }
     }
 
     @Test fun tabsLeadToMarketPaperPositionsJournalAndAccount() {
