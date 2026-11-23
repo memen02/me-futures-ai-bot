@@ -5,8 +5,11 @@
         <ImageView android:id="@+id/asset_logo" android:layout_width="match_parent" android:layout_height="match_parent" android:importantForAccessibility="no"/>
     </FrameLayout>
     <LinearLayout style="@style/MarketColumn">
-        <TextView android:id="@+id/row_symbol" style="@style/DashHeading" android:maxLines="2"/>
-        <TextView android:id="@+id/row_model" style="@style/DashLabel" android:fontFamily="sans-serif-medium" android:textSize="12sp"/>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+            <TextView android:id="@+id/row_symbol" style="@style/DashHeading" android:layout_width="wrap_content" android:maxEms="8" android:maxLines="2" android:ellipsize="end"/>
+            <TextView android:id="@+id/row_model" style="@style/DashLabel" android:layout_marginStart="5dp" android:paddingHorizontal="4dp" android:paddingVertical="2dp" android:background="@drawable/signal_badge" android:fontFamily="sans-serif-medium" android:textSize="10sp"/>
+        </LinearLayout>
+        <TextView android:id="@+id/row_volume" style="@style/DashLabel" android:maxLines="1" android:ellipsize="end" android:textSize="12sp"/>
     </LinearLayout>
     <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="end">
         <TextView android:id="@+id/row_price" style="@style/DashHeading" android:fontFeatureSettings="tnum"/>

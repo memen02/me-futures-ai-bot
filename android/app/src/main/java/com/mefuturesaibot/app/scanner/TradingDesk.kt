@@ -213,7 +213,8 @@ internal class TradingDesk(
             running && execution.getBoolean("enabled",false) -> "Trading aktif"
             else -> "Trading nonaktif"
         }
-        view<TextView>(R.id.desk_bot).text = "${demo.venue.label} · $state"
+        view<TextView>(R.id.desk_bot).text = state
+        view<TextView>(R.id.home_summary).text = "Paper · ${money(store.read().second.balance)} USDT   ·   USDⓈ-M Perpetual"
         val rising = rows.count { it.ticker!!.change > 0 }
         val falling = rows.count { it.ticker!!.change < 0 }
         val flat = rows.size - rising - falling
@@ -331,6 +332,15 @@ internal class TradingDesk(
         AssetLogo.bind(cell, c.base)
         val star = if (c.symbol in store.favorites) "★ " else ""
         cell.findViewById<TextView>(R.id.row_symbol).text = "$star${c.base}/${c.quote}"
+        cell.findViewById<TextView>(R.id.row_volume).text = t?.let {
+            val compact = when {
+                it.volume >= 1e9 -> String.format(Locale.US, "%.2fB", it.volume / 1e9)
+                it.volume >= 1e6 -> String.format(Locale.US, "%.2fM", it.volume / 1e6)
+                it.volume >= 1e3 -> String.format(Locale.US, "%.1fK", it.volume / 1e3)
+                else -> money(it.volume)
+            }
+            "Vol $compact ${c.quote}"
+        } ?: "Volume —"
         badge(cell, if (current) signals.signal(c.symbol) else SmaSignal.waitFor("Menunggu ticker"))
         cell.findViewById<TextView>(R.id.row_price).text = t?.let { price(it.price) } ?: "—"
         cell.findViewById<TextView>(R.id.row_change).apply {
