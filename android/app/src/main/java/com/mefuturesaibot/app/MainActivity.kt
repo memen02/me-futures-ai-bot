@@ -1,5 +1,6 @@
 package com.mefuturesaibot.app
 
+import com.mefuturesaibot.app.scanner.DeskTab
 import com.mefuturesaibot.app.scanner.TradingDesk
 import android.Manifest
 import android.app.AlertDialog
@@ -108,10 +109,10 @@ class MainActivity : Activity() {
         }
         historyButton.setOnClickListener { showCandleHistory() }
         findViewById<Button>(R.id.scan_stop).setOnClickListener { onStopClicked() }
-        desk = TradingDesk(this, savedInstanceState?.getInt("deskTab") ?: 0, ::onStartClicked)
+        desk = TradingDesk(this, DeskTab.restore(savedInstanceState), ::onStartClicked)
         desk.onTabSelected = {
-            if (desk.tab != 0) depth.clear()
-            chartFeed.setVisible(visibleActivity && desk.tab == 0)
+            if (desk.tab != DeskTab.HOME) depth.clear()
+            chartFeed.setVisible(visibleActivity && desk.tab == DeskTab.HOME)
             refreshStatusText()
         }
         userRequestedStop = savedInstanceState?.getBoolean("userRequestedStop") ?: false
@@ -122,14 +123,14 @@ class MainActivity : Activity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean("userRequestedStop", userRequestedStop)
-        outState.putInt("deskTab", desk.tab)
+        outState.putString(DeskTab.STATE_KEY, desk.tab.name)
         outState.putString("chartInterval", chartFeed.state.interval)
     }
 
     override fun onStart() {
         super.onStart()
         visibleActivity = true
-        chartFeed.setVisible(desk.tab == 0)
+        chartFeed.setVisible(desk.tab == DeskTab.HOME)
         pollRunnable.run()
     }
 
@@ -175,9 +176,9 @@ class MainActivity : Activity() {
 
     private fun refreshStatusText() {
         desk.update(BotForegroundService.latestScan, !userRequestedStop && BotForegroundService.isRunning)
-        if (desk.tab != 0) return
+        if (desk.tab != DeskTab.HOME) return
         if (userRequestedStop || !BotForegroundService.isRunning) {
-            renderSignal(SmaSignal.waitFor(if (userRequestedStop) "Pemantauan dihentikan" else "Mulai pemantauan dari tab Scanner"))
+            renderSignal(SmaSignal.waitFor(if (userRequestedStop) "Pemantauan dihentikan" else "Mulai pemantauan dari tab Pasar"))
             statusView.text = if (userRequestedStop) "Pemantauan dihentikan" else "Pemantauan belum dimulai"
             bidView.text = "—"
             askView.text = "—"

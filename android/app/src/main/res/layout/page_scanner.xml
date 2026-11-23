@@ -1,6 +1,6 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:paddingHorizontal="16dp" android:paddingTop="14dp">
-    <TextView style="@style/DeskTitle" android:text="Scanner pasar"/>
+    <TextView style="@style/DeskTitle" android:text="Pasar Futures"/>
     <TextView style="@style/DashLabel" android:text="Binance USDⓈ-M  /  Perpetual  /  24 jam"/>
     <TextView android:id="@+id/scan_state" style="@style/DashHeading" android:layout_marginTop="12dp" android:textSize="16sp"/>
     <Button android:id="@+id/scan_start" style="@style/DeskAction" android:text="Mulai bot"/>

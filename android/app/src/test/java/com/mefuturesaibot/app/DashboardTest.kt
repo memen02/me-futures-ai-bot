@@ -69,7 +69,7 @@ class DashboardTest {
             activity.findViewById<View>(R.id.nav_account).performClick()
             activity.findViewById<Switch>(R.id.account_autostart).isChecked = true
             assertTrue(BotPreferences.isAutoStartEnabled(activity))
-            activity.findViewById<View>(R.id.nav_scanner).performClick()
+            activity.findViewById<View>(R.id.nav_market).performClick()
             activity.findViewById<View>(R.id.scan_stop).performClick()
             activity.findViewById<View>(R.id.nav_home).performClick()
             assertEquals(View.VISIBLE, visibility(R.id.dash_chart))

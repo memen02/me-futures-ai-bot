@@ -2,7 +2,7 @@
     android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="vertical" android:padding="20dp" android:focusableInTouchMode="true">
-        <TextView style="@style/DeskTitle" android:text="Pengaturan" />
+        <TextView style="@style/DeskTitle" android:text="Akun" />
         <LinearLayout style="@style/DashPanel">
             <TextView style="@style/DashHeading" android:text="Mode trading" />
             <RadioGroup android:id="@+id/venue_mode" android:layout_width="match_parent" android:layout_height="wrap_content" android:saveEnabled="false">
@@ -10,6 +10,12 @@
                 <RadioButton android:id="@+id/mode_mainnet" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:textColor="@color/me_text" android:saveEnabled="false" android:text="Mainnet · uang asli"/>
             </RadioGroup>
             <TextView android:id="@+id/mode_message" style="@style/DashLabel" android:accessibilityLiveRegion="polite" android:visibility="gone"/>
+        </LinearLayout>
+        <LinearLayout style="@style/DashPanel">
+            <TextView style="@style/DashHeading" android:text="Paper · simulasi lokal"/>
+            <TextView android:id="@+id/paper_model" style="@style/TerminalNote" android:lineSpacingExtra="3dp"/>
+            <Switch android:id="@+id/paper_enabled" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:minHeight="@dimen/me_touch_target" android:saveEnabled="false" android:text="Aktifkan transaksi Paper" android:textColor="@color/me_text"/>
         </LinearLayout>
         <LinearLayout android:id="@+id/mainnet_credentials" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content">
         <LinearLayout style="@style/DashPanel" android:background="@drawable/dashboard_panel">

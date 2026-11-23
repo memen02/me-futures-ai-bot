@@ -47,14 +47,12 @@ private fun modelLabel(score: Double?) = when {
 }
 
 internal class TradingDesk(
-    private val activity: Activity, initialTab: Int, private val start: () -> Unit,
+    private val activity: Activity, initialTab: DeskTab, private val start: () -> Unit,
 ) {
     private fun <T : View> view(id: Int): T = activity.findViewById(id)
     private val store = DeskStore(activity)
     private var demo = DemoControls(activity, start)
     private val accountPage = AccountPage(activity, credentialsChanged = { demo.render() })
-    private val nav = listOf(R.id.nav_home, R.id.nav_scanner, R.id.nav_paper, R.id.nav_account)
-    private val pages = listOf(R.id.page_home, R.id.page_scanner, R.id.page_paper, R.id.page_account)
     private val query = view<EditText>(R.id.scan_query)
     private val filter = view<Spinner>(R.id.scan_filter)
     private val sort = view<Spinner>(R.id.scan_sort)
@@ -66,7 +64,7 @@ internal class TradingDesk(
     private var fresh = false
     private var running = false
     var onTabSelected: (() -> Unit)? = null
-    var tab = 0
+    var tab = DeskTab.HOME
         private set
 
     private var changingMode = false
@@ -75,8 +73,8 @@ internal class TradingDesk(
     }
 
     init {
-        nav.forEachIndexed { index, id -> view<TextView>(id).setOnClickListener { select(index) } }
-        view<Button>(R.id.desk_history).setOnClickListener { select(2) }
+        DeskTab.values().forEach { dest -> view<TextView>(dest.buttonId).setOnClickListener { select(dest) } }
+        view<Button>(R.id.desk_history).setOnClickListener { select(DeskTab.HISTORY) }
         view<Button>(R.id.scan_start).setOnClickListener { start() }
         val list = view<ListView>(R.id.scan_list)
         list.adapter = adapter
@@ -140,19 +138,19 @@ internal class TradingDesk(
         accountPage.close()
     }
 
-    fun select(index: Int) {
-        if (tab == 1 && index != tab) clearTokenList()
-        tab = index.coerceIn(0, pages.lastIndex)
-        accountPage.show(tab == 3)
-        pages.forEachIndexed { i, id -> view<View>(id).visibility = if (i == tab) View.VISIBLE else View.GONE }
-        nav.forEachIndexed { i, id ->
-            val button = view<TextView>(id)
-            val tint = if (i == tab) activity.getColor(R.color.me_accent) else activity.getColor(R.color.me_muted)
-            button.isSelected = i == tab
+    fun select(destination: DeskTab) {
+        if (tab == DeskTab.MARKET && destination != tab) clearTokenList()
+        tab = destination
+        accountPage.show(tab == DeskTab.ACCOUNT)
+        DeskTab.values().forEach { dest ->
+            view<View>(dest.pageId).visibility = if (dest == tab) View.VISIBLE else View.GONE
+            val button = view<TextView>(dest.buttonId)
+            val tint = if (dest == tab) activity.getColor(R.color.me_accent) else activity.getColor(R.color.me_muted)
+            button.isSelected = dest == tab
             button.setTextColor(tint)
             button.compoundDrawableTintList = ColorStateList.valueOf(tint)
         }
-        if (tab == 3) {
+        if (tab == DeskTab.ACCOUNT) {
             view<Switch>(R.id.account_autostart).isChecked = BotPreferences.isAutoStartEnabled(activity)
             view<TextView>(R.id.account_cache_status).text = CacheCleanupJob.status(activity)
         }
@@ -166,7 +164,7 @@ internal class TradingDesk(
         if (snapshot !== scan) btcTicker = scan.rows.firstOrNull { it.contract.symbol == "BTCUSDT" }?.ticker
         val tickerCurrent = current && btcTicker?.fresh(scan.time + (elapsed - scan.received)) == true
         if (!force && snapshot === scan && current == fresh && running == active && btcFresh == tickerCurrent &&
-            (tab != 0 || elapsed < nextTerminalRefresh)) return
+            (tab != DeskTab.HOME || elapsed < nextTerminalRefresh)) return
         btcFresh = tickerCurrent
         snapshot = scan
         fresh = current
@@ -181,9 +179,9 @@ internal class TradingDesk(
         view<Button>(R.id.scan_start).visibility = if (active) View.GONE else View.VISIBLE
         view<Button>(R.id.scan_stop).visibility = if (active) View.VISIBLE else View.GONE
         renderBtcTicker(btcTicker.takeIf { btcFresh })
-        if (tab == 0) renderTerminal(elapsed)
-        if (tab == 1) listTokens()
-        if (tab == 2 || tab == 3) renderAccount()
+        if (tab == DeskTab.HOME) renderTerminal(elapsed)
+        if (tab == DeskTab.MARKET) listTokens()
+        if (tab == DeskTab.TRADING || tab == DeskTab.HISTORY || tab == DeskTab.ACCOUNT) renderAccount()
     }
 
     private fun renderBtcTicker(ticker: Ticker?) {
@@ -329,7 +327,7 @@ internal class TradingDesk(
     }
 
     private fun listTokens() {
-        if (tab != 1) return
+        if (tab != DeskTab.MARKET) return
         val search = query.text.toString().trim()
         val stars = store.favorites
         val matches = snapshot.rows.filter { row ->
@@ -375,7 +373,7 @@ internal class TradingDesk(
             .setPositiveButton("Tutup", null)
             .setNeutralButton(if (starred) "Hapus favorit" else "Tambah favorit") { _, _ ->
                 store.favorites = if (starred) store.favorites - symbol else store.favorites + symbol
-                if (tab == 0) renderTerminal(SystemClock.elapsedRealtime()) else listTokens()
+                if (tab == DeskTab.HOME) renderTerminal(SystemClock.elapsedRealtime()) else listTokens()
             }.show()
     }
 
