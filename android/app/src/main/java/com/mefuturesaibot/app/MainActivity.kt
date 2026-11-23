@@ -6,7 +6,6 @@ import android.app.AlertDialog
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -238,11 +237,11 @@ class MainActivity : Activity() {
                 "Tutup ${interval.close.stripTrailingZeros().toPlainString()}   SMA 20 ${interval.sma.stripTrailingZeros().toPlainString()}"
         }
         val color = when (signal.side) {
-            SignalSide.WAIT -> "#FFD19C"
-            SignalSide.BUY -> "#82E5BE"
-            SignalSide.SELL -> "#FF9B8F"
+            SignalSide.WAIT -> R.color.me_accent
+            SignalSide.BUY -> R.color.me_buy
+            SignalSide.SELL -> R.color.me_sell
         }
-        val tint = Color.parseColor(color)
+        val tint = getColor(color)
         signalView.setTextColor(tint)
         findViewById<TextView>(R.id.dash_signal_tag).apply {
             text = signal.side.name

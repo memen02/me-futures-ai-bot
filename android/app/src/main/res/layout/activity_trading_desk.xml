@@ -1,14 +1,14 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent"
-    android:fitsSystemWindows="true" android:orientation="vertical" android:background="#0A0D12">
-    <TextView android:id="@+id/active_venue" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="16dp" android:paddingVertical="6dp" android:background="#14191F" android:textColor="#9CE2CB" android:textStyle="bold" android:accessibilityLiveRegion="polite"/>
+    android:fitsSystemWindows="true" android:orientation="vertical" android:background="@color/me_background">
+    <TextView android:id="@+id/active_venue" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="16dp" android:paddingVertical="6dp" android:background="@color/me_surface" android:textColor="@color/me_buy" android:textStyle="bold" android:accessibilityLiveRegion="polite"/>
     <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
             <include layout="@layout/activity_dashboard" android:id="@+id/page_home" android:layout_width="match_parent" android:layout_height="match_parent"/>
             <include layout="@layout/page_scanner" android:id="@+id/page_scanner" android:layout_width="match_parent" android:layout_height="match_parent"/>
             <include layout="@layout/page_paper" android:id="@+id/page_paper" android:layout_width="match_parent" android:layout_height="match_parent"/>
             <include layout="@layout/page_account" android:id="@+id/page_account" android:layout_width="match_parent" android:layout_height="match_parent"/>
     </FrameLayout>
-    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#303740"/>
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:background="#14191F" android:baselineAligned="false">
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/me_border"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@color/me_surface" android:baselineAligned="false">
         <TextView android:id="@+id/nav_home" style="@style/DeskTab" android:drawableTop="@drawable/nav_home" android:text="Dasbor" />
         <TextView android:id="@+id/nav_scanner" style="@style/DeskTab" android:drawableTop="@drawable/nav_scanner" android:text="Scanner" />
         <TextView android:id="@+id/nav_paper" style="@style/DeskTab" android:drawableTop="@drawable/nav_paper" android:text="Simulasi" />

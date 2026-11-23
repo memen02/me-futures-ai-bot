@@ -1,6 +1,6 @@
 <resources>
     <style name="StartupTheme" parent="StartupBase">
-        <item name="android:windowSplashScreenBackground">#0A0D12</item>
+        <item name="android:windowSplashScreenBackground">@color/me_background</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
     </style>
 </resources>

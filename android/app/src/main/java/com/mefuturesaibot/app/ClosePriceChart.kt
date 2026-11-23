@@ -2,7 +2,6 @@ package com.mefuturesaibot.app
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.View
@@ -13,8 +12,9 @@ import kotlin.math.min
 class ClosePriceChart(context: Context, attrs: AttributeSet) : View(context, attrs) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val dp = resources.displayMetrics.density
-    private val up = Color.rgb(47, 221, 159)
-    private val down = Color.rgb(255, 100, 133)
+    private val up = context.getColor(R.color.me_buy)
+    private val down = context.getColor(R.color.me_sell)
+    private val grid = context.getColor(R.color.me_border)
     private var source: List<Candle> = emptyList()
     private var bars: List<Candle> = emptyList()
     private var high = 0.0
@@ -54,7 +54,7 @@ class ClosePriceChart(context: Context, attrs: AttributeSet) : View(context, att
         fun y(price: Double) = if (high == low) pad + chartHeight / 2
             else pad + chartHeight * ((high - price) / (high - low)).toFloat()
         paint.strokeWidth = dp
-        paint.color = Color.rgb(36, 63, 86)
+        paint.color = grid
         for (i in 0..3) {
             val level = pad + chartHeight * i / 3
             canvas.drawLine(pad, level, width - pad, level, paint)

@@ -7,7 +7,6 @@ import com.mefuturesaibot.app.demo.FuturesVenue
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.res.ColorStateList
-import android.graphics.Color
 import android.os.SystemClock
 import android.text.Editable
 import android.text.TextWatcher
@@ -130,7 +129,7 @@ internal class TradingDesk(
         changingMode = false
         view<TextView>(R.id.active_venue).apply {
             text = if (mode == FuturesVenue.REAL) "MAINNET · Uang asli" else "DEMO · Saldo virtual"
-            setTextColor(if (mode == FuturesVenue.REAL) Color.rgb(255,187,125) else Color.rgb(156,226,203))
+            setTextColor(if (mode == FuturesVenue.REAL) activity.getColor(R.color.me_accent) else activity.getColor(R.color.me_text))
         }
         view<View>(R.id.mode_message).visibility = View.GONE
     }
@@ -148,7 +147,7 @@ internal class TradingDesk(
         pages.forEachIndexed { i, id -> view<View>(id).visibility = if (i == tab) View.VISIBLE else View.GONE }
         nav.forEachIndexed { i, id ->
             val button = view<TextView>(id)
-            val tint = if (i == tab) Color.rgb(102, 202, 255) else Color.rgb(175, 185, 198)
+            val tint = if (i == tab) activity.getColor(R.color.me_accent) else activity.getColor(R.color.me_muted)
             button.isSelected = i == tab
             button.setTextColor(tint)
             button.compoundDrawableTintList = ColorStateList.valueOf(tint)
@@ -194,9 +193,9 @@ internal class TradingDesk(
         view<TextView>(R.id.dash_change).apply {
             text = ticker?.let { pct(it.change) + "  ·  24 jam" } ?: "—  ·  24 jam"
             setTextColor(when {
-                ticker == null || ticker.change == 0.0 -> Color.LTGRAY
-                ticker.change > 0 -> Color.rgb(130, 229, 190)
-                else -> Color.rgb(255, 155, 143)
+                ticker == null || ticker.change == 0.0 -> activity.getColor(R.color.me_muted)
+                ticker.change > 0 -> activity.getColor(R.color.me_buy)
+                else -> activity.getColor(R.color.me_sell)
             })
         }
         view<TextView>(R.id.dash_ticker_time).text = when {
@@ -250,9 +249,9 @@ internal class TradingDesk(
         view<TextView>(R.id.desk_profit).apply {
             text = "Perubahan saldo  ${money(net)} USDT"
             setTextColor(when {
-                net > 0 -> Color.rgb(98, 225, 173)
-                net < 0 -> Color.rgb(255, 130, 152)
-                else -> Color.WHITE
+                net > 0 -> activity.getColor(R.color.me_buy)
+                net < 0 -> activity.getColor(R.color.me_sell)
+                else -> activity.getColor(R.color.me_text)
             })
         }
         view<TextView>(R.id.desk_trades).text = "${account.trades} transaksi selesai · Sejak awal"
@@ -297,9 +296,9 @@ internal class TradingDesk(
             cell.findViewById<TextView>(R.id.row_change).apply {
                 text = pct(ticker.change)
                 setTextColor(when {
-                    ticker.change > 0 -> Color.rgb(98, 225, 173)
-                    ticker.change < 0 -> Color.rgb(255, 130, 152)
-                    else -> Color.LTGRAY
+                    ticker.change > 0 -> activity.getColor(R.color.me_buy)
+                    ticker.change < 0 -> activity.getColor(R.color.me_sell)
+                    else -> activity.getColor(R.color.me_muted)
                 })
             }
             cell.isFocusable = true
@@ -428,9 +427,9 @@ internal class TradingDesk(
             cell.findViewById<TextView>(R.id.row_change).apply {
                 text = t?.let { pct(it.change) } ?: "—"
                 setTextColor(when {
-                    t == null || t.change == 0.0 -> Color.LTGRAY
-                    t.change > 0 -> Color.rgb(126, 226, 182)
-                    else -> Color.rgb(255, 154, 140)
+                    t == null || t.change == 0.0 -> activity.getColor(R.color.me_muted)
+                    t.change > 0 -> activity.getColor(R.color.me_buy)
+                    else -> activity.getColor(R.color.me_sell)
                 })
             }
             return cell

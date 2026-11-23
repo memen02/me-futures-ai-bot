@@ -1,8 +1,14 @@
 <resources>
     <style name="StartupBase" parent="@android:style/Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#0A0D12</item>
-        <item name="android:statusBarColor">#0A0D12</item>
-        <item name="android:navigationBarColor">#0A0D12</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorAccent">@color/me_accent</item>
+        <item name="android:colorBackground">@color/me_background</item>
+        <item name="android:colorBackgroundFloating">@color/me_surface</item>
+        <item name="android:textColorPrimary">@color/me_text</item>
+        <item name="android:textColorSecondary">@color/me_muted</item>
+        <item name="android:windowBackground">@color/me_background</item>
+        <item name="android:statusBarColor">@color/me_background</item>
+        <item name="android:navigationBarColor">@color/me_background</item>
     </style>
     <style name="StartupTheme" parent="StartupBase" />
 </resources>

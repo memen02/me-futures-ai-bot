@@ -1,0 +1,6 @@
+<resources>
+    <dimen name="me_panel_radius">6dp</dimen>
+    <dimen name="me_panel_padding">12dp</dimen>
+    <dimen name="me_section_gap">8dp</dimen>
+    <dimen name="me_touch_target">48dp</dimen>
+</resources>

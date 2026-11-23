@@ -1,3 +1,11 @@
 <resources>
     <color name="launcher_background">#11151C</color>
+    <color name="me_background">#0B0E11</color>
+    <color name="me_surface">#181A20</color>
+    <color name="me_border">#2B3139</color>
+    <color name="me_text">#EAECEF</color>
+    <color name="me_muted">#848E9C</color>
+    <color name="me_accent">#F0B90B</color>
+    <color name="me_buy">#0ECB81</color>
+    <color name="me_sell">#F6465D</color>
 </resources>
