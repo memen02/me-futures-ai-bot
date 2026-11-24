@@ -34,6 +34,14 @@ android {
     }
 
     buildTypes {
+        create("dev") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            isDebuggable = false
+            buildConfigField("boolean", "MAINNET_ORDERS", "false")
+            matchingFallbacks += "release"
+        }
         create("real") {
             initWith(getByName("release"))
             applicationIdSuffix = ".real"

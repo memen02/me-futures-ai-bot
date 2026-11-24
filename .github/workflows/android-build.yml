@@ -67,3 +67,20 @@ jobs:
           name: me-project-unified-unsigned
           path: android/app/build/outputs/apk/real/app-real-unsigned.apk
           if-no-files-found: error
+
+      - name: Assemble ME Project DEV APK
+        run: |
+          gradle :app:assembleDev --no-daemon
+          apk=app/build/outputs/apk/dev/app-dev-unsigned.apk
+          aapt=$(ls -dv "$ANDROID_HOME"/build-tools/*/aapt | tail -n 1)
+          "$aapt" dump badging "$apk" > "$RUNNER_TEMP/me-project-dev.txt"
+          grep -F "package: name='com.mefuturesaibot.app.dev'" "$RUNNER_TEMP/me-project-dev.txt"
+          grep -Fx "application-label:'ME Project DEV'" "$RUNNER_TEMP/me-project-dev.txt"
+          if grep -Fx "application-debuggable" "$RUNNER_TEMP/me-project-dev.txt"; then exit 1; fi
+
+      - name: Upload ME Project DEV APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: me-project-dev-unsigned
+          path: android/app/build/outputs/apk/dev/app-dev-unsigned.apk
+          if-no-files-found: error
