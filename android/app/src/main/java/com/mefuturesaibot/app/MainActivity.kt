@@ -78,7 +78,10 @@ class MainActivity : Activity() {
 
     private fun onStopClicked() {
         userRequestedStop = true
-        BotPreferences.setShouldRun(this, false)
+        synchronized(com.mefuturesaibot.app.demo.DemoRunner.entryLock) {
+            BotPreferences.setShouldRun(this, false)
+            com.mefuturesaibot.app.demo.FuturesVenue.selected(this).prefs(this).edit().putBoolean("enabled",false).apply()
+        }
 
         if (BotForegroundService.isRunning) {
             startService(

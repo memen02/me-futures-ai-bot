@@ -95,6 +95,12 @@ internal class DemoControls(private val activity: Activity, private val start: (
         prefs.edit().clear().putString("closedLedger",ledger).apply()
     }
 
+    private fun changeDemoCredentials(change: () -> Unit) = synchronized(DemoRunner.entryLock) {
+        check(!live && FuturesVenue.selected(activity) == venue && !prefs.getBoolean("enabled",false) && !prefs.contains("intent"))
+        change()
+        resetDemoSession()
+    }
+
     private fun edit() {
         val form = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
         fun field(name: String) = EditText(activity).apply {
@@ -111,7 +117,9 @@ internal class DemoControls(private val activity: Activity, private val start: (
         val dialog = AlertDialog.Builder(activity).setTitle("Key Binance Futures Demo").setView(form)
             .setPositiveButton("Simpan", null).setNegativeButton("Batal",null)
             .setNeutralButton(if (vault.exists()) "Hapus key" else null) { _,_ ->
-                runCatching { vault.remove() }.onSuccess { resetDemoSession() }
+                runCatching { changeDemoCredentials { vault.remove() } }.onFailure {
+                    label.text = "Periksa status bot dan posisi sebelum mengganti kredensial"
+                }
                 render()
             }.create()
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -125,8 +133,7 @@ internal class DemoControls(private val activity: Activity, private val start: (
             if (listOf(k,s).any { it.isEmpty() || it.length > 512 || !it.all { ch -> ch.code in 33..126 } }) {
                 secret.error = "Isi pasangan key Demo tanpa spasi"
             } else {
-                runCatching { vault.save(BinanceCredentials(k,s)) }.onSuccess {
-                    resetDemoSession()
+                runCatching { changeDemoCredentials { vault.save(BinanceCredentials(k,s)) } }.onSuccess {
                     dialog.dismiss()
                     render()
                 }.onFailure { secret.error = "Penyimpanan terenkripsi gagal" }

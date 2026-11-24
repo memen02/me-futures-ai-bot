@@ -130,7 +130,7 @@ class ReconnectingWebSocket(
          * (bukan private) supaya bisa diperiksa langsung dari unit test. Lihat
          * OkHttpSingletonTest.kt.
          */
-        val sharedHttpClient: OkHttpClient by lazy { OkHttpClient() }
+        val sharedHttpClient: OkHttpClient by lazy { OkHttpClient.Builder().pingInterval(20, java.util.concurrent.TimeUnit.SECONDS).build() }
 
         /**
          * Backoff eksponensial + jitter, dibatasi maxMs -- FUNGSI MURNI, diuji penuh
