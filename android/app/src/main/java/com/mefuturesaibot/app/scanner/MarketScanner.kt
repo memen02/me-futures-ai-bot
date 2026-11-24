@@ -102,8 +102,9 @@ internal class MarketScanner(private val store: DeskStore, private val botEnable
                         }
                     }
                 }
+                val confirmed = confirmation
                 val pending = pendingEntry.takeIf { seekEntry }
-                val candidate = pending?.eligible(snapshot)?.takeIf { confirmation?.symbol == it.contract.symbol && confirmation.long == pending.long }
+                val candidate = pending?.eligible(snapshot)?.takeIf { confirmed?.symbol == it.contract.symbol && confirmed.long == pending.long }
                 val symbol = candidate?.contract?.symbol
                 var quote: Quote? = null
                 var plan: RiskPlan? = null
@@ -114,12 +115,12 @@ internal class MarketScanner(private val store: DeskStore, private val botEnable
                     val at = book.serverTime ?: throw IOException("Waktu bursa kosong")
                     quote = Quote(json.getDouble("bidPrice"), json.getDouble("askPrice"), json.getLong("time"))
                     snapshot = snapshot.copy(time = at)
-                    if (confirmation?.levels != null) {
+                    if (confirmed?.levels != null) {
                         val nextFunding = JSONObject(get("premiumIndex?symbol=$symbol").body).getLong("nextFundingTime")
                         try {
                             require(nextFunding > at + 31 * 60_000L) { "mendekati settlement funding" }
-                            require(at / 60_000 == confirmation.time / 60_000) { "candle konfirmasi telah berganti" }
-                            plan = RiskPlan.build(if (confirmation.long) 1 else -1, quote, confirmation.levels, paper.balance, at)
+                            require(at / 60_000 == confirmed.time / 60_000) { "candle konfirmasi telah berganti" }
+                            plan = RiskPlan.build(if (confirmed.long) 1 else -1, quote, confirmed.levels, paper.balance, at)
                         } catch (e: IllegalArgumentException) {
                             note = "WAIT · $symbol · ${e.message}"
                         }
