@@ -4,6 +4,11 @@ import android.content.Context
 import com.mefuturesaibot.app.account.CredentialVault
 import com.mefuturesaibot.app.exchange.CandleHistory
 import com.mefuturesaibot.app.exchange.SignalSide
+import com.mefuturesaibot.app.scanner.BaselineDecision
+import com.mefuturesaibot.app.scanner.Contract
+import com.mefuturesaibot.app.scanner.MarketData
+import com.mefuturesaibot.app.scanner.MarketRow
+import com.mefuturesaibot.app.scanner.DeskStore
 import com.mefuturesaibot.app.scanner.Levels
 import com.mefuturesaibot.app.scanner.Quote
 import com.mefuturesaibot.app.scanner.TradeLedger
@@ -83,7 +88,11 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
         }
         val bars = CandleHistory(CandleHistory.parseClosedCandles(api.public("klines","symbol" to SYMBOL,
             "interval" to "1m","limit" to "121")), "Siap", true)
-        val signal = bars.signalAt(api.now())
+        val ticker = MarketData.tickers(JSONArray().put(JSONObject(api.public("ticker/24hr","symbol" to SYMBOL))).toString())[SYMBOL]
+        val score = ticker?.let(DeskStore(context).read().first::score)
+        val row = MarketRow(Contract(SYMBOL,"USDT"),ticker,score)
+        fun decision() = BaselineDecision.evaluate(row, api.now(), bars.signalAt(api.now()))
+        val signal = decision()
         if (signal.side == SignalSide.WAIT) return "WAIT · ${signal.reason}"
         val side = if (signal.side == SignalSide.BUY) 1 else -1
         val premium = JSONObject(api.public("premiumIndex","symbol" to SYMBOL))
@@ -103,7 +112,7 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
         val qty = rounded(minOf(plan.quantity,lot.getDouble("maxQty")),lot.getString("stepSize").toBigDecimal(),RoundingMode.DOWN)
         if (qty.toDouble() < lot.getDouble("minQty") || qty.toDouble() * plan.entry < filters.getValue("MIN_NOTIONAL").getDouble("notional"))
             return "WAIT · ukuran di bawah minimum kontrak"
-        if (closing || !prefs.getBoolean("enabled",false) || bars.signalAt(api.now()).side != signal.side || quote.problem(api.now()) != null)
+        if (closing || !prefs.getBoolean("enabled",false) || decision().side != signal.side || quote.problem(api.now()) != null)
             return "WAIT · konfirmasi kedaluwarsa atau $mode dimatikan"
         val id = (if (live) "meR" else "meD") + api.now()
         val intent = JSONObject().put("id",id).put("side",side).put("created",api.now())

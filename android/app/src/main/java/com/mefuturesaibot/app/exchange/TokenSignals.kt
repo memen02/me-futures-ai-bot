@@ -1,5 +1,7 @@
 package com.mefuturesaibot.app.exchange
 
+import com.mefuturesaibot.app.ScreeningService
+import com.mefuturesaibot.app.scanner.BaselineDecision
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -13,8 +15,14 @@ internal class TokenSignals(private val changed: (String, SmaSignal) -> Unit) {
     private var symbols = emptyList<String>()
     private var busy = false
 
-    fun signal(symbol: String): SmaSignal = cache.get(symbol)?.takeIf { it.expires > SystemClock.elapsedRealtime() }?.signal
-        ?: SmaSignal.waitFor("Menunggu candle tertutup 1m dan 5m")
+    fun signal(symbol: String): SmaSignal {
+        val now = SystemClock.elapsedRealtime()
+        val sma = cache.get(symbol)?.takeIf { it.expires > now }?.signal
+            ?: return SmaSignal.waitFor("Menunggu candle tertutup 1m dan 5m")
+        val scan = ScreeningService.latest
+        val at = if (scan.fresh(now)) scan.time + now - scan.received else null
+        return BaselineDecision.evaluate(scan.rows.firstOrNull { it.contract.symbol == symbol }, at, sma)
+    }
 
     fun watch(visible: List<String>) {
         symbols = visible.distinct()

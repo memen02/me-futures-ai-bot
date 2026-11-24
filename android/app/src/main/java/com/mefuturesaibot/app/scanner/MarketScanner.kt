@@ -104,7 +104,7 @@ internal class MarketScanner(private val store: DeskStore, private val botEnable
                             val path = "klines?symbol=${java.net.URLEncoder.encode(top.contract.symbol, "UTF-8")}&interval=1m&limit=121"
                             val candles = get(path)
                             val history = CandleHistory(CandleHistory.parseClosedCandles(candles.body), "Siap", true)
-                            val signal = history.signalAt(candles.serverTime)
+                            val signal = BaselineDecision.evaluate(top, candles.serverTime, history.signalAt(candles.serverTime))
                             note = "WAIT · ${top.contract.symbol} · ${signal.reason}"
                             val long = requireNotNull(top.score) > 0.5
                             if (signal.side == (if (long) SignalSide.BUY else SignalSide.SELL)) {
@@ -120,7 +120,7 @@ internal class MarketScanner(private val store: DeskStore, private val botEnable
                     }
                 }
                 val pending = pendingEntry.takeIf { seekEntry }
-                val candidate = pending?.eligible(snapshot)
+                val candidate = pending?.eligible(snapshot)?.takeIf { confirmation?.symbol == it.contract.symbol && confirmation.long == pending.long }
                 val symbol = paper.position?.symbol ?: candidate?.contract?.symbol
                 var quote: Quote? = null
                 var plan: RiskPlan? = null
@@ -135,11 +135,12 @@ internal class MarketScanner(private val store: DeskStore, private val botEnable
                     val held = paper.position
                     if (held != null) {
                         payments = funding(symbol, held.fundingAt, at)
-                    } else if (candidate != null && pending?.levels != null) {
+                    } else if (candidate != null && confirmation?.levels != null) {
                         val nextFunding = JSONObject(get("premiumIndex?symbol=$symbol").body).getLong("nextFundingTime")
                         try {
                             require(nextFunding > at + 31 * 60_000L) { "mendekati settlement funding" }
-                            plan = RiskPlan.build(if (pending.long) 1 else -1, quote, pending.levels, paper.balance, at)
+                            require(at / 60_000 == confirmation.time / 60_000) { "candle konfirmasi telah berganti" }
+                            plan = RiskPlan.build(if (confirmation.long) 1 else -1, quote, confirmation.levels, paper.balance, at)
                         } catch (e: IllegalArgumentException) {
                             note = "WAIT · $symbol · ${e.message}"
                         }
