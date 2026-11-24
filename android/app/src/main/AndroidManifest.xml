@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <!-- Foreground Service: wajib dideklarasikan sejak API 28.
          PERBAIKAN (audit 2026-11-10, temuan #1): tipe diganti dari "dataSync" ke
          "specialUse". Alasan: dataSync kena batas keras 6 jam per 24 jam di

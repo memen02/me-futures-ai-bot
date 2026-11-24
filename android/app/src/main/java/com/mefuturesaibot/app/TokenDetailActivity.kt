@@ -1,6 +1,9 @@
 package com.mefuturesaibot.app
 
+import com.mefuturesaibot.app.security.UiAccess
+
 import android.app.Activity
+import com.mefuturesaibot.app.security.SecureActivity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
@@ -21,7 +24,7 @@ import java.time.format.DateTimeFormatter
 import java.math.BigDecimal
 import java.util.Locale
 
-class TokenDetailActivity : Activity() {
+class TokenDetailActivity : SecureActivity() {
     private lateinit var contract: Contract
     private lateinit var store: DeskStore
     private lateinit var chart: ClosePriceChart
@@ -74,19 +77,23 @@ class TokenDetailActivity : Activity() {
             setOnCheckedChangeListener { _, enabled -> chart.overlays = enabled }
         }
         findViewById<View>(R.id.dash_interval).setOnClickListener {
-            AlertDialog.Builder(this).setTitle("Interval · $symbol").setSingleChoiceItems(
+            if (!UiAccess.allowed(this)) return@setOnClickListener
+            val dialog = AlertDialog.Builder(this).setTitle("Interval · $symbol").setSingleChoiceItems(
                 chartIntervals.toTypedArray(), chartIntervals.indexOf(feed.state.interval)) { dialog, i ->
                 feed.select(chartIntervals[i]); dialog.dismiss()
             }.show()
+            UiAccess.protect(this, dialog)
         }
         findViewById<View>(R.id.token_candle_picker).setOnClickListener {
             val bars = feed.state.bars
             val options = bars.map { "${at(it.openTime)} · ${it.close.plain()}" }.reversed().toTypedArray()
-            AlertDialog.Builder(this).setTitle("Candle · $symbol").setItems(options) { _, i ->
+            if (!UiAccess.allowed(this)) return@setOnClickListener
+            val dialog = AlertDialog.Builder(this).setTitle("Candle · $symbol").setItems(options) { _, i ->
                 val selectedTime = bars[bars.lastIndex - i].openTime
                 val current = feed.state.bars.indexOfFirst { it.openTime == selectedTime }
                 chart.selectCandle(current)
             }.show()
+            UiAccess.protect(this, dialog)
         }
         state?.getString("interval")?.takeIf { it in chartIntervals }?.let(feed::select)
     }

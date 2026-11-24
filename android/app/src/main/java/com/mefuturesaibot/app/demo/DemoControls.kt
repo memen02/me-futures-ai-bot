@@ -1,5 +1,7 @@
 package com.mefuturesaibot.app.demo
 
+import com.mefuturesaibot.app.security.UiAccess
+
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
@@ -114,9 +116,12 @@ internal class DemoControls(private val activity: Activity, private val start: (
         }
         val key = field("API Key Demo")
         val secret = field("API Secret Demo")
+        if (!UiAccess.allowed(activity)) return
+        val session = UiAccess.session()
         val dialog = AlertDialog.Builder(activity).setTitle("Key Binance Futures Demo").setView(form)
             .setPositiveButton("Simpan", null).setNegativeButton("Batal",null)
             .setNeutralButton(if (vault.exists()) "Hapus key" else null) { _,_ ->
+                if (!UiAccess.allowed(activity, session)) return@setNeutralButton
                 runCatching { changeDemoCredentials { vault.remove() } }.onFailure {
                     label.text = "Periksa status bot dan posisi sebelum mengganti kredensial"
                 }
@@ -126,8 +131,14 @@ internal class DemoControls(private val activity: Activity, private val start: (
         editor = dialog
         dialog.setOnDismissListener { key.text.clear(); secret.text.clear(); editor = null }
         dialog.show()
+        UiAccess.protect(activity, dialog)
+        if (!dialog.isShowing) return
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            if (!UiAccess.allowed(activity, session)) {
+                dialog.dismiss()
+                return@setOnClickListener
+            }
             val k = key.text.toString().trim()
             val s = secret.text.toString().trim()
             if (listOf(k,s).any { it.isEmpty() || it.length > 512 || !it.all { ch -> ch.code in 33..126 } }) {

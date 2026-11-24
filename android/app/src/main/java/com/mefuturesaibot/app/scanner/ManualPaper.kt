@@ -1,6 +1,7 @@
 package com.mefuturesaibot.app.scanner
 
 import android.app.Activity
+import com.mefuturesaibot.app.security.UiAccess
 import android.app.AlertDialog
 import android.os.SystemClock
 import android.widget.*
@@ -15,6 +16,8 @@ internal class ManualPaper(private val activity: Activity, private val store: De
     private var dialog: AlertDialog? = null
     private fun message(s: String) { Toast.makeText(activity,s,Toast.LENGTH_LONG).show() }
     fun open() {
+        if (!UiAccess.allowed(activity)) return
+        val session = UiAccess.session()
         close()
         val scan = market()
         if (!scan.fresh(SystemClock.elapsedRealtime())) { message("Menunggu daftar kontrak mutakhir"); return }
@@ -32,7 +35,12 @@ internal class ManualPaper(private val activity: Activity, private val store: De
         listOf(token,side,sl,tp).forEach { form.addView(it) }
         dialog = AlertDialog.Builder(activity).setTitle("Buka posisi Paper").setView(form).setNegativeButton("Batal",null)
             .setPositiveButton("Periksa harga",null).show().apply {
+                UiAccess.protect(activity, this)
                 getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                    if (!UiAccess.allowed(activity, session)) {
+                        dismiss()
+                        return@setOnClickListener
+                    }
                     val symbol = token.text.toString().trim().uppercase()
                     val stop = sl.text.toString().replace(',','.').toDoubleOrNull()
                     val target = tp.text.toString().replace(',','.').toDoubleOrNull()
@@ -42,18 +50,21 @@ internal class ManualPaper(private val activity: Activity, private val store: De
                     else {
                         val direction = if (side.selectedItemPosition == 0) 1 else -1
                         dismiss()
-                        prepare(symbol,direction,if(direction>0) Levels(stop,target) else Levels(target,stop))
+                        prepare(symbol,direction,if(direction>0) Levels(stop,target) else Levels(target,stop),session)
                     }
                 }
             }
     }
-    private fun prepare(symbol: String, side: Int, levels: Levels) {
+    private fun prepare(symbol: String, side: Int, levels: Levels, session: Long) {
+        if (!UiAccess.allowed(activity, session)) return
         val escaped = PublicReader.encode(symbol)
         reader.read("premiumIndex?symbol=$escaped") funding@{ raw, _, error ->
+            if (!UiAccess.allowed(activity, session)) return@funding
             val premium = raw?.let { runCatching { JSONObject(it) }.getOrNull() }
             if (premium?.optString("symbol") != symbol) { message(error.ifBlank { "Funding belum tersedia" }); return@funding }
             val nextFunding = premium.optLong("nextFundingTime")
             reader.read("ticker/bookTicker?symbol=$escaped") quote@{ body, time, problem ->
+                if (!UiAccess.allowed(activity, session)) return@quote
                 if (body == null || time == null) { message(problem.ifBlank { "Kuotasi belum tersedia" }); return@quote }
                 val result = runCatching {
                     val data = JSONObject(body); require(data.getString("symbol")==symbol)
@@ -69,6 +80,10 @@ internal class ManualPaper(private val activity: Activity, private val store: De
                 dialog = AlertDialog.Builder(activity).setTitle("Konfirmasi Paper · $symbol").setMessage(
                     "${if(side>0) "LONG" else "SHORT"} · Entry ${plan.entry}\nSL ${plan.stop} · TP ${plan.target}\nJumlah ${plan.quantity}\nRisiko maksimal 0,5% · Kuotasi berlaku 5 detik.")
                     .setNegativeButton("Batal",null).setPositiveButton("Buka Paper") { _,_ ->
+                        if (!UiAccess.allowed(activity, session)) {
+                            message("Sesi berakhir. Ulangi transaksi.")
+                            return@setPositiveButton
+                        }
                         val now = time + SystemClock.elapsedRealtime() - received
                         val (model,current) = store.read()
                         val live = market()
@@ -84,7 +99,9 @@ internal class ManualPaper(private val activity: Activity, private val store: De
                             store.save(model,account)
                             updated()
                         }
-                    }.show()
+                    }.show().also {
+                        UiAccess.protect(activity, it)
+                    }
             }
         }
     }

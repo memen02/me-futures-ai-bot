@@ -1,5 +1,7 @@
 package com.mefuturesaibot.app.account
 
+import com.mefuturesaibot.app.security.UiAccess
+
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
@@ -46,9 +48,14 @@ internal class AccountPage(
         activity.findViewById<Button>(R.id.account_replace).setOnClickListener { editing = true; clearFields(); render() }
         activity.findViewById<Button>(R.id.account_check).setOnClickListener { verify() }
         activity.findViewById<Button>(R.id.account_remove).setOnClickListener {
-            AlertDialog.Builder(activity).setTitle("Hapus kredensial dari HP?")
+            if (!UiAccess.allowed(activity)) return@setOnClickListener
+            val session = UiAccess.session()
+            val dialog = AlertDialog.Builder(activity).setTitle("Hapus kredensial dari HP?")
                 .setMessage("Untuk mencabut key di Binance, buka API Management di akun Binance.")
-                .setNegativeButton("Batal", null).setPositiveButton("Hapus dari HP") { _, _ -> remove() }.show()
+                .setNegativeButton("Batal", null).setPositiveButton("Hapus dari HP") { _, _ ->
+                    if (UiAccess.allowed(activity, session)) remove()
+                }.show()
+            UiAccess.protect(activity, dialog)
         }
     }
 
@@ -62,7 +69,9 @@ internal class AccountPage(
         } else {
             clearFields()
             editing = false
-            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            if (activity !is com.mefuturesaibot.app.security.SecureActivity) {
+                activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            }
         }
     }
 

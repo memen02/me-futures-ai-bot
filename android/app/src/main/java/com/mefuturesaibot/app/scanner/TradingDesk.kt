@@ -1,5 +1,7 @@
 package com.mefuturesaibot.app.scanner
 
+import com.mefuturesaibot.app.security.UiAccess
+
 import android.content.SharedPreferences
 import android.widget.RadioGroup
 import com.mefuturesaibot.app.demo.DemoControls
@@ -81,12 +83,16 @@ internal class TradingDesk(
         DeskTab.values().forEach { dest -> view<TextView>(dest.buttonId).setOnClickListener { select(dest) } }
         view<Button>(R.id.manual_close).setOnClickListener {
             val pos = store.read().second.position ?: return@setOnClickListener
-            android.app.AlertDialog.Builder(activity).setTitle("Tutup posisi Paper ${pos.symbol}?")
+            if (!UiAccess.allowed(activity)) return@setOnClickListener
+            val session = UiAccess.session()
+            val dialog = android.app.AlertDialog.Builder(activity).setTitle("Tutup posisi Paper ${pos.symbol}?")
                 .setMessage("Simulasi memakai kuotasi valid berikutnya, termasuk biaya dan slippage.")
                 .setNegativeButton("Batal",null).setPositiveButton("Tutup Paper") { _,_ ->
+                    if (!UiAccess.allowed(activity, session)) return@setPositiveButton
                     if (store.read().second.position?.opened == pos.opened) store.requestClose(pos)
                     renderAccount()
                 }.show()
+            UiAccess.protect(activity, dialog)
         }
         view<Button>(R.id.manual_open).setOnClickListener { manual.open() }
         view<Switch>(R.id.paper_trailing).apply {

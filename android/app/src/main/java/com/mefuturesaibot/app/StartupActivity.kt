@@ -1,6 +1,7 @@
 package com.mefuturesaibot.app
 
 import android.app.Activity
+import com.mefuturesaibot.app.security.SecureActivity
 import android.content.Intent
 import android.graphics.Typeface
 import android.os.Bundle
@@ -20,7 +21,7 @@ import com.mefuturesaibot.app.exchange.ExchangeClock
 import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
 import com.mefuturesaibot.app.exchange.ReconnectingWebSocket.ConnectionStatus
 
-class StartupActivity : Activity() {
+class StartupActivity : SecureActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private val clock = ExchangeClock()
     private var connection = ConnectionStatus.CONNECTING
@@ -69,7 +70,7 @@ class StartupActivity : Activity() {
             retry.visibility = if (timedOut || rows.any { it.state == CheckState.FAILED }) View.VISIBLE else View.GONE
             if (ready) {
                 val since = allPassedAt ?: now.also { allPassedAt = it }
-                if (now - since >= 900L) {
+                if (now - since >= 900L && canUseProtectedUi()) {
                     openDashboard()
                     return
                 }
@@ -187,6 +188,7 @@ class StartupActivity : Activity() {
     }
 
     private fun openDashboard() {
+        if (!canUseProtectedUi()) return
         if (isFinishing) return
         stopChecks()
         startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))

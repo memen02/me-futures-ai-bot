@@ -1,6 +1,7 @@
 package com.mefuturesaibot.app.demo
 
 import android.app.Activity
+import com.mefuturesaibot.app.security.UiAccess
 import android.app.AlertDialog
 import android.text.InputType
 import android.widget.CheckBox
@@ -22,6 +23,8 @@ internal class LiveApproval(private val activity: Activity, private val vault: C
     private fun message(text: String) { prefs.edit().putString("status",text).apply() }
 
     fun begin() {
+        if (!UiAccess.allowed(activity)) return
+        val session = UiAccess.session()
         if (busy || closed || FuturesVenue.selected(activity) != FuturesVenue.REAL || !vault.exists()) return
         val panel = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
         val amount = EditText(activity).apply {
@@ -36,16 +39,19 @@ internal class LiveApproval(private val activity: Activity, private val vault: C
         panel.addView(tested)
         val dialog = AlertDialog.Builder(activity).setTitle("Siapkan trading real BTC/USDT")
             .setView(panel).setNegativeButton("Batal",null).setPositiveButton("Periksa akun",null).show()
+        UiAccess.protect(activity, dialog)
+        if (!dialog.isShowing) return
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val cap = amount.text.toString().trim().replace(',','.').toDoubleOrNull()
             if (cap == null || !cap.isFinite() || cap <= 0) { amount.error = "Masukkan alokasi USDT positif"; return@setOnClickListener }
             if (!tested.isChecked) { tested.error = "Selesaikan pengujian Demo sebelum melanjutkan"; return@setOnClickListener }
             dialog.dismiss()
-            verify(cap)
+            if (!UiAccess.allowed(activity, session)) return@setOnClickListener
+            verify(cap, session)
         }
     }
 
-    private fun verify(cap: Double) {
+    private fun verify(cap: Double, session: Long) {
         busy = true
         message("Memeriksa akses akun Binance Futures…")
         worker.execute {
@@ -62,21 +68,30 @@ internal class LiveApproval(private val activity: Activity, private val vault: C
             activity.runOnUiThread {
                 if (closed || activity.isFinishing || activity.isDestroyed) return@runOnUiThread
                 busy = false
+                if (!UiAccess.allowed(activity, session)) {
+                    message("Sesi berakhir. Ulangi pemeriksaan akun.")
+                    return@runOnUiThread
+                }
                 result.onSuccess { id ->
                     if (!activity.findViewById<TextView>(R.id.demo_status).isShown) {
                         message("Pemeriksaan selesai · trading real nonaktif")
-                    } else confirm(cap,id)
+                    } else confirm(cap,id,session)
                 }.onFailure { error -> message((error as? AccountCheckError)?.explanation
                     ?: (error as? IllegalStateException)?.message ?: "Akun belum terverifikasi. Periksa key dan koneksi.") }
             }
         }
     }
 
-    private fun confirm(cap: Double, keyId: String) {
+    private fun confirm(cap: Double, keyId: String, session: Long) {
+        if (!UiAccess.allowed(activity, session)) return
         message("Akun diperiksa · menunggu persetujuan")
-        AlertDialog.Builder(activity).setTitle("Aktifkan trading dengan uang asli?")
+        val dialog = AlertDialog.Builder(activity).setTitle("Aktifkan trading dengan uang asli?")
             .setMessage("Bot dapat membuka LONG atau SHORT BTC/USDT dengan alokasi maksimum $cap USDT. Risiko terencana hingga 0,5% per posisi. Harga eksekusi saat pasar bergerak cepat dapat membuat kerugian lebih besar. Stop bot meminta penutupan posisi.")
             .setNegativeButton("Batal",null).setPositiveButton("Aktifkan trading real") { _,_ ->
+                if (!UiAccess.allowed(activity, session)) {
+                    message("Sesi berakhir. Persetujuan dibatalkan.")
+                    return@setPositiveButton
+                }
                 val armed = synchronized(DemoRunner.entryLock) {
                     if (closed || FuturesVenue.selected(activity) != FuturesVenue.REAL || prefs.contains("intent") || runCatching { FuturesVenue.keyId(vault.read().key) }.getOrNull() != keyId) false
                     else prefs.edit().putString("capital",cap.toString()).putString("consentKey",keyId)
@@ -84,6 +99,7 @@ internal class LiveApproval(private val activity: Activity, private val vault: C
                 }
                 if (armed) start() else message("Persetujuan belum tersimpan. Periksa akun kembali.")
             }.show()
+        UiAccess.protect(activity, dialog)
     }
 
     fun close() { closed = true; checker.close(); worker.shutdown() }

@@ -2,6 +2,7 @@ package com.mefuturesaibot.app
 
 import android.Manifest
 import android.app.Activity
+import com.mefuturesaibot.app.security.SecureActivity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -13,7 +14,7 @@ import com.mefuturesaibot.app.scanner.DeskTab
 import com.mefuturesaibot.app.scanner.Scan
 import com.mefuturesaibot.app.scanner.TradingDesk
 
-class MainActivity : Activity() {
+class MainActivity : SecureActivity() {
     private lateinit var desk: TradingDesk
     private val pollHandler = Handler(Looper.getMainLooper())
     private var userRequestedStop = false
@@ -29,6 +30,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_trading_desk)
+        setupSecuritySettings()
         findViewById<Button>(R.id.scan_stop).setOnClickListener { onStopClicked() }
         desk = TradingDesk(this, DeskTab.restore(savedInstanceState), ::onStartClicked)
         desk.onTabSelected = ::refreshStatusText
@@ -65,6 +67,54 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         desk.close()
         super.onDestroy()
+    }
+
+    private fun setupSecuritySettings() {
+        val biometric = findViewById<Button>(R.id.settings_biometric)
+        val pin = findViewById<Button>(R.id.settings_pin)
+        val autoLock = findViewById<Button>(R.id.settings_autolock)
+
+        biometric.isEnabled = true
+        pin.isEnabled = true
+        autoLock.isEnabled = true
+
+        biometric.setOnClickListener {
+            configureAppLock(true)
+        }
+
+        pin.setOnClickListener {
+            configureAppLock(true)
+        }
+
+        autoLock.setOnClickListener {
+            configureAppLock(
+                !com.mefuturesaibot.app.security.AppLock.isEnabled(this)
+            )
+        }
+
+        refreshSecuritySettings()
+    }
+
+    private fun refreshSecuritySettings() {
+        val enabled =
+            com.mefuturesaibot.app.security.AppLock.isEnabled(this)
+
+        findViewById<Button>(R.id.settings_autolock).text =
+            if (enabled) "Penguncian otomatis: AKTIF"
+            else "Penguncian otomatis: NONAKTIF"
+
+        findViewById<android.widget.TextView>(
+            R.id.user_access_status
+        ).text = if (enabled) {
+            "App Lock aktif · Lisensi online belum tersedia"
+        } else {
+            "App Lock nonaktif · Lisensi online belum tersedia"
+        }
+    }
+
+    override fun onSecuritySettingsChanged() {
+        super.onSecuritySettingsChanged()
+        refreshSecuritySettings()
     }
 
     private fun onStartClicked() {
