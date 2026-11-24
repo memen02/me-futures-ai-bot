@@ -34,10 +34,11 @@ internal class DeskStore(context: Context) {
         }
         return model to account
     }
-    fun save(next: MarketModel, paper: PaperAccount) {
+    fun save(next: MarketModel, paper: PaperAccount, durable: Boolean = false) {
         if (next == model && paper == account) return
         val value = JSONObject().put("model", next.json()).put("account", paper.json()).toString()
-        prefs.edit().putString("desk", value).apply()
+        val edit = prefs.edit().putString("desk",value)
+        if (durable) check(edit.commit()) else edit.apply()
         model = next
         account = paper
         raw = value

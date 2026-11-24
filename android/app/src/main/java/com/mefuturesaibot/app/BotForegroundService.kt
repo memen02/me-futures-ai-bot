@@ -50,6 +50,27 @@ class BotForegroundService : Service() {
     private var draining = false
 
 
+    private val tickerHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var positionFeed: com.mefuturesaibot.app.exchange.PositionFeed? = null
+    private var watchedIntent: Pair<String,String>? = null
+    private val watchExchange = object : Runnable {
+        override fun run() {
+            val venue = com.mefuturesaibot.app.demo.FuturesVenue.selected(this@BotForegroundService)
+            val intent = venue.prefs(this@BotForegroundService).getString("intent",null)
+            val id = intent?.let { runCatching { org.json.JSONObject(it).getString("id") }.getOrNull() }
+            val next = id?.let { venue.name to it }
+            if (watchedIntent != next) {
+                positionFeed?.close()
+                watchedIntent = next
+                positionFeed = if (next == null) null else com.mefuturesaibot.app.exchange.PositionFeed(
+                    "BTCUSDT",venue == com.mefuturesaibot.app.demo.FuturesVenue.DEMO,{ mark ->
+                        exchangeMark = mark?.let { next to it }
+                    }).also { it.start() }
+            }
+            tickerHandler.postDelayed(this,1000)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         com.mefuturesaibot.app.demo.FuturesVenue.settings(this).registerOnSharedPreferenceChangeListener(modeListener)
@@ -58,6 +79,7 @@ class BotForegroundService : Service() {
         latestQuote = null
         latestStatus = ReconnectingWebSocket.ConnectionStatus.CONNECTING
         isRunning = true
+        watchExchange.run()
         ensureNotificationChannel()
         startForegroundCompat(buildNotification(ReconnectingWebSocket.ConnectionStatus.CONNECTING))
         if (BotPreferences.shouldRun(this) || demoPrefs().contains("intent")) {
@@ -88,6 +110,9 @@ class BotForegroundService : Service() {
 
     override fun onDestroy() {
         com.mefuturesaibot.app.demo.FuturesVenue.settings(this).unregisterOnSharedPreferenceChangeListener(modeListener)
+        tickerHandler.removeCallbacksAndMessages(null)
+        positionFeed?.close()
+        exchangeMark = null
         drain.removeCallbacksAndMessages(null)
         demo?.close()
         demo = null
@@ -229,6 +254,9 @@ class BotForegroundService : Service() {
             private set
 
 
+
+        internal var exchangeMark: Pair<Pair<String,String>,com.mefuturesaibot.app.exchange.PositionMark>? = null
+            private set
 
         @Volatile var latestQuote: BookQuote? = null
             private set

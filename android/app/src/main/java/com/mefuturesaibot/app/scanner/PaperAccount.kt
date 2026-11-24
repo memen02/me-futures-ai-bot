@@ -19,7 +19,7 @@ internal data class EntryConfirmation(val symbol: String, val long: Boolean, val
 internal data class PaperPosition(val symbol: String, val side: Int, val entry: Double, val opened: Long,
     val quantity: Double = 100.0 / entry, val stop: Double = entry * (1 - side * 0.01),
     val target: Double = entry * (1 + side * 0.02), val funding: Double = 0.0, val fundingAt: Long = opened,
-    val initialStop: Double = stop, val trailing: Boolean = false, val manual: Boolean = false) {
+    val initialStop: Double = stop, val trailing: Boolean = false, val manual: Boolean = false, val exitQuote: Quote? = null, val exitReason: String? = null) {
     fun gross(price: Double) = side * quantity * (price - entry)
     fun exitFee(price: Double) = quantity * price * RiskPlan.FEE
 }
@@ -36,7 +36,7 @@ internal data class PaperAccount(val balance: Double = INITIAL_BALANCE, val posi
     fun locked(now: Long) = day == now / 86_400_000 && balance <= dayStart * (1 - RiskPlan.DAY_LIMIT)
 
     fun advance(scan: Scan, symbol: String?, plan: RiskPlan?, enabled: Boolean, quote: Quote?,
-        funding: List<Funding> = emptyList(), trailing: Boolean = false, manual: Boolean = false, exitRequested: Boolean = false): PaperAccount {
+        funding: List<Funding> = emptyList(), trailing: Boolean = false, manual: Boolean = false, exitRequested: Boolean = false, latchedReason: String? = null): PaperAccount {
         if (!scan.ok || scan.time <= lastAction) return this
         val today = scan.time / 86_400_000
         val anchor = if (day == today) dayStart else balance
@@ -53,7 +53,7 @@ internal data class PaperAccount(val balance: Double = INITIAL_BALANCE, val posi
             val equity = balance - paid + pos.gross(price) - pos.exitFee(price)
             val high = maxOf(peak, equity)
             val dd = maxOf(drawdown, (high - equity) / high)
-            val reason = when {
+            val reason = latchedReason ?: when {
                 pos.side * (mark - pos.stop) <= 0 -> if (pos.stop != pos.initialStop) "trailing stop" else "stop-loss"
                 pos.side * (mark - pos.target) >= 0 -> "take-profit"
                 exitRequested -> "ditutup pengguna"
@@ -91,6 +91,7 @@ internal data class PaperAccount(val balance: Double = INITIAL_BALANCE, val posi
             .put("ledger", ledger.json()).put("mw", measuredWins).put("ml", measuredLosses)
         position?.let { out.put("position", JSONObject().put("symbol", it.symbol).put("side", it.side).put("entry", it.entry)
             .put("opened", it.opened).put("qty", it.quantity).put("stop", it.stop).put("target", it.target)
+            .put("exitQuote",it.exitQuote?.let { q -> JSONArray(listOf(q.bid,q.ask,q.at)) }).put("exitReason",it.exitReason)
             .put("initialStop",it.initialStop).put("trail",it.trailing).put("manual",it.manual).put("funding", it.funding).put("fundingAt", it.fundingAt)) }
         return out
     }
@@ -104,7 +105,8 @@ internal data class PaperAccount(val balance: Double = INITIAL_BALANCE, val posi
                 legacy.copy(quantity = p.optDouble("qty", legacy.quantity), stop = p.optDouble("stop", legacy.stop),
                     target = p.optDouble("target", legacy.target), funding = p.optDouble("funding", 0.0),
                     fundingAt = p.optLong("fundingAt", legacy.opened), initialStop = p.optDouble("initialStop",p.optDouble("stop",legacy.stop)),
-                    trailing = p.optBoolean("trail"), manual = p.optBoolean("manual"))
+                    trailing = p.optBoolean("trail"), manual = p.optBoolean("manual"), exitReason = p.optString("exitReason").takeIf { it.isNotEmpty() },
+                    exitQuote = p.optJSONArray("exitQuote")?.let { Quote(it.getDouble(0),it.getDouble(1),it.getLong(2)) })
             }
             val log = data.optJSONArray("log") ?: JSONArray()
             val bal = data.getDouble("balance")

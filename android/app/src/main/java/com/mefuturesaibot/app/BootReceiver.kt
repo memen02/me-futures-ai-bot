@@ -13,7 +13,12 @@ class BootReceiver : BroadcastReceiver() {
 
         // Jangan hidupkan bot jika Auto Start mati atau pengguna pernah menekan Stop.
         if (!BotPreferences.isAutoStartEnabled(context)) return
-        if (!BotPreferences.shouldRun(context)) return
+        val venue = com.mefuturesaibot.app.demo.FuturesVenue.selected(context)
+        if (!BotPreferences.shouldRun(context) && !venue.prefs(context).contains("intent")) {
+            if (com.mefuturesaibot.app.scanner.DeskStore(context).read().second.position != null)
+                context.startForegroundService(Intent(context, ScreeningService::class.java))
+            return
+        }
 
         val serviceIntent = Intent(context, BotForegroundService::class.java)
 

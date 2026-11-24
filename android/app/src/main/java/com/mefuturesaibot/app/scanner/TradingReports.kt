@@ -37,16 +37,25 @@ internal class TradingReports(private val activity: Activity, private val store:
         val past = (prefs?.getInt("n",0) ?: 0) + (prefs?.getInt("unrated",0) ?: 0)
         val month = YearMonth.now(ZoneOffset.UTC).plusMonths(offset)
         val paper = if (reportVenue == null) store.read().second.ledger else null
-        val key = listOf(venue,position,month,reportVenue,saved,past,paper)
+        val state = position?.let { JSONObject(it) }
+        val mark = com.mefuturesaibot.app.BotForegroundService.exchangeMark?.takeIf {
+            it.first == (venue.name to state?.optString("id")) && it.second.fresh(android.os.SystemClock.elapsedRealtime())
+        }?.second
+        val key = listOf(venue,position,mark,month,reportVenue,saved,past,paper)
         if (lastKey == key) return
         lastKey = key
-        val state = position?.let { JSONObject(it) }
         label(R.id.exchange_position).text = when {
             state == null -> "${venue.label} · Belum ada posisi bot yang dipantau"
             !state.has("entry") -> "${venue.label} · BTCUSDT · Menunggu konfirmasi fill"
             else -> "${venue.label} · BTCUSDT · ${if(state.getInt("side")>0) "LONG" else "SHORT"}\n" +
                 "Entry ${state.getDouble("entry")} · Jumlah ${state.getDouble("heldQty")} BTC\n" +
                 "SL ${state.getString("stop")} · TP ${state.getString("target")}\nPosisi terakhir yang dikonfirmasi bot"
+        }
+        if (state?.has("entry") == true) {
+            val liquidation = state.optDouble("liquidation",0.0)
+            val pnl = mark?.let { (it.price - state.getDouble("entry")) * state.getDouble("heldQty") * state.getInt("side") }
+            label(R.id.exchange_position).append("\nMark ${mark?.price ?: "—"} · PnL laten ${pnl?.let(::money) ?: "—"} USDT")
+            if (liquidation > 0) label(R.id.exchange_position).append("\nLikuidasi menurut snapshot bursa $liquidation")
         }
         val ledger = paper ?: saved?.let { TradeLedger.read(JSONObject(it)) } ?: TradeLedger(incomplete = past > 0)
         val m = ledger.months[month.toString()] ?: MonthResult()

@@ -35,14 +35,20 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
     private var retryAt = 0L
     @Volatile private var closing = false
 
-    fun start() { worker.scheduleWithFixedDelay({ synchronized(lock) {
+    fun start() { worker.execute(::monitor) }
+    private fun monitor() {
+        synchronized(lock) {
         if (!closing && System.currentTimeMillis() >= retryAt && (prefs.getBoolean("enabled", false) || prefs.contains("intent"))) {
             try { status(cycle()) } catch (e: Exception) {
                 if (e is Rejection && e.code in listOf(-1003, 418, 429)) retryAt = System.currentTimeMillis() + 120_000
                 status(if (e is Rejection) "WAIT · Binance $mode ${e.code}" else "WAIT · periksa koneksi, key $mode dan status order")
             }
         }
-    } }, 0, 10, TimeUnit.SECONDS) }
+        }
+        if (!closing) runCatching {
+            worker.schedule(::monitor, if (prefs.contains("intent")) 3L else 10L, TimeUnit.SECONDS)
+        }
+    }
 
     fun close() { closing = true; worker.shutdown() }
     private fun status(s: String) { prefs.edit().putString("status",s).apply() }
@@ -166,7 +172,10 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
             return "WAIT · kepemilikan posisi BTC belum terverifikasi"
         val partial = fill.getString("status") !in terminal
         val entry = holding!!.getDouble("entryPrice")
-        if (state.optDouble("entry") != entry || state.optDouble("heldQty") != kotlin.math.abs(amount)) {
+        val liquidation = holding.optDouble("liquidationPrice",0.0)
+        if (state.optDouble("entry") != entry || state.optDouble("heldQty") != kotlin.math.abs(amount) ||
+            state.optDouble("liquidation",0.0) != liquidation) {
+            state.put("liquidation",liquidation)
             state.put("entry", entry).put("heldQty", kotlin.math.abs(amount))
             persist(state)
         }
@@ -175,7 +184,6 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
         val fee = state.optDouble("fee",RiskPlan.FEE)
         val loss = side * (entry - stopFill) + fee * (entry + stopFill)
         val gain = side * (targetFill - entry) - fee * (entry + targetFill)
-        val liquidation = holding.optDouble("liquidationPrice",0.0)
         val liquidationBeforeStop = live && liquidation > 0 && side * (stopFill - liquidation) <= 0
         val fillOutsidePlan = liquidationBeforeStop || loss <= 0 || gain < 2 * loss || loss * kotlin.math.abs(amount) > state.getDouble("budget")
         if (fillOutsidePlan) return stopAfterFailure(api,state,amount,exitSide)

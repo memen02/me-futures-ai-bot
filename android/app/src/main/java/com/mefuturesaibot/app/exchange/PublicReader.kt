@@ -10,7 +10,7 @@ import okhttp3.Response
 import java.io.IOException
 
 /** One visible public resource. Cancellation also invalidates callbacks already queued on the UI thread. */
-internal class PublicReader {
+internal class PublicReader(private val demo: Boolean = false) {
     private val main = Handler(Looper.getMainLooper())
     private var pending: Call? = null
     fun read(path: String, done: (String?, Long?, String) -> Unit) {
@@ -19,7 +19,8 @@ internal class PublicReader {
             done(null, null, "Batas permintaan Binance")
             return
         }
-        val request = Request.Builder().url("https://fapi.binance.com/fapi/v1/$path").build()
+        val host = if (demo) "demo-fapi.binance.com" else "fapi.binance.com"
+        val request = Request.Builder().url("https://$host/fapi/v1/$path").build()
         val current = ReconnectingWebSocket.sharedHttpClient.newCall(request)
         pending = current
         fun finish(body: String?, at: Long?, note: String) {
