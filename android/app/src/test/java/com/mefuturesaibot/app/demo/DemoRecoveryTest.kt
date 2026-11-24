@@ -58,7 +58,7 @@ class DemoRecoveryTest {
                 "income" -> JSONArray().put(JSONObject().put("income",-0.03).put("asset","USDT"))
                 "order" -> {
                     if (req.method == "POST") { assertEquals("true",req.url.queryParameter("reduceOnly")); writes.add("exit"); amount=0.0 }
-                    JSONObject().put("status","FILLED").put("executedQty",0.01)
+                    JSONObject().put("clientOrderId",req.url.queryParameter("origClientOrderId") ?: "meD1").put("side","BUY").put("status","FILLED").put("executedQty",0.01)
                 }
                 else -> error("Unexpected request")
             }

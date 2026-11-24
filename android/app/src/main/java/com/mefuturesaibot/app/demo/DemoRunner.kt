@@ -46,6 +46,10 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
         if (FuturesVenue.selected(context) != venue) return "WAIT · mode telah berubah"
         require(api.venue == venue)
         val pending = prefs.getString("intent", null)?.let(::JSONObject)
+        if (live && pending == null) {
+            if (prefs.getBoolean("enabled",false)) prefs.edit().putBoolean("enabled",false).remove("consentKey").apply()
+            return "Mainnet terkunci untuk entry baru selama riset V3"
+        }
         if (live) {
             // Recovery must work after Stop, but only with the key that opened the position.
             val authorizedKey = pending?.getString("accountId") ?: prefs.getString("consentKey",null)
@@ -130,25 +134,28 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
                 if (e.code != -2013) throw e
                 null
             }
-            if (order == null && api.now() - state.getLong("created") < 60_000 ||
-                order != null && order.getString("status") !in setOf("FILLED","CANCELED","EXPIRED","REJECTED","EXPIRED_IN_MATCH"))
-                return "WAIT · konfirmasi order masuk"
-            if (order?.optString("status") == "FILLED" && api.now() - state.getLong("created") < 10_000)
+            if (order == null) return "WAIT · status entry belum terbukti, ID dipertahankan"
+            if (order.getString("status") !in terminal) {
+                if (state.optBoolean("exit") || !prefs.getBoolean("enabled",false) || live)
+                    api.cancelEntry(id)
+                return "WAIT · menunggu status terminal entry"
+            }
+            if (order.optString("status") == "FILLED" && api.now() - state.getLong("created") < 10_000)
                 return "WAIT · sinkronisasi posisi"
             owned.forEach { api.cancel(it.getString("clientAlgoId")) }
-            if ((order?.optDouble("executedQty",0.0) ?: 0.0) > 0) return settle(api,state,order!!)
+            if (owned.isNotEmpty() && api.algos().objects().any { it.optString("clientAlgoId") in setOf(id+"s",id+"t") })
+                return "WAIT · pembatalan proteksi belum terverifikasi"
+            if (order.getDouble("executedQty") > 0) return settle(api,state,order)
             check(prefs.edit().remove("intent").commit())
             return "$mode · posisi kosong dan proteksi diperiksa"
         }
         if (amount * side <= 0 || kotlin.math.abs(amount) > state.getString("qty").toDouble() * 1.0000001)
             return "WAIT · posisi $mode berubah di luar aplikasi, periksa akun"
-        if (live) {
-            val fill = api.query(id)
-            val filled = fill.getDouble("executedQty")
-            if (fill.getString("clientOrderId") != id || fill.getString("side") != (if (side == 1) "BUY" else "SELL") ||
-                kotlin.math.abs(amount) > filled * 1.0000001)
-                return "WAIT · kepemilikan posisi BTC belum terverifikasi"
-        }
+        val fill = api.query(id)
+        if (fill.getString("clientOrderId") != id || fill.getString("side") != (if (side == 1) "BUY" else "SELL") ||
+            kotlin.math.abs(amount) > fill.getDouble("executedQty") * 1.0000001)
+            return "WAIT · kepemilikan posisi BTC belum terverifikasi"
+        val partial = fill.getString("status") !in terminal
         val entry = holding!!.getDouble("entryPrice")
         if (state.optDouble("entry") != entry || state.optDouble("heldQty") != kotlin.math.abs(amount)) {
             state.put("entry", entry).put("heldQty", kotlin.math.abs(amount))
@@ -165,7 +172,7 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
         if (fillOutsidePlan) return stopAfterFailure(api,state,amount,exitSide)
         val emergency = state.optBoolean("exit") || !prefs.getBoolean("enabled",false) ||
             api.now() - state.getLong("created") >= 30 * 60_000
-        if (!emergency) {
+        if (!emergency || partial) {
             for ((suffix, field, type) in listOf(Triple("s","stop","STOP_MARKET"), Triple("t","target","TAKE_PROFIT_MARKET"))) {
                 val already = owned.firstOrNull { it.optString("clientAlgoId") == id+suffix }
                 if (already != null && already.optString("side") == exitSide && already.optString("orderType") == type &&
@@ -176,9 +183,9 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
                     return stopAfterFailure(api,state,amount,exitSide)
                 }
                 try {
-                    api.protect(exitSide,state.getString(field),id+suffix,type)
                     state.put("sent"+suffix,true)
                     persist(state)
+                    api.protect(exitSide,state.getString(field),id+suffix,type)
                 } catch (e: Rejection) {
                     return stopAfterFailure(api,state,amount,exitSide)
                 }
@@ -190,6 +197,10 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
                     it.optString("workingType") == "MARK_PRICE" && it.optDouble("triggerPrice") == state.getDouble(field) }
             }
             if (!protected) return stopAfterFailure(api,state,amount,exitSide)
+            if (partial) {
+                api.cancelEntry(id)
+                return "WAIT · fill parsial diproteksi, memeriksa sisa entry"
+            }
             return "$mode · ${if (side == 1) "LONG" else "SHORT"} BTC · SL ${state.getString("stop")} · TP ${state.getString("target")}"
         }
         return flatten(api,state,amount,exitSide)
@@ -250,15 +261,34 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
     }
 
     private fun flatten(api: DemoExchange, state: JSONObject, amount: Double, exitSide: String): String {
-        state.put("exit",true)
+        val entry = api.query(state.getString("id"))
+        if (entry.getString("status") !in terminal) {
+            api.cancelEntry(state.getString("id"))
+            return "WAIT · entry dibatalkan sebelum menutup sisa posisi"
+        }
+        val previous = state.optString("exitId")
+        if (previous.isNotEmpty()) {
+            val old = try { api.query(previous) } catch (e: Rejection) {
+                if (e.code != -2013) throw e
+                return "WAIT · status exit ambigu, periksa ID exit di bursa"
+            }
+            if (old.getString("clientOrderId") != previous || old.getString("status") !in terminal)
+                return "WAIT · exit sebelumnya belum terminal"
+            val before = state.getDouble("exitAmount")
+            val filled = old.getDouble("executedQty")
+            if (!filled.isFinite() || filled < 0 || kotlin.math.abs(amount) > before - filled + 1e-10)
+                return "WAIT · menunggu saldo posisi setelah exit"
+        }
+        val attempt = state.optInt("exitAttempt") + 1
+        val exitId = state.getString("id") + "x" + attempt
+        state.put("exit",true).put("exitId",exitId).put("exitAttempt",attempt).put("exitAmount",kotlin.math.abs(amount))
         persist(state)
-        // A fresh position snapshot plus reduceOnly caps any retried exit at the remaining position.
-        api.market(exitSide,BigDecimal.valueOf(kotlin.math.abs(amount)).stripTrailingZeros().toPlainString(),
-            state.getString("id")+"x"+api.now(),true)
+        api.market(exitSide,BigDecimal.valueOf(kotlin.math.abs(amount)).stripTrailingZeros().toPlainString(),exitId,true)
         return "$mode · menutup posisi, menunggu konfirmasi bursa"
     }
 
     companion object {
+        private val terminal = setOf("FILLED","CANCELED","EXPIRED","REJECTED","EXPIRED_IN_MATCH")
         internal val entryLock = Any()
         private val lock = Any()
         const val PREFS = "me_project_futures_demo_v1"

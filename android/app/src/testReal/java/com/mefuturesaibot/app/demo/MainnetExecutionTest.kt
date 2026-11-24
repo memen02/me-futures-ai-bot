@@ -105,29 +105,45 @@ class MainnetExecutionTest {
         runner.cycle(api)
         assertEquals(0,calls)
     }
-    @Test fun cappedEntryAndBothExchangeGuardsSurviveRestart() {
+    @Test fun priorApprovalCannotOpenAnotherRealPosition() {
         approve()
+        assertTrue(DemoRunner(context).cycle(api).contains("terkunci"))
+        assertEquals(0,calls)
+        assertFalse(prefs.getBoolean("enabled",true))
+        assertThrows(IllegalStateException::class.java) { api.market("BUY","0.001","blocked") }
+        assertEquals(0,calls)
+    }
+
+    private fun legacyPosition() {
+        approve()
+        entry = "meR1"
+        qty = 0.01
+        val state = JSONObject().put("id",entry).put("side",1).put("qty","0.01").put("created",now-20_000)
+            .put("budget",5.0).put("stop","99").put("target","105").put("accountId",api.accountId)
+        prefs.edit().putString("intent",state.toString()).commit()
+    }
+    @Test fun legacyGuardsSurviveRestartAndStopRemainsReduceOnly() {
+        legacyPosition()
         assertTrue(DemoRunner(context).cycle(api).contains("LONG"))
         assertEquals(setOf("STOP_MARKET","TAKE_PROFIT_MARKET"),guards.values.map { it.getString("orderType") }.toSet())
         DemoRunner(context).cycle(api)
-        assertEquals(1,entries)
+        assertEquals(0,entries)
         assertEquals(2,guards.size)
         prefs.edit().putBoolean("enabled",false).commit()
         DemoRunner(context).cycle(api)
         assertEquals(1,closes)
     }
     @Test fun stopRejectionPausesAndAttemptsOnlyReduceOnlyExit() {
-        approve()
+        legacyPosition()
         rejectedStop=true
         DemoRunner(context).cycle(api)
-        assertFalse(prefs.getBoolean("enabled",false))
+        assertFalse(prefs.getBoolean("enabled",true))
         assertEquals(1,closes)
         assertTrue(prefs.contains("intent"))
     }
     @Test fun unrelatedPositionCannotBeClosedByRecovery() {
-        approve()
+        legacyPosition()
         lookupQty=0.0
-        DemoRunner(context).cycle(api)
         prefs.edit().putBoolean("enabled",false).commit()
         assertTrue(DemoRunner(context).cycle(api).contains("kepemilikan"))
         assertEquals(0,closes)

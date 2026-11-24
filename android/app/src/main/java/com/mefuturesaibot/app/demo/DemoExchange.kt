@@ -49,9 +49,13 @@ internal class DemoExchange(private val keys: BinanceCredentials, client: okhttp
     fun fundingIncome(start: Long, end: Long) = JSONArray(request("GET","v1/income",listOf(
         "symbol" to SYMBOL,"incomeType" to "FUNDING_FEE","startTime" to start.toString(),"endTime" to end.toString(),"limit" to "1000"),true))
     fun query(id: String) = JSONObject(request("GET","v1/order",listOf("symbol" to SYMBOL,"origClientOrderId" to id),true))
-    fun market(side: String, qty: String, id: String, reduce: Boolean = false) = JSONObject(request("POST", "v1/order",
+    fun cancelEntry(id: String) { request("DELETE","v1/order",listOf("symbol" to SYMBOL,"origClientOrderId" to id),true) }
+    fun market(side: String, qty: String, id: String, reduce: Boolean = false): JSONObject {
+        check(venue != FuturesVenue.REAL || reduce) { "Mainnet entry terkunci selama Fase 1" }
+        return JSONObject(request("POST", "v1/order",
         listOf("symbol" to SYMBOL,"type" to "MARKET","side" to side,"quantity" to qty,"newClientOrderId" to id,
             "newOrderRespType" to "RESULT","reduceOnly" to reduce.toString()), true))
+    }
     fun protect(side: String, trigger: String, id: String, type: String) = JSONObject(request("POST","v1/algoOrder",
         listOf("algoType" to "CONDITIONAL","symbol" to SYMBOL,"side" to side,"type" to type,"triggerPrice" to trigger,
             "workingType" to "MARK_PRICE","closePosition" to "true","clientAlgoId" to id),true))

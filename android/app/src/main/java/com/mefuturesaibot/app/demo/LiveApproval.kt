@@ -52,8 +52,8 @@ internal class LiveApproval(private val activity: Activity, private val vault: C
             val result = runCatching {
                 val keys = vault.read()
                 val access = checker.verify(keys)
-                check(access.canTrade && access.futuresKey != false) { "Akses trading Futures belum tersedia." }
-                check(access.withdrawals != true) { "Gunakan key trading tanpa izin penarikan." }
+                check(access.canTrade && access.futuresKey == true) { "Akses trading Futures belum tersedia." }
+                check(access.withdrawals == false) { "Gunakan key trading tanpa izin penarikan." }
                 val exchange = DemoExchange(keys, venue = FuturesVenue.REAL)
                 exchange.sync()
                 check(exchange.oneWay()) { "Akun harus memakai One-way Mode." }

@@ -35,7 +35,7 @@ internal class DemoControls(private val activity: Activity, private val start: (
             activity.findViewById<TextView>(R.id.execution_heading).text = "Binance Futures Real · BTC/USDT"
             activity.findViewById<TextView>(R.id.execution_help).text = "Bot memakai dana asli pada akun khusus One-way. Menonaktifkan bot meminta penutupan sisa posisi milik bot ketika terhubung."
             activity.findViewById<TextView>(R.id.execution_note).text = "Saldo dan performa pada kartu simulasi tetap virtual. Hasil mainnet ditampilkan di bagian Real."
-            toggle.text = "Trading otomatis dengan dana asli"
+            toggle.text = "Mainnet · entry baru terkunci (riset V3)"
             keys.visibility = View.GONE
         } else {
             activity.findViewById<TextView>(R.id.execution_heading).text = "Binance Futures Demo · BTC/USDT"
@@ -50,7 +50,7 @@ internal class DemoControls(private val activity: Activity, private val start: (
         toggle.setOnCheckedChangeListener { _, enabled ->
             if (!rendering && enabled && live) {
                 render()
-                approval?.begin()
+                prefs.edit().putString("status","Entry Mainnet terkunci selama riset V3").apply()
             } else if (!rendering) {
                 synchronized(DemoRunner.entryLock) {
                     if (FuturesVenue.selected(activity) != venue) return@setOnCheckedChangeListener
@@ -69,7 +69,7 @@ internal class DemoControls(private val activity: Activity, private val start: (
         val enabled = prefs.getBoolean("enabled",false)
         if (!live) activity.findViewById<TextView>(R.id.demo_key_status).text = if (vault.exists()) "Key Demo tersimpan di HP" else "Belum ada kredensial Demo tersimpan"
         toggle.isChecked = enabled
-        toggle.isEnabled = vault.exists() && (enabled || !prefs.contains("intent"))
+        toggle.isEnabled = vault.exists() && (if (live) enabled else enabled || !prefs.contains("intent"))
         keys.isEnabled = !enabled && !prefs.contains("intent")
         label.text = prefs.getString("status", if (vault.exists()) "Key ${venue.label} tersimpan" else "Masukkan key Binance ${venue.label} untuk mulai")
         if (live && enabled) label.append("\nAlokasi maksimum ${prefs.getString("capital","—")} USDT")
