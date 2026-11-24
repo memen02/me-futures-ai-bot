@@ -67,6 +67,8 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
             if (authorizedKey != api.accountId) return "WAIT · akun belum disetujui atau key telah berubah"
             if (pending == null && !prefs.getBoolean("enabled",false)) return "Trading real nonaktif"
         }
+        if (pending?.has("accountId") == true && pending.getString("accountId") != api.accountId)
+            return "WAIT · key berbeda dari akun pemilik intent"
         api.sync()
         if (pending != null) return reconcile(api, pending)
         val minute = api.now() / 60_000
@@ -124,13 +126,21 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
         val intent = JSONObject().put("id",id).put("side",side).put("created",api.now())
             .put("stop",BigDecimal.valueOf(plan.stop).toPlainString()).put("target",BigDecimal.valueOf(plan.target).toPlainString())
             .put("qty",qty).put("budget",minOf(available * RiskPlan.RISK,remaining)).put("fee",fee)
-        if (live) intent.put("accountId",api.accountId)
+        intent.put("accountId",api.accountId)
         synchronized(entryLock) {
             if (closing || FuturesVenue.selected(context) != venue || !prefs.getBoolean("enabled",false) ||
                 live && (prefs.getString("consentKey",null) != api.accountId || prefs.getString("capital",null)?.toDoubleOrNull() != cap)) return "$mode nonaktif"
             check(prefs.edit().putString("intent",intent.toString()).putLong("entryMinute",minute).commit())
         }
-        api.market(if (side == 1) "BUY" else "SELL",qty,id)
+        try {
+            api.market(if (side == 1) "BUY" else "SELL",qty,id)
+        } catch (error: Rejection) {
+            if (error.code in setOf(-1111, -2019, -4164)) {
+                intent.put("entryRejected",error.code)
+                check(prefs.edit().putBoolean("enabled",false).putString("intent",intent.toString()).commit())
+            }
+            throw error
+        }
         return reconcile(api,intent)
     }
 
@@ -149,7 +159,13 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
                 if (e.code != -2013) throw e
                 null
             }
-            if (order == null) return "WAIT · status entry belum terbukti, ID dipertahankan"
+            if (order == null) {
+                if (state.has("entryRejected") && owned.isEmpty() && api.orders().length() == 0) {
+                    check(prefs.edit().remove("intent").commit())
+                    return "$mode dijeda · penolakan entry dan posisi kosong terverifikasi"
+                }
+                return "WAIT · status entry belum terbukti, ID dipertahankan"
+            }
             if (order.getString("status") !in terminal) {
                 if (state.optBoolean("exit") || !prefs.getBoolean("enabled",false) || live)
                     api.cancelEntry(id)
@@ -184,7 +200,7 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
         val fee = state.optDouble("fee",RiskPlan.FEE)
         val loss = side * (entry - stopFill) + fee * (entry + stopFill)
         val gain = side * (targetFill - entry) - fee * (entry + targetFill)
-        val liquidationBeforeStop = live && liquidation > 0 && side * (stopFill - liquidation) <= 0
+        val liquidationBeforeStop = liquidation > 0 && side * (stopFill - liquidation) <= 0
         val fillOutsidePlan = liquidationBeforeStop || loss <= 0 || gain < 2 * loss || loss * kotlin.math.abs(amount) > state.getDouble("budget")
         if (fillOutsidePlan) return stopAfterFailure(api,state,amount,exitSide)
         val emergency = state.optBoolean("exit") || !prefs.getBoolean("enabled",false) ||
