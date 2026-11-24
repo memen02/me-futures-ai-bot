@@ -55,6 +55,7 @@ internal class TradingDesk(
     private val sort = view<Spinner>(R.id.scan_sort)
     private val adapter = TokenAdapter()
     private var snapshot = Scan()
+    private var displayedMarketStatus = ""
     private var watchMode = if (store.favorites.isEmpty()) 1 else 0
     private val modes = listOf("Favorit", "Volume", "Naik", "Turun", "Baru")
     private val signals = TokenSignals { symbol, signal ->
@@ -68,7 +69,9 @@ internal class TradingDesk(
         private set
 
     private val reports = TradingReports(activity,store)
-    private val manual = ManualPaper(activity,store,{ snapshot },::renderAccount)
+    private val manual = ManualPaper(activity,store,{
+        com.mefuturesaibot.app.ScreeningService.latest
+    },::renderAccount)
     private var changingMode = false
     private val modeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == "venue") renderMode()
@@ -193,15 +196,17 @@ internal class TradingDesk(
             view<Switch>(R.id.account_autostart).isChecked = BotPreferences.isAutoStartEnabled(activity)
             view<TextView>(R.id.account_cache_status).text = CacheCleanupJob.status(activity)
         }
-        update(com.mefuturesaibot.app.ScreeningService.latest, BotForegroundService.isRunning, force = true)
+        update(com.mefuturesaibot.app.ScreeningService.displayLatest, BotForegroundService.isRunning, force = true)
         onTabSelected?.invoke()
     }
 
     fun update(scan: Scan, active: Boolean, force: Boolean = false) {
         val elapsed = SystemClock.elapsedRealtime()
         val current = scan.fresh(elapsed)
-        if (!force && snapshot === scan && current == fresh && running == active &&
+        val marketStatus = com.mefuturesaibot.app.ScreeningService.marketStatus
+        if (!force && displayedMarketStatus == marketStatus && snapshot === scan && current == fresh && running == active &&
             (tab != DeskTab.HOME || elapsed < nextTerminalRefresh)) return
+        displayedMarketStatus = marketStatus
         snapshot = scan
         fresh = current
         running = active
@@ -213,7 +218,12 @@ internal class TradingDesk(
         val last = if (scan.time > 0) " · ${time(scan.time)}" else ""
         view<TextView>(R.id.scan_state).text = when {
             !current -> if (scan.ok) "Ticker kedaluwarsa" else "Menunggu pembaruan pasar"
-            else -> "Scanner aktif · ${scan.rows.size} kontrak$last"
+            else -> "$marketStatus · ${scan.rows.size} kontrak"
+        }
+        if (!current) {
+            view<TextView>(R.id.scan_state).append(" · $marketStatus")
+        } else if (!marketStatus.startsWith("LIVE ")) {
+            view<TextView>(R.id.scan_state).append(" · REST")
         }
         view<TextView>(R.id.bot_state).text = status + last
         view<Button>(R.id.scan_start).visibility = if (active) View.GONE else View.VISIBLE

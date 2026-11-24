@@ -125,6 +125,18 @@ class StartupActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+
+        try {
+            startForegroundService(
+                Intent(this, ScreeningService::class.java)
+            )
+        } catch (e: RuntimeException) {
+            android.util.Log.w(
+                "MEProjectStartup",
+                "Scanner belum dapat dimulai", e
+            )
+        }
+
         beginChecks()
     }
 

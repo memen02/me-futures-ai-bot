@@ -95,7 +95,7 @@ class MainActivity : Activity() {
 
     private fun refreshStatusText() {
         val active = !userRequestedStop && BotForegroundService.isRunning
-        desk.update(ScreeningService.latest, active)
+        desk.update(ScreeningService.displayLatest, active)
         if (visible) desk.refreshSignals()
     }
 
