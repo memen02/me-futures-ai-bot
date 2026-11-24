@@ -1,9 +1,6 @@
 package com.mefuturesaibot.app
 
 import android.app.Notification
-import com.mefuturesaibot.app.scanner.DeskStore
-import com.mefuturesaibot.app.scanner.MarketScanner
-import com.mefuturesaibot.app.scanner.Scan
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent

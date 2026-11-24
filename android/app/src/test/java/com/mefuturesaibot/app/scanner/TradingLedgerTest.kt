@@ -17,6 +17,16 @@ class TradingLedgerTest {
         assertEquals(2.25,saved.months.getValue("2025-01").gain,0.0)
         assertEquals(84.0,saved.months.getValue("2025-02").let { it.gain-it.loss },0.0)
     }
+    @Test fun manualPaperCloseUsesQuoteAndStaysOutOfStrategyMetrics() {
+        val position = PaperPosition("ETHUSDT",1,100.0,1000,1.0,95.0,110.0,manual=true)
+        val account = PaperAccount(position=position)
+        val scan = Scan(time=3000,ok=true)
+        val closed = account.advance(scan,"ETHUSDT",null,true,Quote(102.0,102.1,3000),exitRequested=true)
+        assertEquals(1,closed.trades)
+        assertEquals(0,closed.measured)
+        assertEquals("ditutup pengguna",closed.ledger.recent.single().reason)
+        assertEquals(closed,closed.advance(scan,"ETHUSDT",null,true,Quote(102.0,102.1,3000),exitRequested=true))
+    }
     @Test fun trailingMirrorsLongAndShortAndPersistsTheInitialRisk() {
         for (side in listOf(1,-1)) {
             val p = PaperPosition("ETHUSDT",side,100.0,1000,1.0,100.0-side*2,100.0+side*9,trailing=true)

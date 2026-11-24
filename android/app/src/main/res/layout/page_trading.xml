@@ -5,6 +5,7 @@
             <TextView style="@style/DashHeading" android:text="Posisi Paper" />
             <Button style="@style/AccountPrimary" android:id="@+id/manual_open" android:text="Buka posisi Paper" />
             <TextView android:id="@+id/paper_open" style="@style/TerminalNote" android:lineSpacingExtra="3dp" />
+            <Button style="@style/AccountSecondary" android:id="@+id/manual_close" android:text="Tutup posisi Paper" android:visibility="gone" />
         </LinearLayout>
         <LinearLayout style="@style/DashPanel">
             <TextView style="@style/DashHeading" android:text="Posisi bot di bursa" />

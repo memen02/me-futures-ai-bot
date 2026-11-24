@@ -8,6 +8,12 @@ internal class DeskStore(context: Context) {
     var simulation: Boolean
         get() = prefs.getBoolean("paper_enabled", false)
         set(value) { prefs.edit().putBoolean("paper_enabled", value).apply() }
+    fun requestClose(position: PaperPosition) {
+        prefs.edit().putString("paper_close", "${position.symbol}|${position.opened}").apply()
+    }
+    fun closeRequested(position: PaperPosition?) = position != null &&
+        prefs.getString("paper_close",null) == "${position.symbol}|${position.opened}"
+
     var trailing: Boolean
         get() = prefs.getBoolean("paper_trailing", false)
         set(value) { prefs.edit().putBoolean("paper_trailing", value).apply() }

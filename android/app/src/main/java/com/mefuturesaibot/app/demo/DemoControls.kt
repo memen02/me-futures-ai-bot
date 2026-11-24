@@ -86,6 +86,13 @@ internal class DemoControls(private val activity: Activity, private val start: (
         rendering = false
     }
 
+    private fun resetDemoSession() {
+        val saved = prefs.getString("closedLedger",null)
+        val ledger = saved ?: com.mefuturesaibot.app.scanner.TradeLedger(
+            incomplete = prefs.getInt("n",0) + prefs.getInt("unrated",0) > 0).json().toString()
+        prefs.edit().clear().putString("closedLedger",ledger).apply()
+    }
+
     private fun edit() {
         val form = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
         fun field(name: String) = EditText(activity).apply {
@@ -102,7 +109,7 @@ internal class DemoControls(private val activity: Activity, private val start: (
         val dialog = AlertDialog.Builder(activity).setTitle("Key Binance Futures Demo").setView(form)
             .setPositiveButton("Simpan", null).setNegativeButton("Batal",null)
             .setNeutralButton(if (vault.exists()) "Hapus key" else null) { _,_ ->
-                runCatching { vault.remove() }.onSuccess { prefs.edit().clear().apply() }
+                runCatching { vault.remove() }.onSuccess { resetDemoSession() }
                 render()
             }.create()
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -117,7 +124,7 @@ internal class DemoControls(private val activity: Activity, private val start: (
                 secret.error = "Isi pasangan key Demo tanpa spasi"
             } else {
                 runCatching { vault.save(BinanceCredentials(k,s)) }.onSuccess {
-                    prefs.edit().clear().apply()
+                    resetDemoSession()
                     dialog.dismiss()
                     render()
                 }.onFailure { secret.error = "Penyimpanan terenkripsi gagal" }

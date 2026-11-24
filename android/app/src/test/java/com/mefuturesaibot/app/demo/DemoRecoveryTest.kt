@@ -53,7 +53,7 @@ class DemoRecoveryTest {
                 }
                 "userTrades" -> JSONArray().apply {
                     if (historyVisible) for (side in listOf("BUY","SELL")) put(JSONObject().put("side",side).put("qty",0.01)
-                        .put("commissionAsset","USDT").put("commission",0.01).put("realizedPnl",if (side=="BUY") 0 else 1))
+                        .put("time", now - 500).put("commissionAsset","USDT").put("commission",0.01).put("realizedPnl",if (side=="BUY") 0 else 1))
                 }
                 "income" -> JSONArray().put(JSONObject().put("income",-0.03).put("asset","USDT"))
                 "order" -> {
@@ -90,6 +90,9 @@ class DemoRecoveryTest {
         DemoRunner(context,FuturesVenue.DEMO).cycle(api)
         assertFalse(prefs.contains("intent"))
         assertEquals(1,prefs.getInt("n",0))
+        val ledger = com.mefuturesaibot.app.scanner.TradeLedger.read(JSONObject(prefs.getString("closedLedger",null)!!))
+        assertEquals(0.95,ledger.months.getValue("1970-01").gain,1e-9)
+        assertEquals(now-500,ledger.recent.single().at)
         assertEquals(0.95,prefs.getString("net",null)!!.toDouble(),1e-9)
     }
     @Test fun rejectedStopClosesReduceOnlyAndKeepsJournalUntilFlat() {

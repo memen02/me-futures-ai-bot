@@ -151,7 +151,8 @@ internal class MarketScanner(private val store: DeskStore, private val botEnable
                         val current = store.read().second
                         val allowEntry = botEnabled() && store.simulation
                         val account = if (timely && current == paper) paper.advance(snapshot, symbol,
-                            plan.takeIf { allowEntry }, allowEntry || paper.position?.manual == true, quote, payments, trailing = store.trailing) else current
+                            plan.takeIf { allowEntry }, allowEntry || paper.position?.manual == true, quote, payments, trailing = store.trailing,
+                            exitRequested = store.closeRequested(paper.position)) else current
                         val outcome = when {
                             !timely -> "WAIT · pemindaian kedaluwarsa"
                             paper.position == null && account.position != null -> "Virtual · ${account.journal.first().substringAfter('|')}"

@@ -36,7 +36,7 @@ internal data class PaperAccount(val balance: Double = INITIAL_BALANCE, val posi
     fun locked(now: Long) = day == now / 86_400_000 && balance <= dayStart * (1 - RiskPlan.DAY_LIMIT)
 
     fun advance(scan: Scan, symbol: String?, plan: RiskPlan?, enabled: Boolean, quote: Quote?,
-        funding: List<Funding> = emptyList(), trailing: Boolean = false, manual: Boolean = false): PaperAccount {
+        funding: List<Funding> = emptyList(), trailing: Boolean = false, manual: Boolean = false, exitRequested: Boolean = false): PaperAccount {
         if (!scan.ok || scan.time <= lastAction) return this
         val today = scan.time / 86_400_000
         val anchor = if (day == today) dayStart else balance
@@ -56,6 +56,7 @@ internal data class PaperAccount(val balance: Double = INITIAL_BALANCE, val posi
             val reason = when {
                 pos.side * (mark - pos.stop) <= 0 -> if (pos.stop != pos.initialStop) "trailing stop" else "stop-loss"
                 pos.side * (mark - pos.target) >= 0 -> "take-profit"
+                exitRequested -> "ditutup pengguna"
                 !enabled -> "simulasi dinonaktifkan"
                 scan.time - pos.opened >= 30 * 60_000L -> "30 menit"
                 else -> null

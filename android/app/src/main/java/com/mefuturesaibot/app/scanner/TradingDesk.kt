@@ -76,6 +76,15 @@ internal class TradingDesk(
 
     init {
         DeskTab.values().forEach { dest -> view<TextView>(dest.buttonId).setOnClickListener { select(dest) } }
+        view<Button>(R.id.manual_close).setOnClickListener {
+            val pos = store.read().second.position ?: return@setOnClickListener
+            android.app.AlertDialog.Builder(activity).setTitle("Tutup posisi Paper ${pos.symbol}?")
+                .setMessage("Simulasi memakai kuotasi valid berikutnya, termasuk biaya dan slippage.")
+                .setNegativeButton("Batal",null).setPositiveButton("Tutup Paper") { _,_ ->
+                    if (store.read().second.position?.opened == pos.opened) store.requestClose(pos)
+                    renderAccount()
+                }.show()
+        }
         view<Button>(R.id.manual_open).setOnClickListener { manual.open() }
         view<Switch>(R.id.paper_trailing).apply {
             isChecked = store.trailing
@@ -438,6 +447,12 @@ internal class TradingDesk(
         if (tab == DeskTab.ACCOUNT || tab == DeskTab.BOT) renderPerformance(account)
         if (tab == DeskTab.TRADING) reports.render()
         val position = account.position
+        view<View>(R.id.manual_open).isEnabled = position == null
+        view<Button>(R.id.manual_close).apply {
+            visibility = if (position == null) View.GONE else View.VISIBLE
+            isEnabled = !store.closeRequested(position)
+            text = if (isEnabled) "Tutup posisi Paper" else "Menunggu kuotasi penutupan"
+        }
         val t = snapshot.rows.firstOrNull { it.contract.symbol == position?.symbol }?.ticker
         val mark = t?.takeIf { fresh && it.fresh(snapshot.time) }?.price
         val unrealized = if (position != null && mark != null) position.gross(mark) else null
