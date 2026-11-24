@@ -53,6 +53,7 @@ class DemoRecoveryTest {
                             .put("orderType",req.url.queryParameter("type")).put("workingType",req.url.queryParameter("workingType"))
                             .put("triggerPrice",req.url.queryParameter("triggerPrice")).put("closePosition",req.url.queryParameter("closePosition"))
                         active[id] = order
+                        if (loseStopAck && id.endsWith("s")) throw java.io.IOException("simulated lost stop acknowledgement")
                         order
                     }
                 }

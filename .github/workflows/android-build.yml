@@ -36,8 +36,20 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Run unit tests (JUnit, JVM murni -- Signer & backoff calculator)
+      - name: Run unit tests (JUnit and Robolectric)
         run: gradle test --no-daemon --stacktrace
+
+      - name: Summarize Android unit tests
+        if: always()
+        run: |
+          python3 - <<'PYTHON'
+          import pathlib
+          import xml.etree.ElementTree as ET
+          for suite in sorted(pathlib.Path("app/build/test-results").glob("test*UnitTest")):
+              reports = [ET.parse(f).getroot() for f in suite.glob("TEST-*.xml")]
+              totals = {k: sum(int(r.get(k, 0)) for r in reports) for k in ("tests", "failures", "errors", "skipped")}
+              print(suite.name, totals)
+          PYTHON
 
       - name: Assemble ME Project APK for offline signing
         run: |
