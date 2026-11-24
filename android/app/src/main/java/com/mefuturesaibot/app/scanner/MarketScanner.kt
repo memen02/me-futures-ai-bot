@@ -15,7 +15,7 @@ import java.util.concurrent.Executors
 import kotlin.math.abs
 
 /** A single worker owns the registry and performs one sequential scan at a time. */
-internal class MarketScanner(private val store: DeskStore, private val publish: (Scan) -> Unit) {
+internal class MarketScanner(private val store: DeskStore, private val botEnabled: () -> Boolean, private val publish: (Scan) -> Unit) {
     private val handler = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor()
     private var registry = emptyList<Contract>()
@@ -69,7 +69,7 @@ internal class MarketScanner(private val store: DeskStore, private val publish: 
     private fun cycle() {
         if (closed) return
         val (baseModel, paper) = store.read()
-        val seekEntry = store.simulation && paper.position == null
+        val seekEntry = botEnabled() && store.simulation && paper.position == null
         worker.execute {
             try {
                 val elapsed = SystemClock.elapsedRealtime()
@@ -89,7 +89,7 @@ internal class MarketScanner(private val store: DeskStore, private val publish: 
                 var confirmation: EntryConfirmation? = null
                 var note = when {
                     paper.position != null -> "Memantau posisi virtual"
-                    !store.simulation -> "WAIT · simulasi nonaktif"
+                    !seekEntry -> "WAIT · simulasi nonaktif"
                     paper.locked(now) -> "WAIT · batas rugi harian"
                     model.rounds < MarketModel.WARMUP -> "WAIT · pemanasan model"
                     else -> "WAIT · belum ada konfirmasi"
@@ -119,7 +119,7 @@ internal class MarketScanner(private val store: DeskStore, private val publish: 
                         }
                     }
                 }
-                val pending = pendingEntry
+                val pending = pendingEntry.takeIf { seekEntry }
                 val candidate = pending?.eligible(snapshot)
                 val symbol = paper.position?.symbol ?: candidate?.contract?.symbol
                 var quote: Quote? = null
@@ -148,7 +148,11 @@ internal class MarketScanner(private val store: DeskStore, private val publish: 
                 handler.post {
                     if (!closed) {
                         val timely = SystemClock.elapsedRealtime() - snapshot.received in 0L..5000L
-                        val account = if (timely) paper.advance(snapshot, symbol, plan, store.simulation, quote, payments) else paper
+                        val current = store.read().second
+                        val allowEntry = botEnabled() && store.simulation
+                        val account = if (timely && current == paper) paper.advance(snapshot, symbol,
+                            plan.takeIf { allowEntry }, allowEntry || paper.position?.manual == true, quote, payments, trailing = store.trailing,
+                            exitRequested = store.closeRequested(paper.position)) else current
                         val outcome = when {
                             !timely -> "WAIT · pemindaian kedaluwarsa"
                             paper.position == null && account.position != null -> "Virtual · ${account.journal.first().substringAfter('|')}"
@@ -156,7 +160,7 @@ internal class MarketScanner(private val store: DeskStore, private val publish: 
                             else -> note
                         }
                         val next = snapshot.copy(status = outcome)
-                        pendingEntry = if (timely && store.simulation && account.position == null) confirmation else null
+                        pendingEntry = if (timely && allowEntry && account.position == null) confirmation else null
                         store.save(model, account)
                         previous = next
                         publish(next)

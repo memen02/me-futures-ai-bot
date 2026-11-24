@@ -45,6 +45,7 @@ internal class DemoControls(private val activity: Activity, private val start: (
             keys.visibility = View.VISIBLE
         }
         activity.findViewById<View>(R.id.mainnet_credentials).visibility = if (live) View.VISIBLE else View.GONE
+        activity.findViewById<View>(R.id.demo_connection_panel).visibility = if (live) View.GONE else View.VISIBLE
         keys.setOnClickListener { edit() }
         toggle.setOnCheckedChangeListener { _, enabled ->
             if (!rendering && enabled && live) {
@@ -66,6 +67,7 @@ internal class DemoControls(private val activity: Activity, private val start: (
     fun render() {
         rendering = true
         val enabled = prefs.getBoolean("enabled",false)
+        if (!live) activity.findViewById<TextView>(R.id.demo_key_status).text = if (vault.exists()) "Key Demo tersimpan di HP" else "Belum ada kredensial Demo tersimpan"
         toggle.isChecked = enabled
         toggle.isEnabled = vault.exists() && (enabled || !prefs.contains("intent"))
         keys.isEnabled = !enabled && !prefs.contains("intent")
@@ -86,6 +88,13 @@ internal class DemoControls(private val activity: Activity, private val start: (
         rendering = false
     }
 
+    private fun resetDemoSession() {
+        val saved = prefs.getString("closedLedger",null)
+        val ledger = saved ?: com.mefuturesaibot.app.scanner.TradeLedger(
+            incomplete = prefs.getInt("n",0) + prefs.getInt("unrated",0) > 0).json().toString()
+        prefs.edit().clear().putString("closedLedger",ledger).apply()
+    }
+
     private fun edit() {
         val form = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
         fun field(name: String) = EditText(activity).apply {
@@ -102,7 +111,7 @@ internal class DemoControls(private val activity: Activity, private val start: (
         val dialog = AlertDialog.Builder(activity).setTitle("Key Binance Futures Demo").setView(form)
             .setPositiveButton("Simpan", null).setNegativeButton("Batal",null)
             .setNeutralButton(if (vault.exists()) "Hapus key" else null) { _,_ ->
-                runCatching { vault.remove() }.onSuccess { prefs.edit().clear().apply() }
+                runCatching { vault.remove() }.onSuccess { resetDemoSession() }
                 render()
             }.create()
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -117,7 +126,7 @@ internal class DemoControls(private val activity: Activity, private val start: (
                 secret.error = "Isi pasangan key Demo tanpa spasi"
             } else {
                 runCatching { vault.save(BinanceCredentials(k,s)) }.onSuccess {
-                    prefs.edit().clear().apply()
+                    resetDemoSession()
                     dialog.dismiss()
                     render()
                 }.onFailure { secret.error = "Penyimpanan terenkripsi gagal" }

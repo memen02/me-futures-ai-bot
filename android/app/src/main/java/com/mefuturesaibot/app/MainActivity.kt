@@ -9,7 +9,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.widget.Button
-import com.mefuturesaibot.app.scanner.BrowseMarket
 import com.mefuturesaibot.app.scanner.DeskTab
 import com.mefuturesaibot.app.scanner.Scan
 import com.mefuturesaibot.app.scanner.TradingDesk
@@ -19,8 +18,6 @@ class MainActivity : Activity() {
     private val pollHandler = Handler(Looper.getMainLooper())
     private var userRequestedStop = false
     private var visible = false
-    private var browsing: BrowseMarket? = null
-    private var publicScan = Scan()
 
     private val pollRunnable = object : Runnable {
         override fun run() {
@@ -47,6 +44,7 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        startForegroundService(Intent(this, ScreeningService::class.java))
         visible = true
         pollRunnable.run()
     }
@@ -54,8 +52,6 @@ class MainActivity : Activity() {
     override fun onStop() {
         visible = false
         pollHandler.removeCallbacks(pollRunnable)
-        browsing?.close()
-        browsing = null
         desk.releaseDisplayData()
         super.onStop()
     }
@@ -96,14 +92,7 @@ class MainActivity : Activity() {
 
     private fun refreshStatusText() {
         val active = !userRequestedStop && BotForegroundService.isRunning
-        val browse = visible && !active && (desk.tab == DeskTab.HOME || desk.tab == DeskTab.MARKET)
-        if (browse && browsing == null) {
-            browsing = BrowseMarket { publicScan = it }.also { it.start() }
-        } else if (!browse) {
-            browsing?.close()
-            browsing = null
-        }
-        desk.update(if (active) BotForegroundService.latestScan else publicScan, active)
+        desk.update(ScreeningService.latest, active)
         if (visible) desk.refreshSignals()
     }
 

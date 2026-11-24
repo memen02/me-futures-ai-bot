@@ -1,79 +1,55 @@
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical" android:padding="20dp" android:focusableInTouchMode="true">
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:focusableInTouchMode="true">
         <TextView style="@style/DeskTitle" android:text="Akun" />
+        <LinearLayout android:id="@+id/demo_connection_panel" style="@style/DashPanel">
+            <TextView style="@style/DashHeading" android:text="Koneksi Binance Demo"/>
+            <TextView android:id="@+id/demo_key_status" style="@style/TerminalNote"/>
+            <Button android:id="@+id/demo_keys" style="@style/AccountSecondary" android:text="Kelola API Key dan Secret Demo"/>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/mainnet_credentials" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <LinearLayout style="@style/DashPanel" android:background="@drawable/dashboard_panel">
+                <TextView style="@style/DashLabel" android:text="BINANCE FUTURES" android:letterSpacing="0.10" android:textColor="@color/me_accent" />
+                <TextView style="@style/DashHeading" android:text="USDⓈ-M · Mainnet" android:textSize="23sp" android:layout_marginTop="4dp" />
+                <TextView android:id="@+id/account_connection" style="@style/DashLabel" android:text="Belum terhubung" android:textSize="15sp" android:layout_marginTop="8dp" android:accessibilityLiveRegion="polite" />
+            </LinearLayout>
+            <LinearLayout android:id="@+id/account_form" style="@style/DashPanel" android:importantForAutofill="noExcludeDescendants">
+                <TextView style="@style/DashHeading" android:text="Kredensial API" />
+                <TextView style="@style/DashLabel" android:layout_marginTop="4dp" android:text="Gunakan pasangan key HMAC dari API Management Binance." />
+                <TextView style="@style/AccountFieldLabel" android:text="API Key" android:labelFor="@+id/account_key" />
+                <EditText android:id="@id/account_key" style="@style/AccountInput" android:hint="Masukkan API Key" android:imeOptions="actionNext" />
+                <TextView style="@style/AccountFieldLabel" android:text="API Secret" android:labelFor="@+id/account_secret" />
+                <EditText android:id="@id/account_secret" style="@style/AccountInput" android:hint="Masukkan API Secret" android:imeOptions="actionDone" />
+                <TextView style="@style/DashLabel" android:layout_marginTop="8dp" android:text="Tersimpan terenkripsi di HP. Jika secret lama hilang, buat pasangan API baru di Binance." />
+                <Button android:id="@+id/account_save" style="@style/AccountPrimary" android:text="Simpan di HP" />
+                <Button android:id="@+id/account_cancel" style="@style/AccountSecondary" android:text="Batal mengganti" android:visibility="gone" />
+            </LinearLayout>
+            <LinearLayout android:id="@+id/account_actions" style="@style/DashPanel" android:visibility="gone">
+                <TextView style="@style/DashHeading" android:text="Akses API" />
+                <TextView android:id="@+id/account_access" style="@style/DashLabel" android:layout_marginTop="6dp" android:lineSpacingExtra="4dp" />
+                <Button android:id="@+id/account_check" style="@style/AccountPrimary" android:text="Uji koneksi ke Binance" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+                    <Button android:id="@+id/account_replace" style="@style/AccountSecondary" android:layout_width="0dp" android:layout_weight="1" android:text="Ganti key" />
+                    <Button android:id="@+id/account_remove" style="@style/AccountSecondary" android:layout_width="0dp" android:layout_weight="1" android:textColor="@color/me_sell" android:text="Hapus dari HP" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
         <LinearLayout style="@style/DashPanel">
             <TextView style="@style/DashHeading" android:text="Mode trading" />
             <RadioGroup android:id="@+id/venue_mode" android:layout_width="match_parent" android:layout_height="wrap_content" android:saveEnabled="false">
-                <RadioButton android:id="@+id/mode_demo" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:textColor="@color/me_text" android:saveEnabled="false" android:text="Demo · saldo virtual"/>
-                <RadioButton android:id="@+id/mode_mainnet" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:textColor="@color/me_text" android:saveEnabled="false" android:text="Mainnet · uang asli"/>
+                <RadioButton android:id="@+id/mode_demo" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:textColor="@color/me_text" android:saveEnabled="false" android:text="Demo · saldo virtual" />
+                <RadioButton android:id="@+id/mode_mainnet" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:textColor="@color/me_text" android:saveEnabled="false" android:text="Mainnet · uang asli" />
             </RadioGroup>
-            <TextView android:id="@+id/mode_message" style="@style/DashLabel" android:accessibilityLiveRegion="polite" android:visibility="gone"/>
+            <TextView android:id="@+id/mode_message" style="@style/DashLabel" android:accessibilityLiveRegion="polite" android:visibility="gone" />
         </LinearLayout>
-        <LinearLayout style="@style/DashPanel">
-            <TextView style="@style/DashHeading" android:text="Paper · simulasi lokal"/>
-            <TextView android:id="@+id/paper_model" style="@style/TerminalNote" android:lineSpacingExtra="3dp"/>
-            <Switch android:id="@+id/paper_enabled" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:minHeight="@dimen/me_touch_target" android:saveEnabled="false" android:text="Aktifkan transaksi Paper" android:textColor="@color/me_text"/>
+        <LinearLayout style="@style/TerminalPanel">
+            <TextView style="@style/TerminalTitle" android:text="Performa simulasi" />
+            <TextView style="@style/MarketValue" android:id="@+id/desk_profit" />
+            <TextView style="@style/TerminalNote" android:id="@+id/desk_trades" />
+            <TextView style="@style/TerminalNote" android:id="@+id/desk_winrate" />
+            <TextView style="@style/TerminalNote" android:id="@+id/desk_position" />
         </LinearLayout>
-                <LinearLayout style="@style/TerminalPanel">
-                    <TextView style="@style/TerminalTitle" android:text="Performa simulasi" />
-                    <TextView style="@style/MarketValue" android:id="@+id/desk_profit" />
-                    <TextView style="@style/TerminalNote" android:id="@+id/desk_trades" />
-                    <TextView style="@style/TerminalNote" android:id="@+id/desk_winrate" />
-                    <TextView style="@style/TerminalNote" android:id="@+id/desk_position" />
-                    <Button style="@style/TerminalLink" android:id="@+id/desk_history" android:text="Lihat jurnal" />
-                </LinearLayout>
-        <LinearLayout style="@style/TerminalPanel" android:id="@+id/section_risk">
-            <TextView style="@style/TerminalTitle" android:text="Manajemen risiko · Simulasi" />
-            <TextView style="@style/TerminalNote" android:id="@+id/desk_risk" />
-            <TextView style="@style/TerminalNote" android:id="@+id/desk_targets" />
-        </LinearLayout>
-
-        <LinearLayout android:id="@+id/mainnet_credentials" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content">
-        <LinearLayout style="@style/DashPanel" android:background="@drawable/dashboard_panel">
-            <TextView style="@style/DashLabel" android:text="BINANCE FUTURES" android:letterSpacing="0.10" android:textColor="@color/me_accent" />
-            <TextView style="@style/DashHeading" android:text="USDⓈ-M · Mainnet" android:textSize="23sp" android:layout_marginTop="4dp" />
-            <TextView android:id="@+id/account_connection" style="@style/DashLabel" android:text="Belum terhubung"
-                android:textSize="15sp" android:layout_marginTop="8dp" android:accessibilityLiveRegion="polite" />
-        </LinearLayout>
-        <LinearLayout android:id="@+id/account_form" style="@style/DashPanel" android:importantForAutofill="noExcludeDescendants">
-            <TextView style="@style/DashHeading" android:text="Kredensial API" />
-            <TextView style="@style/DashLabel" android:layout_marginTop="4dp" android:text="Gunakan pasangan key HMAC dari API Management Binance." />
-            <TextView style="@style/AccountFieldLabel" android:text="API Key" android:labelFor="@+id/account_key" />
-            <EditText android:id="@id/account_key" style="@style/AccountInput" android:hint="Masukkan API Key"
-                android:imeOptions="actionNext" />
-            <TextView style="@style/AccountFieldLabel" android:text="API Secret" android:labelFor="@+id/account_secret" />
-            <EditText android:id="@id/account_secret" style="@style/AccountInput" android:hint="Masukkan API Secret"
-                android:imeOptions="actionDone" />
-            <TextView style="@style/DashLabel" android:layout_marginTop="8dp"
-                android:text="Tersimpan terenkripsi di HP. Jika secret lama hilang, buat pasangan API baru di Binance." />
-            <Button android:id="@+id/account_save" style="@style/AccountPrimary" android:text="Simpan di HP" />
-            <Button android:id="@+id/account_cancel" style="@style/AccountSecondary" android:text="Batal mengganti" android:visibility="gone" />
-        </LinearLayout>
-        <LinearLayout android:id="@+id/account_actions" style="@style/DashPanel" android:visibility="gone">
-            <TextView style="@style/DashHeading" android:text="Akses API" />
-            <TextView android:id="@+id/account_access" style="@style/DashLabel" android:layout_marginTop="6dp" android:lineSpacingExtra="4dp" />
-            <Button android:id="@+id/account_check" style="@style/AccountPrimary" android:text="Uji koneksi ke Binance" />
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
-                <Button android:id="@+id/account_replace" style="@style/AccountSecondary" android:layout_width="0dp" android:layout_weight="1" android:text="Ganti key" />
-                <Button android:id="@+id/account_remove" style="@style/AccountSecondary" android:layout_width="0dp" android:layout_weight="1" android:textColor="@color/me_sell" android:text="Hapus dari HP" />
-            </LinearLayout>
-        </LinearLayout>
-        </LinearLayout>
-        <LinearLayout style="@style/DashPanel">
-            <TextView style="@style/DashHeading" android:id="@+id/execution_heading" android:text="Binance Futures Demo · BTC/USDT"/>
-            <TextView style="@style/DashLabel" android:id="@+id/execution_help" android:text="Gunakan akun Demo khusus dengan mode One-way. Sinyal SMA 1m/5m, stop dan target dipasang di bursa demo. Menonaktifkan demo menutup sisa posisi ketika terhubung."/>
-            <Button android:id="@+id/demo_keys" style="@style/AccountSecondary" android:text="Kelola key Demo"/>
-            <Switch android:id="@+id/demo_enabled" android:saveEnabled="false" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="Jalankan dengan saldo Demo" android:textColor="@color/me_text"/>
-            <TextView android:id="@+id/demo_status" style="@style/DashLabel"/>
-        </LinearLayout>
-        <TextView style="@style/DashLabel" android:layout_marginTop="12dp" android:id="@+id/execution_note" android:text="Trading otomatis pada build ini memakai saldo simulasi. Uji koneksi hanya membaca status akun dan izin key." />
         <LinearLayout style="@style/DashPanel">
             <TextView style="@style/DashHeading" android:text="Perangkat" />
-            <Switch android:id="@+id/account_autostart" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:minHeight="52dp" android:text="Auto Start setelah reboot" android:textColor="@color/me_text"/>
             <TextView style="@style/AccountFieldLabel" android:text="Pembersihan cache" />
             <TextView android:id="@+id/account_cache_status" style="@style/DashLabel" android:layout_marginBottom="12dp" />
             <TextView android:id="@+id/account_build" style="@style/DashLabel" />
