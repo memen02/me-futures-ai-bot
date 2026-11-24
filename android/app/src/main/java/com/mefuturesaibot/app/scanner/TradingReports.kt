@@ -52,8 +52,18 @@ internal class TradingReports(private val activity: Activity, private val store:
         val m = ledger.months[month.toString()] ?: MonthResult()
         label(R.id.report_month).text = month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.forLanguageTag("id-ID"))) + " · UTC"
         label(R.id.next_month).isEnabled = offset < 0
+        label(R.id.report_gain).text = "+${money(m.gain)}"
+        label(R.id.report_loss).text = "−${money(m.loss)}"
+        label(R.id.report_net).apply {
+            text = money(m.gain - m.loss)
+            setTextColor(activity.getColor(when {
+                m.gain > m.loss -> R.color.me_buy
+                m.gain < m.loss -> R.color.me_sell
+                else -> R.color.me_text
+            }))
+        }
         label(R.id.report_totals).text = buildString {
-            append("Untung   +${money(m.gain)} USDT\nRugi   −${money(m.loss)} USDT\nBersih   ${money(m.gain-m.loss)} USDT\n${m.count} posisi ditutup")
+            append("USDT · ${m.count} posisi ditutup")
             if (m.unknown > 0) append(" · ${m.unknown} belum dinilai")
             if (ledger.incomplete) append("\nRiwayat lama tidak lengkap. Total hanya mencakup hasil tercatat.")
         }

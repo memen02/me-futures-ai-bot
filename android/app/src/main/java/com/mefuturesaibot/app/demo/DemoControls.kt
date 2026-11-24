@@ -45,6 +45,7 @@ internal class DemoControls(private val activity: Activity, private val start: (
             keys.visibility = View.VISIBLE
         }
         activity.findViewById<View>(R.id.mainnet_credentials).visibility = if (live) View.VISIBLE else View.GONE
+        activity.findViewById<View>(R.id.demo_connection_panel).visibility = if (live) View.GONE else View.VISIBLE
         keys.setOnClickListener { edit() }
         toggle.setOnCheckedChangeListener { _, enabled ->
             if (!rendering && enabled && live) {
@@ -66,6 +67,7 @@ internal class DemoControls(private val activity: Activity, private val start: (
     fun render() {
         rendering = true
         val enabled = prefs.getBoolean("enabled",false)
+        if (!live) activity.findViewById<TextView>(R.id.demo_key_status).text = if (vault.exists()) "Key Demo tersimpan di HP" else "Belum ada kredensial Demo tersimpan"
         toggle.isChecked = enabled
         toggle.isEnabled = vault.exists() && (enabled || !prefs.contains("intent"))
         keys.isEnabled = !enabled && !prefs.contains("intent")

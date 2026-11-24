@@ -19,6 +19,20 @@
                 <TextView style="@style/TerminalNote" android:id="@+id/report_month" android:text="" android:lineSpacingExtra="3dp" />
                 <Button style="@style/TerminalLink" android:id="@+id/next_month" android:text="›" android:contentDescription="Bulan berikutnya" />
             </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:baselineAligned="false">
+                <LinearLayout style="@style/MarketColumn">
+                    <TextView style="@style/TerminalNote" android:text="Untung"/>
+                    <TextView android:id="@+id/report_gain" style="@style/MarketValue" android:textColor="@color/me_buy" android:fontFeatureSettings="tnum"/>
+                </LinearLayout>
+                <LinearLayout style="@style/MarketColumn">
+                    <TextView style="@style/TerminalNote" android:text="Rugi"/>
+                    <TextView android:id="@+id/report_loss" style="@style/MarketValue" android:textColor="@color/me_sell" android:fontFeatureSettings="tnum"/>
+                </LinearLayout>
+                <LinearLayout style="@style/MarketColumn">
+                    <TextView style="@style/TerminalNote" android:text="Bersih"/>
+                    <TextView android:id="@+id/report_net" style="@style/MarketValue" android:textColor="@color/me_text" android:fontFeatureSettings="tnum"/>
+                </LinearLayout>
+            </LinearLayout>
             <TextView style="@style/TerminalNote" android:id="@+id/report_totals" android:text="" android:lineSpacingExtra="3dp" />
             <TextView style="@style/TerminalNote" android:id="@+id/report_closed" android:text="" android:lineSpacingExtra="3dp" />
         </LinearLayout>
