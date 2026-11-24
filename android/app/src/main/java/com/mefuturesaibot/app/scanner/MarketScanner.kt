@@ -42,23 +42,6 @@ internal class MarketScanner(private val store: DeskStore, private val botEnable
         }
     }
 
-    private fun funding(symbol: String, from: Long, until: Long): List<Funding> {
-        val events = mutableListOf<Funding>()
-        var start = from + 1
-        while (start <= until) {
-            val items = JSONArray(get("fundingRate?symbol=$symbol&startTime=$start&endTime=$until&limit=1000").body)
-            for (i in 0 until items.length()) {
-                val item = items.getJSONObject(i)
-                val event = Funding(item.getLong("fundingTime"), item.getDouble("fundingRate"), item.getDouble("markPrice"))
-                require(event.time in start..until && event.mark > 0 && event.rate.isFinite())
-                events.add(event)
-            }
-            if (items.length() < 1000) break
-            start = events.last().time + 1
-        }
-        return events
-    }
-
     fun start() {
         if (started || closed) return
         started = true
@@ -104,7 +87,7 @@ internal class MarketScanner(private val store: DeskStore, private val botEnable
                             val path = "klines?symbol=${java.net.URLEncoder.encode(top.contract.symbol, "UTF-8")}&interval=1m&limit=121"
                             val candles = get(path)
                             val history = CandleHistory(CandleHistory.parseClosedCandles(candles.body), "Siap", true)
-                            val signal = history.signalAt(candles.serverTime)
+                            val signal = BaselineDecision.evaluate(top, candles.serverTime, history.signalAt(candles.serverTime))
                             note = "WAIT · ${top.contract.symbol} · ${signal.reason}"
                             val long = requireNotNull(top.score) > 0.5
                             if (signal.side == (if (long) SignalSide.BUY else SignalSide.SELL)) {
@@ -119,12 +102,12 @@ internal class MarketScanner(private val store: DeskStore, private val botEnable
                         }
                     }
                 }
+                val confirmed = confirmation
                 val pending = pendingEntry.takeIf { seekEntry }
-                val candidate = pending?.eligible(snapshot)
-                val symbol = paper.position?.symbol ?: candidate?.contract?.symbol
+                val candidate = pending?.eligible(snapshot)?.takeIf { confirmed?.symbol == it.contract.symbol && confirmed.long == pending.long }
+                val symbol = candidate?.contract?.symbol
                 var quote: Quote? = null
                 var plan: RiskPlan? = null
-                var payments = emptyList<Funding>()
                 if (symbol != null) {
                     val book = get("ticker/bookTicker?symbol=$symbol")
                     val json = JSONObject(book.body)
@@ -132,14 +115,12 @@ internal class MarketScanner(private val store: DeskStore, private val botEnable
                     val at = book.serverTime ?: throw IOException("Waktu bursa kosong")
                     quote = Quote(json.getDouble("bidPrice"), json.getDouble("askPrice"), json.getLong("time"))
                     snapshot = snapshot.copy(time = at)
-                    val held = paper.position
-                    if (held != null) {
-                        payments = funding(symbol, held.fundingAt, at)
-                    } else if (candidate != null && pending?.levels != null) {
+                    if (confirmed?.levels != null) {
                         val nextFunding = JSONObject(get("premiumIndex?symbol=$symbol").body).getLong("nextFundingTime")
                         try {
                             require(nextFunding > at + 31 * 60_000L) { "mendekati settlement funding" }
-                            plan = RiskPlan.build(if (pending.long) 1 else -1, quote, pending.levels, paper.balance, at)
+                            require(at / 60_000 == confirmed.time / 60_000) { "candle konfirmasi telah berganti" }
+                            plan = RiskPlan.build(if (confirmed.long) 1 else -1, quote, confirmed.levels, paper.balance, at)
                         } catch (e: IllegalArgumentException) {
                             note = "WAIT · $symbol · ${e.message}"
                         }
@@ -150,9 +131,8 @@ internal class MarketScanner(private val store: DeskStore, private val botEnable
                         val timely = SystemClock.elapsedRealtime() - snapshot.received in 0L..5000L
                         val current = store.read().second
                         val allowEntry = botEnabled() && store.simulation
-                        val account = if (timely && current == paper) paper.advance(snapshot, symbol,
-                            plan.takeIf { allowEntry }, allowEntry || paper.position?.manual == true, quote, payments, trailing = store.trailing,
-                            exitRequested = store.closeRequested(paper.position)) else current
+                        val account = if (timely && current.position == null && current == paper && allowEntry && plan != null)
+                            paper.advance(snapshot,symbol,plan,true,quote,trailing=store.trailing) else current
                         val outcome = when {
                             !timely -> "WAIT · pemindaian kedaluwarsa"
                             paper.position == null && account.position != null -> "Virtual · ${account.journal.first().substringAfter('|')}"

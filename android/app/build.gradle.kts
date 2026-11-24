@@ -27,6 +27,11 @@ android {
     }
 
     testOptions.unitTests.isIncludeAndroidResources = true
+    if (System.getenv("GITHUB_ACTIONS") == "true") {
+        testOptions.unitTests.all {
+            it.systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2/")
+        }
+    }
 
     buildTypes {
         create("real") {

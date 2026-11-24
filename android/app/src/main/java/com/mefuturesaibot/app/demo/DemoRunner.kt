@@ -4,6 +4,11 @@ import android.content.Context
 import com.mefuturesaibot.app.account.CredentialVault
 import com.mefuturesaibot.app.exchange.CandleHistory
 import com.mefuturesaibot.app.exchange.SignalSide
+import com.mefuturesaibot.app.scanner.BaselineDecision
+import com.mefuturesaibot.app.scanner.Contract
+import com.mefuturesaibot.app.scanner.MarketData
+import com.mefuturesaibot.app.scanner.MarketRow
+import com.mefuturesaibot.app.scanner.DeskStore
 import com.mefuturesaibot.app.scanner.Levels
 import com.mefuturesaibot.app.scanner.Quote
 import com.mefuturesaibot.app.scanner.TradeLedger
@@ -30,14 +35,20 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
     private var retryAt = 0L
     @Volatile private var closing = false
 
-    fun start() { worker.scheduleWithFixedDelay({ synchronized(lock) {
+    fun start() { worker.execute(::monitor) }
+    private fun monitor() {
+        synchronized(lock) {
         if (!closing && System.currentTimeMillis() >= retryAt && (prefs.getBoolean("enabled", false) || prefs.contains("intent"))) {
             try { status(cycle()) } catch (e: Exception) {
                 if (e is Rejection && e.code in listOf(-1003, 418, 429)) retryAt = System.currentTimeMillis() + 120_000
                 status(if (e is Rejection) "WAIT · Binance $mode ${e.code}" else "WAIT · periksa koneksi, key $mode dan status order")
             }
         }
-    } }, 0, 10, TimeUnit.SECONDS) }
+        }
+        if (!closing) runCatching {
+            worker.schedule(::monitor, if (prefs.contains("intent")) 3L else 10L, TimeUnit.SECONDS)
+        }
+    }
 
     fun close() { closing = true; worker.shutdown() }
     private fun status(s: String) { prefs.edit().putString("status",s).apply() }
@@ -46,12 +57,18 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
         if (FuturesVenue.selected(context) != venue) return "WAIT · mode telah berubah"
         require(api.venue == venue)
         val pending = prefs.getString("intent", null)?.let(::JSONObject)
+        if (live && pending == null) {
+            if (prefs.getBoolean("enabled",false)) prefs.edit().putBoolean("enabled",false).remove("consentKey").apply()
+            return "Mainnet terkunci untuk entry baru selama riset V3"
+        }
         if (live) {
             // Recovery must work after Stop, but only with the key that opened the position.
             val authorizedKey = pending?.getString("accountId") ?: prefs.getString("consentKey",null)
             if (authorizedKey != api.accountId) return "WAIT · akun belum disetujui atau key telah berubah"
             if (pending == null && !prefs.getBoolean("enabled",false)) return "Trading real nonaktif"
         }
+        if (pending?.has("accountId") == true && pending.getString("accountId") != api.accountId)
+            return "WAIT · key berbeda dari akun pemilik intent"
         api.sync()
         if (pending != null) return reconcile(api, pending)
         val minute = api.now() / 60_000
@@ -79,7 +96,11 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
         }
         val bars = CandleHistory(CandleHistory.parseClosedCandles(api.public("klines","symbol" to SYMBOL,
             "interval" to "1m","limit" to "121")), "Siap", true)
-        val signal = bars.signalAt(api.now())
+        val ticker = MarketData.tickers(JSONArray().put(JSONObject(api.public("ticker/24hr","symbol" to SYMBOL))).toString())[SYMBOL]
+        val score = ticker?.let(DeskStore(context).read().first::score)
+        val row = MarketRow(Contract(SYMBOL,"USDT"),ticker,score)
+        fun decision() = BaselineDecision.evaluate(row, api.now(), bars.signalAt(api.now()))
+        val signal = decision()
         if (signal.side == SignalSide.WAIT) return "WAIT · ${signal.reason}"
         val side = if (signal.side == SignalSide.BUY) 1 else -1
         val premium = JSONObject(api.public("premiumIndex","symbol" to SYMBOL))
@@ -99,19 +120,27 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
         val qty = rounded(minOf(plan.quantity,lot.getDouble("maxQty")),lot.getString("stepSize").toBigDecimal(),RoundingMode.DOWN)
         if (qty.toDouble() < lot.getDouble("minQty") || qty.toDouble() * plan.entry < filters.getValue("MIN_NOTIONAL").getDouble("notional"))
             return "WAIT · ukuran di bawah minimum kontrak"
-        if (closing || !prefs.getBoolean("enabled",false) || bars.signalAt(api.now()).side != signal.side || quote.problem(api.now()) != null)
+        if (closing || !prefs.getBoolean("enabled",false) || decision().side != signal.side || quote.problem(api.now()) != null)
             return "WAIT · konfirmasi kedaluwarsa atau $mode dimatikan"
         val id = (if (live) "meR" else "meD") + api.now()
         val intent = JSONObject().put("id",id).put("side",side).put("created",api.now())
             .put("stop",BigDecimal.valueOf(plan.stop).toPlainString()).put("target",BigDecimal.valueOf(plan.target).toPlainString())
             .put("qty",qty).put("budget",minOf(available * RiskPlan.RISK,remaining)).put("fee",fee)
-        if (live) intent.put("accountId",api.accountId)
+        intent.put("accountId",api.accountId)
         synchronized(entryLock) {
             if (closing || FuturesVenue.selected(context) != venue || !prefs.getBoolean("enabled",false) ||
                 live && (prefs.getString("consentKey",null) != api.accountId || prefs.getString("capital",null)?.toDoubleOrNull() != cap)) return "$mode nonaktif"
             check(prefs.edit().putString("intent",intent.toString()).putLong("entryMinute",minute).commit())
         }
-        api.market(if (side == 1) "BUY" else "SELL",qty,id)
+        try {
+            api.market(if (side == 1) "BUY" else "SELL",qty,id)
+        } catch (error: Rejection) {
+            if (error.code in setOf(-1111, -2019, -4164)) {
+                intent.put("entryRejected",error.code)
+                check(prefs.edit().putBoolean("enabled",false).putString("intent",intent.toString()).commit())
+            }
+            throw error
+        }
         return reconcile(api,intent)
     }
 
@@ -130,27 +159,39 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
                 if (e.code != -2013) throw e
                 null
             }
-            if (order == null && api.now() - state.getLong("created") < 60_000 ||
-                order != null && order.getString("status") !in setOf("FILLED","CANCELED","EXPIRED","REJECTED","EXPIRED_IN_MATCH"))
-                return "WAIT · konfirmasi order masuk"
-            if (order?.optString("status") == "FILLED" && api.now() - state.getLong("created") < 10_000)
+            if (order == null) {
+                if (state.has("entryRejected") && owned.isEmpty() && api.orders().length() == 0) {
+                    check(prefs.edit().remove("intent").commit())
+                    return "$mode dijeda · penolakan entry dan posisi kosong terverifikasi"
+                }
+                return "WAIT · status entry belum terbukti, ID dipertahankan"
+            }
+            if (order.getString("status") !in terminal) {
+                if (state.optBoolean("exit") || !prefs.getBoolean("enabled",false) || live)
+                    api.cancelEntry(id)
+                return "WAIT · menunggu status terminal entry"
+            }
+            if (order.optString("status") == "FILLED" && api.now() - state.getLong("created") < 10_000)
                 return "WAIT · sinkronisasi posisi"
             owned.forEach { api.cancel(it.getString("clientAlgoId")) }
-            if ((order?.optDouble("executedQty",0.0) ?: 0.0) > 0) return settle(api,state,order!!)
+            if (owned.isNotEmpty() && api.algos().objects().any { it.optString("clientAlgoId") in setOf(id+"s",id+"t") })
+                return "WAIT · pembatalan proteksi belum terverifikasi"
+            if (order.getDouble("executedQty") > 0) return settle(api,state,order)
             check(prefs.edit().remove("intent").commit())
             return "$mode · posisi kosong dan proteksi diperiksa"
         }
         if (amount * side <= 0 || kotlin.math.abs(amount) > state.getString("qty").toDouble() * 1.0000001)
             return "WAIT · posisi $mode berubah di luar aplikasi, periksa akun"
-        if (live) {
-            val fill = api.query(id)
-            val filled = fill.getDouble("executedQty")
-            if (fill.getString("clientOrderId") != id || fill.getString("side") != (if (side == 1) "BUY" else "SELL") ||
-                kotlin.math.abs(amount) > filled * 1.0000001)
-                return "WAIT · kepemilikan posisi BTC belum terverifikasi"
-        }
+        val fill = api.query(id)
+        if (fill.getString("clientOrderId") != id || fill.getString("side") != (if (side == 1) "BUY" else "SELL") ||
+            kotlin.math.abs(amount) > fill.getDouble("executedQty") * 1.0000001)
+            return "WAIT · kepemilikan posisi BTC belum terverifikasi"
+        val partial = fill.getString("status") !in terminal
         val entry = holding!!.getDouble("entryPrice")
-        if (state.optDouble("entry") != entry || state.optDouble("heldQty") != kotlin.math.abs(amount)) {
+        val liquidation = holding.optDouble("liquidationPrice",0.0)
+        if (state.optDouble("entry") != entry || state.optDouble("heldQty") != kotlin.math.abs(amount) ||
+            state.optDouble("liquidation",0.0) != liquidation) {
+            state.put("liquidation",liquidation)
             state.put("entry", entry).put("heldQty", kotlin.math.abs(amount))
             persist(state)
         }
@@ -159,13 +200,12 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
         val fee = state.optDouble("fee",RiskPlan.FEE)
         val loss = side * (entry - stopFill) + fee * (entry + stopFill)
         val gain = side * (targetFill - entry) - fee * (entry + targetFill)
-        val liquidation = holding.optDouble("liquidationPrice",0.0)
-        val liquidationBeforeStop = live && liquidation > 0 && side * (stopFill - liquidation) <= 0
+        val liquidationBeforeStop = liquidation > 0 && side * (stopFill - liquidation) <= 0
         val fillOutsidePlan = liquidationBeforeStop || loss <= 0 || gain < 2 * loss || loss * kotlin.math.abs(amount) > state.getDouble("budget")
         if (fillOutsidePlan) return stopAfterFailure(api,state,amount,exitSide)
         val emergency = state.optBoolean("exit") || !prefs.getBoolean("enabled",false) ||
             api.now() - state.getLong("created") >= 30 * 60_000
-        if (!emergency) {
+        if (!emergency || partial) {
             for ((suffix, field, type) in listOf(Triple("s","stop","STOP_MARKET"), Triple("t","target","TAKE_PROFIT_MARKET"))) {
                 val already = owned.firstOrNull { it.optString("clientAlgoId") == id+suffix }
                 if (already != null && already.optString("side") == exitSide && already.optString("orderType") == type &&
@@ -176,9 +216,9 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
                     return stopAfterFailure(api,state,amount,exitSide)
                 }
                 try {
-                    api.protect(exitSide,state.getString(field),id+suffix,type)
                     state.put("sent"+suffix,true)
                     persist(state)
+                    api.protect(exitSide,state.getString(field),id+suffix,type)
                 } catch (e: Rejection) {
                     return stopAfterFailure(api,state,amount,exitSide)
                 }
@@ -190,6 +230,10 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
                     it.optString("workingType") == "MARK_PRICE" && it.optDouble("triggerPrice") == state.getDouble(field) }
             }
             if (!protected) return stopAfterFailure(api,state,amount,exitSide)
+            if (partial) {
+                api.cancelEntry(id)
+                return "WAIT · fill parsial diproteksi, memeriksa sisa entry"
+            }
             return "$mode · ${if (side == 1) "LONG" else "SHORT"} BTC · SL ${state.getString("stop")} · TP ${state.getString("target")}"
         }
         return flatten(api,state,amount,exitSide)
@@ -250,15 +294,34 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
     }
 
     private fun flatten(api: DemoExchange, state: JSONObject, amount: Double, exitSide: String): String {
-        state.put("exit",true)
+        val entry = api.query(state.getString("id"))
+        if (entry.getString("status") !in terminal) {
+            api.cancelEntry(state.getString("id"))
+            return "WAIT · entry dibatalkan sebelum menutup sisa posisi"
+        }
+        val previous = state.optString("exitId")
+        if (previous.isNotEmpty()) {
+            val old = try { api.query(previous) } catch (e: Rejection) {
+                if (e.code != -2013) throw e
+                return "WAIT · status exit ambigu, periksa ID exit di bursa"
+            }
+            if (old.getString("clientOrderId") != previous || old.getString("status") !in terminal)
+                return "WAIT · exit sebelumnya belum terminal"
+            val before = state.getDouble("exitAmount")
+            val filled = old.getDouble("executedQty")
+            if (!filled.isFinite() || filled < 0 || kotlin.math.abs(amount) > before - filled + 1e-10)
+                return "WAIT · menunggu saldo posisi setelah exit"
+        }
+        val attempt = state.optInt("exitAttempt") + 1
+        val exitId = state.getString("id") + "x" + attempt
+        state.put("exit",true).put("exitId",exitId).put("exitAttempt",attempt).put("exitAmount",kotlin.math.abs(amount))
         persist(state)
-        // A fresh position snapshot plus reduceOnly caps any retried exit at the remaining position.
-        api.market(exitSide,BigDecimal.valueOf(kotlin.math.abs(amount)).stripTrailingZeros().toPlainString(),
-            state.getString("id")+"x"+api.now(),true)
+        api.market(exitSide,BigDecimal.valueOf(kotlin.math.abs(amount)).stripTrailingZeros().toPlainString(),exitId,true)
         return "$mode · menutup posisi, menunggu konfirmasi bursa"
     }
 
     companion object {
+        private val terminal = setOf("FILLED","CANCELED","EXPIRED","REJECTED","EXPIRED_IN_MATCH")
         internal val entryLock = Any()
         private val lock = Any()
         const val PREFS = "me_project_futures_demo_v1"

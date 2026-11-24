@@ -325,8 +325,12 @@ internal class TradingDesk(
         return (0 until parent.childCount).map(parent::getChildAt)
     }
 
+    private var displayedPaper: Pair<PaperPosition?,com.mefuturesaibot.app.exchange.PositionMark?>? = null
     fun refreshSignals() {
-        if (tab == DeskTab.TRADING) reports.render()
+        if (tab == DeskTab.TRADING) {
+            val key = store.read().second.position to PaperPositionMonitor.mark?.takeIf { it.fresh(SystemClock.elapsedRealtime()) }
+            if (key != displayedPaper) { displayedPaper = key; renderAccount() } else reports.render()
+        }
         if (tab == DeskTab.BOT) {
             val symbol = store.read().second.position?.symbol ?: "BTCUSDT"
             signals.watch(listOf(symbol))
@@ -453,8 +457,7 @@ internal class TradingDesk(
             isEnabled = !store.closeRequested(position)
             text = if (isEnabled) "Tutup posisi Paper" else "Menunggu kuotasi penutupan"
         }
-        val t = snapshot.rows.firstOrNull { it.contract.symbol == position?.symbol }?.ticker
-        val mark = t?.takeIf { fresh && it.fresh(snapshot.time) }?.price
+        val mark = PaperPositionMonitor.mark?.takeIf { it.symbol == position?.symbol && it.fresh(SystemClock.elapsedRealtime()) }?.price
         val unrealized = if (position != null && mark != null) position.gross(mark) else null
         view<TextView>(R.id.paper_model).text = buildString {
             append("Regresi logistik · ${model.rounds} ronde belajar\n")
@@ -466,6 +469,7 @@ internal class TradingDesk(
             append("${if (position.side > 0) "LONG" else "SHORT"}  ${position.symbol} · ${money(position.quantity * position.entry)} USDT\nEntry   ${price(position.entry)}\n")
             append("SL ${price(position.stop)} · TP ${price(position.target)}\n")
             append("PnL berjalan   ${unrealized?.let(::money) ?: "menunggu harga"} USDT")
+            if (position.exitQuote != null) append("\nPenutupan terkunci · menunggu rekonsiliasi funding")
             if (position.trailing) append("\nTrailing 1R · Stop aktif ${price(position.stop)}")
             if (!store.simulation && !position.manual) append("\nMenunggu harga valid untuk menutup posisi.")
         }

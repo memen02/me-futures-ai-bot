@@ -29,12 +29,14 @@ class MainnetExecutionTest {
     private var rejectedStop = false
     private var entries = 0
     private var closes = 0
+    private var venue = FuturesVenue.REAL
+    private var rejectEntry = false
     private var calls = 0
     private var lookupQty: Double? = null
     private val http = OkHttpClient.Builder().addInterceptor(Interceptor { chain ->
         calls++
         val req = chain.request()
-        assertEquals("fapi.binance.com",req.url.host)
+        assertEquals(venue.host,req.url.host)
         fun param(key: String) = requireNotNull(req.url.queryParameter(key))
         var code = 200
         val data: Any = when (req.url.encodedPath.substringAfterLast('/')) {
@@ -44,11 +46,13 @@ class MainnetExecutionTest {
                 .put("positionAmt",qty).put("entryPrice",100).put("liquidationPrice","0")) }
             "openOrders" -> JSONArray()
             "openAlgoOrders" -> JSONArray(guards.values.toList())
-            "account" -> JSONObject().put("assets",JSONArray().put(JSONObject().put("asset","USDT")
+            "account" -> JSONObject().put("totalMarginBalance",250).put("availableBalance",250).put("assets",JSONArray().put(JSONObject().put("asset","USDT")
                 .put("marginBalance","10000").put("availableBalance","10000")))
             "premiumIndex" -> JSONObject().put("nextFundingTime",now + 7_200_000)
             "commissionRate" -> JSONObject().put("takerCommissionRate","0.0005")
             "exchangeInfo" -> JSONObject("""{"symbols":[{"symbol":"BTCUSDT","filters":[{"filterType":"PRICE_FILTER","tickSize":"0.01"},{"filterType":"MARKET_LOT_SIZE","minQty":"0.001","maxQty":"1000","stepSize":"0.001"},{"filterType":"MIN_NOTIONAL","notional":"5"}]}]}""")
+            "24hr" -> JSONObject().put("symbol","BTCUSDT").put("lastPrice",100).put("weightedAvgPrice",99)
+                .put("lowPrice",98).put("highPrice",110).put("priceChangePercent",1).put("quoteVolume",2_000_000).put("closeTime",now)
             "ticker" , "bookTicker" -> JSONObject().put("askPrice",100.0).put("bidPrice",99.99).put("time",now)
             "klines" -> JSONArray().apply {
                 for (i in 0..120) {
@@ -61,15 +65,19 @@ class MainnetExecutionTest {
                 if (req.method == "POST") {
                     if (param("reduceOnly") == "true") { closes++; qty=0.0 }
                     else {
-                        assertTrue(prefs.contains("intent"))
+                        assertTrue(venue.prefs(context).contains("intent"))
                         entries++
                         qty=param("quantity").toDouble()
                         entry=param("newClientOrderId")
-                        assertTrue(entry.startsWith("meR"))
+                        assertTrue(entry.startsWith(if (venue == FuturesVenue.REAL) "meR" else "meD"))
                         assertTrue(qty*100 <= 250)
                     }
                 }
-                JSONObject().put("clientOrderId",entry).put("side","BUY").put("status","FILLED")
+                if (rejectEntry) {
+                    qty=0.0
+                    code=400
+                    JSONObject().put("code",if (req.method == "POST") -2019 else -2013)
+                } else JSONObject().put("clientOrderId",entry).put("side","BUY").put("status","FILLED")
                     .put("executedQty",lookupQty ?: qty)
             }
             "algoOrder" -> {
@@ -105,29 +113,75 @@ class MainnetExecutionTest {
         runner.cycle(api)
         assertEquals(0,calls)
     }
-    @Test fun cappedEntryAndBothExchangeGuardsSurviveRestart() {
+    @Test fun priorApprovalCannotOpenAnotherRealPosition() {
         approve()
+        assertTrue(DemoRunner(context).cycle(api).contains("terkunci"))
+        assertEquals(0,calls)
+        assertFalse(prefs.getBoolean("enabled",true))
+        assertThrows(IllegalStateException::class.java) { api.market("BUY","0.001","blocked") }
+        assertEquals(0,calls)
+    }
+
+    private fun simulatedDemo(): DemoExchange {
+        venue = FuturesVenue.DEMO
+        assertTrue(FuturesVenue.select(context,venue))
+        venue.prefs(context).edit().clear().putBoolean("enabled",true).commit()
+        val store = com.mefuturesaibot.app.scanner.DeskStore(context)
+        store.save(com.mefuturesaibot.app.scanner.MarketModel(listOf(2.0,0.0,0.0,0.0),40),store.read().second)
+        return DemoExchange(credentials,http,venue)
+    }
+
+    @Test fun demoAlignedBaselineOpensOnceAndVerifiesTwoGuards() {
+        val demo = simulatedDemo()
+        assertTrue(DemoRunner(context,venue).cycle(demo).contains("LONG"))
+        assertEquals(1,entries)
+        assertEquals(2,guards.size)
+        DemoRunner(context,venue).cycle(demo)
+        assertEquals(1,entries)
+    }
+
+    @Test fun definiteMarginRejectionRequiresFlatReconciliationBeforeReleasingIntent() {
+        val demo = simulatedDemo()
+        rejectEntry=true
+        assertThrows(Rejection::class.java) { DemoRunner(context,venue).cycle(demo) }
+        val ledger = venue.prefs(context)
+        assertTrue(ledger.contains("intent"))
+        assertFalse(ledger.getBoolean("enabled",true))
+        assertTrue(DemoRunner(context,venue).cycle(demo).contains("terverifikasi"))
+        assertFalse(ledger.contains("intent"))
+        assertEquals(1,entries)
+    }
+
+    private fun legacyPosition() {
+        approve()
+        entry = "meR1"
+        qty = 0.01
+        val state = JSONObject().put("id",entry).put("side",1).put("qty","0.01").put("created",now-20_000)
+            .put("budget",5.0).put("stop","99").put("target","105").put("accountId",api.accountId)
+        prefs.edit().putString("intent",state.toString()).commit()
+    }
+    @Test fun legacyGuardsSurviveRestartAndStopRemainsReduceOnly() {
+        legacyPosition()
         assertTrue(DemoRunner(context).cycle(api).contains("LONG"))
         assertEquals(setOf("STOP_MARKET","TAKE_PROFIT_MARKET"),guards.values.map { it.getString("orderType") }.toSet())
         DemoRunner(context).cycle(api)
-        assertEquals(1,entries)
+        assertEquals(0,entries)
         assertEquals(2,guards.size)
         prefs.edit().putBoolean("enabled",false).commit()
         DemoRunner(context).cycle(api)
         assertEquals(1,closes)
     }
     @Test fun stopRejectionPausesAndAttemptsOnlyReduceOnlyExit() {
-        approve()
+        legacyPosition()
         rejectedStop=true
         DemoRunner(context).cycle(api)
-        assertFalse(prefs.getBoolean("enabled",false))
+        assertFalse(prefs.getBoolean("enabled",true))
         assertEquals(1,closes)
-        assertTrue(prefs.contains("intent"))
+        assertTrue(venue.prefs(context).contains("intent"))
     }
     @Test fun unrelatedPositionCannotBeClosedByRecovery() {
-        approve()
+        legacyPosition()
         lookupQty=0.0
-        DemoRunner(context).cycle(api)
         prefs.edit().putBoolean("enabled",false).commit()
         assertTrue(DemoRunner(context).cycle(api).contains("kepemilikan"))
         assertEquals(0,closes)

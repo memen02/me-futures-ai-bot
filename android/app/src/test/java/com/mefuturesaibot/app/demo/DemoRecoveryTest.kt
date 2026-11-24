@@ -24,6 +24,11 @@ class DemoRecoveryTest {
     private val writes = mutableListOf<String>()
     private var amount = 0.01
     private var rejectStop = false
+    private var loseStopAck = false
+    private var loseExitAck = false
+    private var partial = false
+    private var missingEntry = false
+    private var sentExit = ""
     private var historyVisible = true
     private val now = 100_000L
     private fun setup(): DemoExchange {
@@ -48,6 +53,7 @@ class DemoRecoveryTest {
                             .put("orderType",req.url.queryParameter("type")).put("workingType",req.url.queryParameter("workingType"))
                             .put("triggerPrice",req.url.queryParameter("triggerPrice")).put("closePosition",req.url.queryParameter("closePosition"))
                         active[id] = order
+                        if (loseStopAck && id.endsWith("s")) throw java.io.IOException("simulated lost stop acknowledgement")
                         order
                     }
                 }
@@ -57,8 +63,18 @@ class DemoRecoveryTest {
                 }
                 "income" -> JSONArray().put(JSONObject().put("income",-0.03).put("asset","USDT"))
                 "order" -> {
-                    if (req.method == "POST") { assertEquals("true",req.url.queryParameter("reduceOnly")); writes.add("exit"); amount=0.0 }
-                    JSONObject().put("status","FILLED").put("executedQty",0.01)
+                    val id = req.url.queryParameter("origClientOrderId") ?: "meD1"
+                    if (req.method == "POST") {
+                        assertEquals("true",req.url.queryParameter("reduceOnly")); writes.add("exit")
+                        sentExit = req.url.queryParameter("newClientOrderId")!!
+                        if (loseExitAck) throw java.io.IOException("simulated exit timeout")
+                        amount=0.0
+                    }
+                    if (req.method == "DELETE") { partial=false; writes.add("cancel-entry") }
+                    if (missingEntry && id=="meD1") { code=400; JSONObject().put("code",-2013) }
+                    else JSONObject().put("clientOrderId",id).put("side",if (id==sentExit) "SELL" else "BUY")
+                        .put("status",if (id==sentExit && loseExitAck) "NEW" else if (partial) "PARTIALLY_FILLED" else "FILLED")
+                        .put("executedQty",0.01)
                 }
                 else -> error("Unexpected request")
             }
@@ -107,4 +123,39 @@ class DemoRecoveryTest {
         assertFalse(prefs.contains("intent"))
         assertEquals(0.95,prefs.getString("net",null)!!.toDouble(),1e-9)
     }
+    @Test fun lostStopAcknowledgementIsReconciledAcrossRestart() {
+        val api = setup()
+        loseStopAck=true
+        assertThrows(java.io.IOException::class.java) { DemoRunner(context,FuturesVenue.DEMO).cycle(api) }
+        assertTrue(JSONObject(prefs.getString("intent",null)!!).getBoolean("sents"))
+        DemoRunner(context,FuturesVenue.DEMO).cycle(api)
+        assertEquals(listOf("POSTmeD1s","POSTmeD1t"),writes)
+    }
+    @Test fun lostExitAcknowledgementNeverCausesSecondMarketOrder() {
+        val api = setup()
+        prefs.edit().putBoolean("enabled",false).commit()
+        loseExitAck=true
+        assertThrows(java.io.IOException::class.java) { DemoRunner(context,FuturesVenue.DEMO).cycle(api) }
+        assertEquals(sentExit,JSONObject(prefs.getString("intent",null)!!).getString("exitId"))
+        repeat(2) { DemoRunner(context,FuturesVenue.DEMO).cycle(api) }
+        assertEquals(listOf("exit"),writes)
+    }
+    @Test fun partialEntryIsProtectedBeforeRemainderIsCancelled() {
+        val api = setup()
+        partial=true
+        DemoRunner(context,FuturesVenue.DEMO).cycle(api)
+        assertEquals(listOf("POSTmeD1s","POSTmeD1t","cancel-entry"),writes)
+        assertTrue(prefs.contains("intent"))
+    }
+    @Test fun flatSnapshotAndUnknownEntryNeverClearAmbiguousIntent() {
+        val api = setup()
+        amount=0.0
+        missingEntry=true
+        val intent=JSONObject(prefs.getString("intent",null)!!).put("created",1000)
+        prefs.edit().putString("intent",intent.toString()).commit()
+        DemoRunner(context,FuturesVenue.DEMO).cycle(api)
+        assertTrue(prefs.contains("intent"))
+        assertTrue(writes.isEmpty())
+    }
+
 }
