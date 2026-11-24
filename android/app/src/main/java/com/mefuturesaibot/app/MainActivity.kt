@@ -83,7 +83,10 @@ class MainActivity : SecureActivity() {
         }
 
         pin.setOnClickListener {
-            configureAppLock(true)
+            configureAppLock(
+                true,
+                credentialOnly = true
+            )
         }
 
         autoLock.setOnClickListener {

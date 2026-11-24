@@ -27,6 +27,7 @@ open class SecureActivity : Activity() {
 
                 AppLock.lock()
                 cancelAuthentication()
+                autoPromptAttempted = false
                 dismissProtectedDialogs()
 
                 if (AppLock.isEnabled(this@SecureActivity)) {
@@ -64,6 +65,8 @@ open class SecureActivity : Activity() {
     }
 
     private var resumed = false
+    private var unlockStatus: TextView? = null
+    private var autoPromptAttempted = false
     private var countedAsStarted = false
 
     companion object {
@@ -122,6 +125,7 @@ open class SecureActivity : Activity() {
 
         if (AppLock.requiresUnlock(this)) {
             showLock()
+            launchAutomaticUnlock()
         } else {
             hideLock()
         }
@@ -160,9 +164,33 @@ open class SecureActivity : Activity() {
 
         if (!legacyPending) {
             cancelAuthentication()
+            autoPromptAttempted = false
         }
 
         super.onStop()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+
+        if (hasFocus && resumed &&
+            AppLock.requiresUnlock(this)
+        ) {
+            showLock()
+            launchAutomaticUnlock()
+        }
+    }
+
+    private fun launchAutomaticUnlock() {
+        if (!resumed || authenticating ||
+            autoPromptAttempted ||
+            !hasWindowFocus() ||
+            !AppLock.requiresUnlock(this)
+        ) return
+
+        val status = unlockStatus ?: return
+        autoPromptAttempted = true
+        requestUnlock(status)
     }
 
     private fun showLock() {
@@ -208,12 +236,13 @@ open class SecureActivity : Activity() {
         }
 
         panel.addView(status)
+        unlockStatus = status
 
         panel.addView(Button(this).apply {
-            text = "Buka kunci"
+            text = "Gunakan PIN atau pola"
             isAllCaps = false
             setOnClickListener {
-                requestUnlock(status)
+                requestUnlock(status, credentialOnly = true)
             }
         })
 
@@ -248,7 +277,10 @@ open class SecureActivity : Activity() {
         cover.requestFocus()
     }
 
-    internal fun configureAppLock(enable: Boolean) {
+    internal fun configureAppLock(
+        enable: Boolean,
+        credentialOnly: Boolean = false
+    ) {
         if (!canUseProtectedUi() || authenticating) return
 
         if (!AppLock.deviceSecure(this)) {
@@ -263,10 +295,12 @@ open class SecureActivity : Activity() {
         authenticating = true
         val request = ++generation
         pendingLockSetting = enable
-        legacyPending = android.os.Build.VERSION.SDK_INT < 30
+        legacyPending = credentialOnly ||
+            android.os.Build.VERSION.SDK_INT < 30
 
         cancellation = DeviceAuthentication.authenticate(
             this,
+            credentialOnly = credentialOnly,
             onSuccess = {
                 if (request == generation &&
                     !isFinishing && !isDestroyed) {
@@ -328,6 +362,8 @@ open class SecureActivity : Activity() {
         val cover = shield ?: return
         (cover.parent as? FrameLayout)?.removeView(cover)
         shield = null
+        unlockStatus = null
+        autoPromptAttempted = false
 
         findViewById<View>(android.R.id.content)?.apply {
             visibility = View.VISIBLE
@@ -336,17 +372,21 @@ open class SecureActivity : Activity() {
         }
     }
 
-    private fun requestUnlock(status: TextView) {
+    private fun requestUnlock(
+        status: TextView,
+        credentialOnly: Boolean = false
+    ) {
         if (authenticating || !resumed) return
 
         authenticating = true
         val request = ++generation
 
-        legacyPending =
+        legacyPending = credentialOnly ||
             android.os.Build.VERSION.SDK_INT < 30
 
         cancellation = DeviceAuthentication.authenticate(
             this,
+            credentialOnly = credentialOnly,
             onSuccess = {
                 if (request == generation &&
                     !isFinishing &&
@@ -365,6 +405,10 @@ open class SecureActivity : Activity() {
                     legacyPending = false
                     cancellation = null
                     status.text = message
+
+                    if (resumed && AppLock.requiresUnlock(this)) {
+                        moveTaskToBack(true)
+                    }
                 }
             }
         )
@@ -407,6 +451,10 @@ open class SecureActivity : Activity() {
             } else {
                 pendingLockSetting = null
                 AppLock.lock()
+
+                if (AppLock.requiresUnlock(this)) {
+                    moveTaskToBack(true)
+                }
             }
         }
     }

@@ -13,7 +13,8 @@ internal object DeviceAuthentication {
     fun authenticate(
         activity: Activity,
         onSuccess: () -> Unit,
-        onFailure: (String) -> Unit
+        onFailure: (String) -> Unit,
+        credentialOnly: Boolean = false
     ): CancellationSignal? {
 
         val manager =
@@ -24,7 +25,7 @@ internal object DeviceAuthentication {
             return null
         }
 
-        if (Build.VERSION.SDK_INT >= 30) {
+        if (Build.VERSION.SDK_INT >= 30 && !credentialOnly) {
             val cancellation = CancellationSignal()
 
             try {
