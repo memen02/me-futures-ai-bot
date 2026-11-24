@@ -5,15 +5,15 @@
             <include layout="@layout/activity_dashboard" android:id="@+id/page_home" android:layout_width="match_parent" android:layout_height="match_parent"/>
             <include layout="@layout/page_scanner" android:id="@+id/page_scanner" android:layout_width="match_parent" android:layout_height="match_parent"/>
             <include layout="@layout/page_trading" android:id="@+id/page_trading" android:layout_width="match_parent" android:layout_height="match_parent"/>
-            <include layout="@layout/page_history" android:id="@+id/page_history" android:layout_width="match_parent" android:layout_height="match_parent"/>
+            <include layout="@layout/page_bot" android:id="@+id/page_bot" android:layout_width="match_parent" android:layout_height="match_parent"/>
             <include layout="@layout/page_account" android:id="@+id/page_account" android:layout_width="match_parent" android:layout_height="match_parent"/>
     </FrameLayout>
     <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/me_border"/>
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@color/me_surface" android:baselineAligned="false">
         <TextView android:id="@+id/nav_home" style="@style/DeskTab" android:drawableTop="@drawable/nav_home" android:text="Beranda" />
         <TextView android:id="@+id/nav_market" style="@style/DeskTab" android:drawableTop="@drawable/nav_market" android:text="Pasar" />
+        <TextView android:id="@+id/nav_bot" style="@style/DeskTab" android:drawableTop="@drawable/nav_bot" android:text="Bot" />
         <TextView android:id="@+id/nav_trading" style="@style/DeskTab" android:drawableTop="@drawable/nav_trading" android:text="Trading" />
-        <TextView android:id="@+id/nav_history" style="@style/DeskTab" android:drawableTop="@drawable/nav_history" android:text="Riwayat" />
         <TextView android:id="@+id/nav_account" style="@style/DeskTab" android:drawableTop="@drawable/nav_account" android:text="Akun" />
     </LinearLayout>
 </LinearLayout>

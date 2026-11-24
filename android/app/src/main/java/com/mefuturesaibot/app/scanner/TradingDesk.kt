@@ -67,6 +67,8 @@ internal class TradingDesk(
     var tab = DeskTab.HOME
         private set
 
+    private val reports = TradingReports(activity,store)
+    private val manual = ManualPaper(activity,store,{ snapshot },::renderAccount)
     private var changingMode = false
     private val modeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == "venue") renderMode()
@@ -74,7 +76,11 @@ internal class TradingDesk(
 
     init {
         DeskTab.values().forEach { dest -> view<TextView>(dest.buttonId).setOnClickListener { select(dest) } }
-        view<Button>(R.id.desk_history).setOnClickListener { select(DeskTab.HISTORY) }
+        view<Button>(R.id.manual_open).setOnClickListener { manual.open() }
+        view<Switch>(R.id.paper_trailing).apply {
+            isChecked = store.trailing
+            setOnCheckedChangeListener { _,checked -> store.trailing = checked }
+        }
         view<Button>(R.id.scan_start).setOnClickListener { start() }
         view<Button>(R.id.home_market).setOnClickListener { openMarkets() }
         val filters = view<LinearLayout>(R.id.watch_filters)
@@ -162,6 +168,7 @@ internal class TradingDesk(
     }
 
     fun select(destination: DeskTab) {
+        if (tab == DeskTab.TRADING && destination != tab) manual.close()
         if (tab == DeskTab.MARKET && destination != tab) clearTokenList()
         tab = destination
         accountPage.show(tab == DeskTab.ACCOUNT)
@@ -173,11 +180,11 @@ internal class TradingDesk(
             button.setTextColor(tint)
             button.compoundDrawableTintList = ColorStateList.valueOf(tint)
         }
-        if (tab == DeskTab.ACCOUNT) {
+        if (tab == DeskTab.ACCOUNT || tab == DeskTab.BOT) {
             view<Switch>(R.id.account_autostart).isChecked = BotPreferences.isAutoStartEnabled(activity)
             view<TextView>(R.id.account_cache_status).text = CacheCleanupJob.status(activity)
         }
-        update(BotForegroundService.latestScan, BotForegroundService.isRunning, force = true)
+        update(com.mefuturesaibot.app.ScreeningService.latest, BotForegroundService.isRunning, force = true)
         onTabSelected?.invoke()
     }
 
@@ -195,12 +202,16 @@ internal class TradingDesk(
             else -> scan.status
         }
         val last = if (scan.time > 0) " · ${time(scan.time)}" else ""
-        view<TextView>(R.id.scan_state).text = status + last
+        view<TextView>(R.id.scan_state).text = when {
+            !current -> if (scan.ok) "Ticker kedaluwarsa" else "Menunggu pembaruan pasar"
+            else -> "Scanner aktif · ${scan.rows.size} kontrak$last"
+        }
+        view<TextView>(R.id.bot_state).text = status + last
         view<Button>(R.id.scan_start).visibility = if (active) View.GONE else View.VISIBLE
         view<Button>(R.id.scan_stop).visibility = if (active) View.VISIBLE else View.GONE
         if (tab == DeskTab.HOME) renderTerminal(elapsed)
         if (tab == DeskTab.MARKET) listTokens()
-        if (tab == DeskTab.TRADING || tab == DeskTab.HISTORY || tab == DeskTab.ACCOUNT) renderAccount()
+        if (tab == DeskTab.TRADING || tab == DeskTab.BOT || tab == DeskTab.ACCOUNT) renderAccount()
     }
 
     private fun renderTerminal(elapsed: Long) {
@@ -249,7 +260,7 @@ internal class TradingDesk(
         } ?: "Belum ada posisi terbuka"
         view<TextView>(R.id.desk_risk).text = "Risiko 0,5% · 1 posisi · batas rugi harian 1,5% (UTC)"
         val status = when {
-            !running -> "WAIT · pemantauan berhenti"
+            !running -> "Bot otomatis nonaktif"
             !fresh && snapshot.ok -> "WAIT · data kedaluwarsa"
             else -> snapshot.status
         }
@@ -306,6 +317,19 @@ internal class TradingDesk(
     }
 
     fun refreshSignals() {
+        if (tab == DeskTab.TRADING) reports.render()
+        if (tab == DeskTab.BOT) {
+            val symbol = store.read().second.position?.symbol ?: "BTCUSDT"
+            signals.watch(listOf(symbol))
+            val signal = signals.signal(symbol)
+            val direction = when(signal.side) {
+                SignalSide.BUY -> "Tren naik"
+                SignalSide.SELL -> "Tren turun"
+                SignalSide.WAIT -> "Menunggu konfirmasi"
+            }
+            view<TextView>(R.id.bot_trend).text = "$symbol · $direction · ${signal.side}\n${signal.reason}"
+            return
+        }
         val cells = visibleCells()
         val symbols = cells.mapNotNull { it.tag as? String }
         signals.watch(if (fresh) symbols else emptyList())
@@ -362,6 +386,7 @@ internal class TradingDesk(
     }
 
     fun releaseDisplayData() {
+        manual.close()
         clearTokenList()
         snapshot = Scan()
         signals.stop()
@@ -410,7 +435,8 @@ internal class TradingDesk(
 
     private fun renderAccount() {
         val (model, account) = store.read()
-        if (tab == DeskTab.ACCOUNT) renderPerformance(account)
+        if (tab == DeskTab.ACCOUNT || tab == DeskTab.BOT) renderPerformance(account)
+        if (tab == DeskTab.TRADING) reports.render()
         val position = account.position
         val t = snapshot.rows.firstOrNull { it.contract.symbol == position?.symbol }?.ticker
         val mark = t?.takeIf { fresh && it.fresh(snapshot.time) }?.price
@@ -425,7 +451,8 @@ internal class TradingDesk(
             append("${if (position.side > 0) "LONG" else "SHORT"}  ${position.symbol} · ${money(position.quantity * position.entry)} USDT\nEntry   ${price(position.entry)}\n")
             append("SL ${price(position.stop)} · TP ${price(position.target)}\n")
             append("PnL berjalan   ${unrealized?.let(::money) ?: "menunggu harga"} USDT")
-            if (!store.simulation) append("\nMenunggu harga valid untuk menutup posisi.")
+            if (position.trailing) append("\nTrailing 1R · Stop aktif ${price(position.stop)}")
+            if (!store.simulation && !position.manual) append("\nMenunggu harga valid untuk menutup posisi.")
         }
         view<TextView>(R.id.paper_journal).text = account.journal.joinToString("\n\n") { event ->
             val date = event.substringBefore('|').toLongOrNull()

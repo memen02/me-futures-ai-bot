@@ -38,6 +38,9 @@
         <activity android:name=".TokenDetailActivity" android:theme="@style/DashboardTheme" android:exported="false" />
         <activity android:name=".MainActivity" android:theme="@style/DashboardTheme" android:exported="false" />
 
+        <service android:name=".ScreeningService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Continuous public futures market screening and tracking virtual positions with a visible notification."/>
+        </service>
         <service
             android:name=".BotForegroundService"
             android:exported="false"

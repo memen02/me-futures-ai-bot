@@ -8,6 +8,9 @@ internal class DeskStore(context: Context) {
     var simulation: Boolean
         get() = prefs.getBoolean("paper_enabled", false)
         set(value) { prefs.edit().putBoolean("paper_enabled", value).apply() }
+    var trailing: Boolean
+        get() = prefs.getBoolean("paper_trailing", false)
+        set(value) { prefs.edit().putBoolean("paper_trailing", value).apply() }
     var favorites: Set<String>
         get() = prefs.getStringSet("favorites", emptySet()).orEmpty().toSet()
         set(value) { prefs.edit().putStringSet("favorites", value.toSet()).apply() }

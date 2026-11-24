@@ -6,6 +6,8 @@ import com.mefuturesaibot.app.exchange.CandleHistory
 import com.mefuturesaibot.app.exchange.SignalSide
 import com.mefuturesaibot.app.scanner.Levels
 import com.mefuturesaibot.app.scanner.Quote
+import com.mefuturesaibot.app.scanner.TradeLedger
+import com.mefuturesaibot.app.scanner.TradeClose
 import com.mefuturesaibot.app.scanner.RiskPlan
 import org.json.JSONArray
 import org.json.JSONObject
@@ -148,6 +150,10 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
                 return "WAIT · kepemilikan posisi BTC belum terverifikasi"
         }
         val entry = holding!!.getDouble("entryPrice")
+        if (state.optDouble("entry") != entry || state.optDouble("heldQty") != kotlin.math.abs(amount)) {
+            state.put("entry", entry).put("heldQty", kotlin.math.abs(amount))
+            persist(state)
+        }
         val stopFill = state.getDouble("stop") * (1 - side * RiskPlan.SLIP)
         val targetFill = state.getDouble("target") * (1 - side * RiskPlan.SLIP)
         val fee = state.optDouble("fee",RiskPlan.FEE)
@@ -193,7 +199,13 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
         val from = state.getLong("created")
         val end = api.now()
         val edit = prefs.edit().remove("intent")
+        fun record(at: Long, net: Double?, reason: String) {
+            val ledger = prefs.getString("closedLedger",null)?.let { TradeLedger.read(JSONObject(it)) }
+                ?: TradeLedger(incomplete = prefs.getInt("n",0) + prefs.getInt("unrated",0) > 0)
+            edit.putString("closedLedger",ledger.add(TradeClose(at,SYMBOL,net,reason)).json().toString())
+        }
         if (end - from > 6 * 86_400_000L) {
+            record(end, null, "Rekonsiliasi tertunda · waktu pemeriksaan")
             check(edit.putInt("unrated",prefs.getInt("unrated",0)+1).commit())
             return "$mode · posisi ditutup, riwayat panjang belum dinilai"
         }
@@ -207,10 +219,14 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
         if (kotlin.math.abs(buy-quantity) > 1e-10 || kotlin.math.abs(sell-quantity) > 1e-10 ||
             fills.size == 1000 || funding.size == 1000 || fills.any { it.getString("commissionAsset") != "USDT" } ||
             funding.any { it.getString("asset") != "USDT" }) {
+            record(end, null, "Rekonsiliasi tertunda · waktu pemeriksaan")
             check(edit.putInt("unrated",prefs.getInt("unrated",0)+1).commit())
             return "$mode · hasil transaksi perlu rekonsiliasi manual"
         }
         val net = fills.sumOf { it.getDouble("realizedPnl") - it.getDouble("commission") } + funding.sumOf { it.getDouble("income") }
+        val closeSide = if (state.getInt("side") == 1) "SELL" else "BUY"
+        val closedAt = fills.filter { it.getString("side") == closeSide }.maxOfOrNull { it.optLong("time") } ?: 0
+        record(closedAt.takeIf { it > 0 } ?: end, net, if (closedAt > 0) "Fill bursa" else "Waktu pemeriksaan")
         val pnl = prefs.getString("net","0")!!.toDouble() + net
         val profit = prefs.getString("profit","0")!!.toDouble() + maxOf(net,0.0)
         val loss = prefs.getString("loss","0")!!.toDouble() + maxOf(-net,0.0)

@@ -51,7 +51,7 @@ class BotForegroundService : Service() {
     }
     private val drain = android.os.Handler(android.os.Looper.getMainLooper())
     private var draining = false
-    private var scanner: MarketScanner? = null
+
 
     override fun onCreate() {
         super.onCreate()
@@ -59,7 +59,6 @@ class BotForegroundService : Service() {
         exchangeClock = ExchangeClock()
         latestHistory = CandleHistory()
         latestQuote = null
-        latestScan = Scan()
         latestStatus = ReconnectingWebSocket.ConnectionStatus.CONNECTING
         isRunning = true
         ensureNotificationChannel()
@@ -96,9 +95,6 @@ class BotForegroundService : Service() {
         demo?.close()
         demo = null
         isRunning = false
-        scanner?.close()
-        scanner = null
-        latestScan = Scan()
         candleSync.stop()
         socket?.close()
         socket = null
@@ -123,9 +119,6 @@ class BotForegroundService : Service() {
             }
             return
         }
-        scanner?.close()
-        scanner = null
-        latestScan = Scan()
         candleSync.stop()
         socket?.close()
         socket = null
@@ -136,7 +129,7 @@ class BotForegroundService : Service() {
 
     private fun connectSocket() {
         if (demo == null) demo = com.mefuturesaibot.app.demo.DemoRunner(this).also { it.start() }
-        scanner = MarketScanner(DeskStore(this)) { latestScan = it }.also { it.start() }
+        startForegroundService(Intent(this, ScreeningService::class.java))
         candleSync.start()
         socket = ReconnectingWebSocket(
             url = ReconnectingWebSocket.BTC_BOOK_TICKER_URL,
@@ -238,8 +231,7 @@ class BotForegroundService : Service() {
         @Volatile var latestHistory = CandleHistory()
             private set
 
-        @Volatile internal var latestScan = Scan()
-            private set
+
 
         @Volatile var latestQuote: BookQuote? = null
             private set

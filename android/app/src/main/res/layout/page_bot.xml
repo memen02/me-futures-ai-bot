@@ -1,0 +1,35 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/me_panel_padding">
+        <TextView style="@style/DeskTitle" android:text="Bot" />
+        <LinearLayout style="@style/DashPanel">
+            <TextView style="@style/DashHeading" android:text="Kontrol bot" />
+            <TextView style="@style/TerminalNote" android:id="@+id/bot_state" android:text="" android:lineSpacingExtra="3dp" />
+            <Button android:id="@+id/scan_start" style="@style/DeskAction" android:text="Mulai bot" />
+            <Button android:id="@+id/scan_stop" style="@style/DeskAction" android:text="Hentikan bot" android:visibility="gone" android:backgroundTint="@color/me_surface" android:textColor="@color/me_sell" />
+            <Switch android:id="@+id/account_autostart" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="52dp" android:text="Auto Start setelah reboot" android:textColor="@color/me_text" />
+        </LinearLayout>
+        <LinearLayout style="@style/DashPanel">
+            <TextView style="@style/DashHeading" android:text="Analisis tren" />
+            <TextView style="@style/TerminalNote" android:id="@+id/bot_trend" android:text="" android:lineSpacingExtra="3dp" />
+        </LinearLayout>
+        <LinearLayout style="@style/DashPanel">
+            <TextView style="@style/DashHeading" android:text="Paper · simulasi lokal" />
+            <TextView android:id="@+id/paper_model" style="@style/TerminalNote" android:lineSpacingExtra="3dp" />
+            <Switch android:id="@+id/paper_enabled" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="@dimen/me_touch_target" android:saveEnabled="false" android:text="Aktifkan transaksi Paper" android:textColor="@color/me_text" />
+            <Switch android:id="@+id/paper_trailing" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="Trailing profit · posisi Paper baru" />
+            <TextView style="@style/TerminalNote" android:id="@+id/trail_help" android:text="Aktif setelah harga bergerak 1R. Stop mengikuti kuotasi dengan jarak 1R, sesuai risiko harga awal." android:lineSpacingExtra="3dp" />
+        </LinearLayout>
+        <LinearLayout style="@style/TerminalPanel" android:id="@+id/section_risk">
+            <TextView style="@style/TerminalTitle" android:text="Manajemen risiko · Simulasi" />
+            <TextView style="@style/TerminalNote" android:id="@+id/desk_risk" />
+            <TextView style="@style/TerminalNote" android:id="@+id/desk_targets" />
+        </LinearLayout>
+        <LinearLayout style="@style/DashPanel">
+            <TextView style="@style/DashHeading" android:id="@+id/execution_heading" android:text="Binance Futures Demo · BTC/USDT" />
+            <TextView style="@style/DashLabel" android:id="@+id/execution_help" android:text="Gunakan akun Demo khusus dengan mode One-way. Sinyal SMA 1m/5m, stop dan target dipasang di bursa demo. Menonaktifkan demo menutup sisa posisi ketika terhubung." />
+            <Switch android:id="@+id/demo_enabled" android:saveEnabled="false" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="Jalankan dengan saldo Demo" android:textColor="@color/me_text" />
+            <TextView android:id="@+id/demo_status" style="@style/DashLabel" />
+        </LinearLayout>
+        <TextView style="@style/DashLabel" android:layout_marginTop="12dp" android:id="@+id/execution_note" android:text="Trading otomatis pada build ini memakai saldo simulasi. Uji koneksi hanya membaca status akun dan izin key." />
+    </LinearLayout>
+</ScrollView>

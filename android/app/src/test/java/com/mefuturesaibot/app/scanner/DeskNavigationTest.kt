@@ -21,7 +21,7 @@ class DeskNavigationTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         try {
             val activity = controller.get()
-            val labels = listOf("Beranda", "Pasar", "Trading", "Riwayat", "Akun")
+            val labels = listOf("Beranda", "Pasar", "Bot", "Trading", "Akun")
             DeskTab.values().forEachIndexed { index, target ->
                 val button = activity.findViewById<TextView>(target.buttonId)
                 assertEquals(labels[index], button.text.toString())
@@ -32,9 +32,9 @@ class DeskNavigationTest {
                 }
             }
             activity.findViewById<View>(R.id.nav_account).performClick()
-            activity.findViewById<View>(R.id.desk_history).performClick()
+            activity.findViewById<View>(R.id.nav_trading).performClick()
             controller.recreate()
-            assertTrue(controller.get().findViewById<View>(R.id.page_history).isShown)
+            assertTrue(controller.get().findViewById<View>(R.id.page_trading).isShown)
             assertFalse(com.mefuturesaibot.app.BotPreferences.shouldRun(activity))
             assertFalse(DeskStore(activity).simulation)
             com.mefuturesaibot.app.demo.FuturesVenue.values().forEach {
@@ -111,7 +111,7 @@ class DeskNavigationTest {
             assertNull(home.findViewById<View>(R.id.scan_start))
             assertNull(home.findViewById<View>(R.id.scan_stop))
             activity.findViewById<View>(R.id.nav_market).performClick()
-            assertTrue(activity.findViewById<View>(R.id.scan_start).isShown)
+            assertFalse(activity.findViewById<View>(R.id.scan_start).isShown)
             assertFalse(activity.findViewById<View>(R.id.scan_stop).isShown)
             assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.page_scanner).visibility)
             assertEquals(View.GONE, activity.findViewById<View>(R.id.page_home).visibility)
@@ -122,11 +122,13 @@ class DeskNavigationTest {
             assertTrue(activity.findViewById<TextView>(R.id.account_wallet).text.contains("USDT"))
             assertTrue(activity.findViewById<View>(R.id.paper_open).isShown)
             assertFalse(activity.findViewById<View>(R.id.paper_enabled).isShown)
-            activity.findViewById<View>(R.id.nav_history).performClick()
             assertTrue(activity.findViewById<View>(R.id.paper_journal).isShown)
-            assertFalse(activity.findViewById<View>(R.id.paper_open).isShown)
-            activity.findViewById<View>(R.id.nav_account).performClick()
+            activity.findViewById<View>(R.id.nav_bot).performClick()
             assertTrue(activity.findViewById<View>(R.id.paper_enabled).isShown)
+            assertTrue(activity.findViewById<View>(R.id.account_autostart).isShown)
+            assertTrue(activity.findViewById<View>(R.id.scan_start).isShown)
+            activity.findViewById<View>(R.id.nav_account).performClick()
+            assertTrue(activity.findViewById<View>(R.id.demo_keys).isShown)
             val key = activity.findViewById<EditText>(R.id.account_key)
             val secret = activity.findViewById<EditText>(R.id.account_secret)
             assertFalse(key.isSaveEnabled)
