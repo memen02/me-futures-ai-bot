@@ -31,3 +31,15 @@ Status di bawah merupakan status **baseline**, sehingga temuan tetap dapat ditel
 |Lab, ekspor dan dashboard sistem|Android, backend/src|MISSING|Belum ada replay/walk-forward/Monte Carlo Android, widget dan health telemetry terpadu|Belum diuji|Hasil 30 hari dan Demo riil belum ada|Klaim profit tanpa data|Fase 8–10 serta uji perangkat|
 
 Cakupan pemeriksaan meliputi manifest varian, signing, dependensi, workflow, seluruh paket Android, pohon backend, berkas dokumentasi dan inventaris tes. Hasil CI baseline tersedia di [GitHub Actions](https://github.com/memen02/me-futures-ai-bot/actions/runs/45366039941). Daftar cek Fase 1 dan batas yang belum diuji tercantum di TEST_PLAN_V3.md.
+
+## Tindak lanjut pada branch Fase 1
+
+|Temuan baseline|Perubahan|Batas validasi|
+|---|---|---|
+|Monitor menunggu scanner|PositionFeed dan PaperPositionMonitor mengelola bid/ask, mark, freshness serta pemicu keluar yang disimpan. TradingReports menampilkan mark yang segar. BotForegroundService memakai mark venue untuk intent bursa.|Feed publik dicoba langsung. Keputusan Paper diuji dengan fixture dan tes state. Status order di bursa masih polling REST.|
+|Entry Mainnet dan mekanisme retry|DemoExchange, DemoRunner, DemoControls dan LiveApproval mengunci entry, memeriksa kepemilikan dan merekonsiliasi stable ID. BootReceiver, MainActivity dan BotForegroundService menangani disarm serta restart.|Pengiriman privat diuji melalui intersepsi HTTP, termasuk skenario posisi warisan Mainnet tanpa uang asli.|
+|Sinyal berbeda antar jalur|BaselineDecision dipakai TokenSignals, MarketScanner dan DemoRunner. PaperAccount, RiskPlan dan tiket manual dipertahankan.|Kesamaan dinilai pada input identik. Simbol yang dapat dieksekusi serta data pasar per venue masih berbeda.|
+|Jurnal dan upgrade|DeskStore dan PaperAccount menyimpan tambahan kuotasi dan alasan exit dengan pembacaan opsional data lama. Intent baru menyimpan identitas akun. Paket dan identitas penandatanganan dipertahankan.|Perlu instalasi upgrade dari versi sebelumnya pada HP pemilik.|
+|Transparansi CI|Workflow merekap hasil XML JUnit per varian sebelum assemble dan unggah APK.|Nomor run, versi dan hash APK distribusi dilaporkan bersama rilis pengujian.|
+
+Fitur yang tetap memerlukan pengembangan meliputi private user-data stream, top-K, rate-limit global, strategi dan indikator lanjutan, basis data historis, pengujian out-of-sample serta widget. Pembagian dan gerbang verifikasinya tersedia di [roadmap](DEVELOPMENT_ROADMAP_V3.md), [arsitektur keputusan](AI_ARCHITECTURE_V3.md), [risiko](RISK_AND_SECURITY_V3.md) dan [rencana uji](TEST_PLAN_V3.md).
