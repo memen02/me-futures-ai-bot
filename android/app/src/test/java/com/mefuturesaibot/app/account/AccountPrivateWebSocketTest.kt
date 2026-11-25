@@ -538,14 +538,28 @@ class AccountPrivateWebSocketTest {
     }
 
     @Test
-    fun oversizedMessageNeverEntersQueue() {
+    fun oversizedMessageTerminatesSession() {
         connection().use {
             val socket = openConnection(it)
 
             socket.message("x".repeat(262145))
 
-            assertTrue(scheduler.ready.isEmpty())
+            assertEquals(1, scheduler.ready.size)
+
+            scheduler.drain()
+
+            assertTrue(socket.cancelled)
             assertTrue(events.isEmpty())
+
+            assertEquals(
+                AccountSocketStatus.DISCONNECTED,
+                statuses.last()
+            )
+
+            assertEquals(
+                AccountSocketFailure(),
+                failures.single()
+            )
         }
     }
 
@@ -720,4 +734,216 @@ class AccountPrivateWebSocketTest {
             )
         }
     }
+
+    @Test
+    fun malformedMessagesDoNotConsumeQueue() {
+        connection().use {
+            val socket = openConnection(it)
+
+            repeat(1000) {
+                socket.message("{broken")
+                socket.message("")
+            }
+
+            assertTrue(scheduler.ready.isEmpty())
+            assertTrue(events.isEmpty())
+            assertTrue(failures.isEmpty())
+            assertFalse(socket.cancelled)
+        }
+    }
+
+    @Test
+    fun unknownMessagesDoNotConsumeQueue() {
+        connection().use {
+            val socket = openConnection(it)
+
+            repeat(1000) {
+                socket.message(
+                    """{"e":"unknownEvent"}"""
+                )
+            }
+
+            assertTrue(scheduler.ready.isEmpty())
+            assertTrue(failures.isEmpty())
+            assertFalse(socket.cancelled)
+        }
+    }
+
+    @Test
+    fun exactQueueCapacityRemainsUsable() {
+        connection().use {
+            val socket = openConnection(it)
+
+            repeat(32) {
+                socket.message(accountEvent)
+            }
+
+            assertEquals(32, scheduler.ready.size)
+
+            scheduler.drain()
+
+            assertEquals(32, events.size)
+            assertTrue(failures.isEmpty())
+            assertFalse(socket.cancelled)
+        }
+    }
+
+    @Test
+    fun queueCapacityIsReusableAfterDrain() {
+        connection().use {
+            val socket = openConnection(it)
+
+            repeat(5) {
+                repeat(32) {
+                    socket.message(accountEvent)
+                }
+
+                scheduler.drain()
+            }
+
+            assertEquals(160, events.size)
+            assertTrue(failures.isEmpty())
+            assertFalse(socket.cancelled)
+        }
+    }
+
+    @Test
+    fun overflowPreservesHttp429Metadata() {
+        connection().use {
+            val socket = openConnection(it)
+
+            repeat(33) {
+                socket.message(accountEvent)
+            }
+
+            socket.fail(429, "600")
+
+            assertTrue(scheduler.ready.size <= 33)
+
+            scheduler.drain()
+
+            assertEquals(
+                AccountSocketFailure(429, "600"),
+                failures.single()
+            )
+
+            assertTrue(socket.cancelled)
+            assertTrue(events.isEmpty())
+        }
+    }
+
+    @Test
+    fun overflowPreservesHttp418Metadata() {
+        connection().use {
+            val socket = openConnection(it)
+
+            repeat(33) {
+                socket.message(accountEvent)
+            }
+
+            socket.fail(418, "900")
+
+            scheduler.drain()
+
+            assertEquals(
+                AccountSocketFailure(418, "900"),
+                failures.single()
+            )
+
+            assertTrue(socket.cancelled)
+            assertTrue(events.isEmpty())
+        }
+    }
+
+    @Test
+    fun shorterCooldownCannotReplaceLongerCooldown() {
+        connection().use {
+            it.connect()
+
+            val socket = sockets.single()
+
+            socket.fail(429, "900")
+            socket.fail(418, "300")
+            socket.fail()
+
+            scheduler.drain()
+
+            assertEquals(
+                AccountSocketFailure(429, "900"),
+                failures.single()
+            )
+        }
+    }
+
+    @Test
+    fun timeoutPreservesQueuedRateLimitMetadata() {
+        connection().use {
+            it.connect()
+
+            val socket = sockets.single()
+
+            socket.fail(418, "600")
+
+            scheduler.delayed.single().invoke()
+
+            scheduler.drain()
+
+            assertEquals(
+                AccountSocketFailure(418, "600"),
+                failures.single()
+            )
+
+            assertTrue(socket.cancelled)
+        }
+    }
+
+    @Test
+    fun veryLongNumericRetryAfterSaturates() {
+        connection().use {
+            it.connect()
+
+            sockets.single().fail(
+                429,
+                "9".repeat(200)
+            )
+
+            scheduler.drain()
+
+            assertEquals(
+                AccountSocketFailure(
+                    429,
+                    Long.MAX_VALUE.toString()
+                ),
+                failures.single()
+            )
+        }
+    }
+
+    @Test
+    fun closeInvalidatesQueuedTerminalCallback() {
+        val session = connection()
+
+        val socket = openConnection(session)
+
+        socket.fail(429, "600")
+
+        val callback = scheduler.ready.single()
+
+        val before = statuses.toList()
+
+        session.close()
+
+        callback()
+
+        socket.fail(418, "900")
+
+        scheduler.drain()
+
+        assertTrue(socket.cancelled)
+        assertTrue(failures.isEmpty())
+        assertTrue(events.isEmpty())
+        assertTrue(scheduler.ready.isEmpty())
+        assertEquals(before, statuses)
+    }
+
 }

@@ -5,8 +5,6 @@ import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
 import com.mefuturesaibot.app.exchange.Scheduler
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicBoolean
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -29,6 +27,10 @@ internal data class AccountSocketFailure(
  *
  * All public lifecycle methods and callbacks must
  * run on the same serial scheduler thread.
+ *
+ * Network listeners parse messages before enqueueing.
+ * The scheduler must be dedicated to this transport
+ * and must enqueue callbacks asynchronously.
  *
  * Session manager owns reconnect and key renewal.
  */
@@ -77,9 +79,13 @@ internal class AccountPrivateWebSocket(
 
     private var connected = false
 
-    private val pendingCallbacks = AtomicInteger(0)
+    private val queueLock = Any()
 
-    private val overflowQueued = AtomicBoolean(false)
+    private var pendingCallbacks = 0
+
+    private var terminalQueued = false
+
+    private var terminalFailure: AccountSocketFailure? = null
 
     fun connect() {
         check(!closed)
@@ -116,16 +122,30 @@ internal class AccountPrivateWebSocket(
                         webSocket: WebSocket,
                         text: String
                     ) {
+                        if (closed) return
+
+                        if (text.length > MAX_MESSAGE_LENGTH) {
+                            queueFailure(
+                                current,
+                                webSocket,
+                                AccountSocketFailure()
+                            )
+                            return
+                        }
+
+                        if (text.isEmpty()) return
+
+                        val event =
+                            AccountStreamEventParser.parse(text)
+
                         if (
-                            closed ||
-                            text.length !in 1..MAX_MESSAGE_LENGTH
+                            event.type == AccountStreamEventType.INVALID ||
+                            event.type == AccountStreamEventType.IGNORED
                         ) return
 
                         dispatch(current, webSocket) {
                             if (connected) {
-                                handleEvent(
-                                    AccountStreamEventParser.parse(text)
-                                )
+                                handleEvent(event)
                             }
                         }
                     }
@@ -135,11 +155,11 @@ internal class AccountPrivateWebSocket(
                         code: Int,
                         reason: String
                     ) {
-                        dispatch(current, webSocket) {
-                            disconnect(
-                                AccountSocketFailure()
-                            )
-                        }
+                        queueFailure(
+                            current,
+                            webSocket,
+                            AccountSocketFailure()
+                        )
                     }
 
                     override fun onClosed(
@@ -147,11 +167,11 @@ internal class AccountPrivateWebSocket(
                         code: Int,
                         reason: String
                     ) {
-                        dispatch(current, webSocket) {
-                            disconnect(
-                                AccountSocketFailure()
-                            )
-                        }
+                        queueFailure(
+                            current,
+                            webSocket,
+                            AccountSocketFailure()
+                        )
                     }
 
                     override fun onFailure(
@@ -166,9 +186,11 @@ internal class AccountPrivateWebSocket(
                             )
                         )
 
-                        dispatch(current, webSocket) {
-                            disconnect(failure)
-                        }
+                        queueFailure(
+                            current,
+                            webSocket,
+                            failure
+                        )
                     }
                 }
             )
@@ -179,7 +201,13 @@ internal class AccountPrivateWebSocket(
                     generation == current &&
                     !connected
                 ) {
-                    disconnect(AccountSocketFailure())
+                    val failure = synchronized(queueLock) {
+                        terminalFailure
+                    }
+
+                    disconnect(
+                        failure ?: AccountSocketFailure()
+                    )
                 }
             }
 
@@ -193,43 +221,96 @@ internal class AccountPrivateWebSocket(
         source: WebSocket,
         action: () -> Unit
     ) {
-        if (closed || overflowQueued.get()) return
+        synchronized(queueLock) {
+            if (closed || terminalQueued) return
 
-        val count = pendingCallbacks.incrementAndGet()
-
-        if (count > MAX_PENDING_CALLBACKS) {
-            pendingCallbacks.decrementAndGet()
-
-            if (
-                overflowQueued.compareAndSet(false, true)
-            ) {
-                scheduler.post {
-                    if (
-                        !closed &&
-                        generation == current &&
-                        socket === source
-                    ) {
-                        disconnect(AccountSocketFailure())
-                    }
-                }
+            if (pendingCallbacks >= MAX_PENDING_CALLBACKS) {
+                queueFailure(
+                    current,
+                    source,
+                    AccountSocketFailure()
+                )
+                return
             }
 
-            return
-        }
+            pendingCallbacks++
 
-        scheduler.post {
-            try {
+            scheduler.post {
+                val allowed = synchronized(queueLock) {
+                    pendingCallbacks =
+                        (pendingCallbacks - 1).coerceAtLeast(0)
+
+                    !closed && !terminalQueued
+                }
+
                 if (
-                    !closed &&
-                    !overflowQueued.get() &&
+                    allowed &&
                     generation == current &&
                     socket === source
                 ) {
                     action()
                 }
-            } finally {
-                pendingCallbacks.decrementAndGet()
             }
+        }
+    }
+
+    private fun queueFailure(
+        current: Long,
+        source: WebSocket,
+        failure: AccountSocketFailure
+    ) {
+        synchronized(queueLock) {
+            if (closed) return
+
+            val previous = terminalFailure
+
+            terminalFailure = preferFailure(
+                previous,
+                failure
+            )
+
+            if (terminalQueued) return
+
+            terminalQueued = true
+
+            scheduler.post {
+                if (
+                    !closed &&
+                    generation == current &&
+                    socket === source
+                ) {
+                    disconnect(
+                        synchronized(queueLock) {
+                            terminalFailure
+                        } ?: AccountSocketFailure()
+                    )
+                }
+            }
+        }
+    }
+
+    private fun preferFailure(
+        previous: AccountSocketFailure?,
+        next: AccountSocketFailure
+    ): AccountSocketFailure {
+        if (previous == null) return next
+
+        val oldDelay = AccountRetryAfter.delayMs(
+            previous.httpStatus ?: 0,
+            previous.retryAfter
+        )
+
+        val newDelay = AccountRetryAfter.delayMs(
+            next.httpStatus ?: 0,
+            next.retryAfter
+        )
+
+        return when {
+            newDelay > oldDelay -> next
+            oldDelay > 0L -> previous
+            previous.httpStatus == null &&
+                next.httpStatus != null -> next
+            else -> previous
         }
     }
 
@@ -238,12 +319,14 @@ internal class AccountPrivateWebSocket(
     ): String? {
         val raw = value?.trim() ?: return null
 
-        if (raw.length !in 1..128) return null
+        if (raw.isEmpty()) return null
 
         if (raw.all { it in '0'..'9' }) {
             return raw.toLongOrNull()?.toString()
                 ?: Long.MAX_VALUE.toString()
         }
+
+        if (raw.length > 128) return null
 
         return runCatching {
             ZonedDateTime.parse(
@@ -276,23 +359,39 @@ internal class AccountPrivateWebSocket(
     private fun disconnect(failure: AccountSocketFailure) {
         if (closed) return
 
+        val finalFailure = synchronized(queueLock) {
+            val selected = preferFailure(
+                terminalFailure,
+                failure
+            )
+
+            closed = true
+            selected
+        }
+
         terminate()
 
         onStatus(AccountSocketStatus.DISCONNECTED)
 
-        onFailure(failure)
+        onFailure(finalFailure)
     }
 
     private fun terminate() {
-        closed = true
+        synchronized(queueLock) {
+            closed = true
+            pendingCallbacks = 0
+            terminalQueued = false
+            terminalFailure = null
+
+            scheduler.cancelAll()
+        }
+
         connected = false
         generation++
 
         val previous = socket
 
         socket = null
-
-        scheduler.cancelAll()
 
         previous?.cancel()
     }
