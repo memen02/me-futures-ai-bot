@@ -1,6 +1,6 @@
 package com.mefuturesaibot.app
 
-import android.app.Activity
+import android.animation.ValueAnimator
 import com.mefuturesaibot.app.security.SecureActivity
 import android.content.Intent
 import android.graphics.Typeface
@@ -36,6 +36,7 @@ class StartupActivity : SecureActivity() {
 
     private lateinit var summary: TextView
     private lateinit var progress: ProgressBar
+    private lateinit var startupAnimation: PremiumStartupView
     private lateinit var retry: Button
     private val marks = mutableListOf<TextView>()
     private val details = mutableListOf<TextView>()
@@ -61,6 +62,7 @@ class StartupActivity : SecureActivity() {
             }
             progress.progress = complete
             val ready = complete == rows.size
+            startupAnimation.setLoading(!ready && !timedOut)
             val title = when {
                 ready -> "Semua koneksi siap"
                 timedOut -> "Pemeriksaan belum lengkap · $complete/3"
@@ -90,6 +92,7 @@ class StartupActivity : SecureActivity() {
         setContentView(R.layout.activity_startup)
         summary = findViewById(R.id.startup_summary)
         progress = findViewById(R.id.startup_progress)
+        startupAnimation = findViewById(R.id.startup_animation)
         retry = findViewById(R.id.startup_retry)
         val rows = findViewById<LinearLayout>(R.id.startup_rows)
         for (title in listOf("Binance Futures", "Harga BTC/USDT", "Riwayat candle")) {
@@ -178,6 +181,9 @@ class StartupActivity : SecureActivity() {
 
     private fun stopChecks() {
         handler.removeCallbacks(tick)
+        if (::startupAnimation.isInitialized) {
+            startupAnimation.setLoading(false)
+        }
         if (!checking) return
         checking = false
         if (!usingService) {
@@ -193,6 +199,17 @@ class StartupActivity : SecureActivity() {
         stopChecks()
         startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
         finish()
+
+        if (ValueAnimator.areAnimatorsEnabled()) {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(
+                android.R.anim.fade_in,
+                android.R.anim.fade_out
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }
     }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density + 0.5f).toInt()

@@ -1,4 +1,3 @@
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:inset="25%">
-    <bitmap android:src="@drawable/falcon_emblem" android:gravity="fill" android:filter="true" />
-</inset>
+    android:drawable="@drawable/ic_robot_gold"
+    android:inset="5%"/>
