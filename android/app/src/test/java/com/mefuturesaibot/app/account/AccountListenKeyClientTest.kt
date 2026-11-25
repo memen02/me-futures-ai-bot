@@ -436,7 +436,7 @@ class AccountListenKeyClientTest {
             }
 
             assertEquals(
-                (Long.MAX_VALUE / 1000L) * 1000L,
+                Long.MAX_VALUE,
                 error.retryAfterMs
             )
         }
@@ -745,4 +745,54 @@ class AccountListenKeyClientTest {
             worker.shutdownNow()
         }
     }
+
+    @Test
+    fun oversizedNumericRetryAfterSaturates() {
+        client {
+            response(
+                it,
+                code = 429,
+                body = "{}",
+                retryAfter = "9".repeat(100)
+            )
+        }.use {
+            val error = assertThrows(
+                AccountListenKeyError::class.java
+            ) {
+                it.start()
+            }
+
+            assertEquals(
+                Long.MAX_VALUE,
+                error.retryAfterMs
+            )
+        }
+    }
+
+    @Test
+    fun httpDateOverflowSaturatesSafely() {
+        client(
+            wallClock = { Long.MIN_VALUE }
+        ) {
+            response(
+                it,
+                code = 429,
+                body = "{}",
+                retryAfter =
+                    "Tue, 14 Nov 2023 22:23:20 GMT"
+            )
+        }.use {
+            val error = assertThrows(
+                AccountListenKeyError::class.java
+            ) {
+                it.start()
+            }
+
+            assertEquals(
+                Long.MAX_VALUE,
+                error.retryAfterMs
+            )
+        }
+    }
+
 }

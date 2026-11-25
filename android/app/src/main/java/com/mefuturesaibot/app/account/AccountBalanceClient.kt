@@ -21,7 +21,9 @@ internal class AccountBalanceClient(
     client: OkHttpClient =
         ReconnectingWebSocket.sharedHttpClient,
     private val elapsed: () -> Long =
-        { SystemClock.elapsedRealtime() }
+        { SystemClock.elapsedRealtime() },
+    private val wallClock: () -> Long =
+        { System.currentTimeMillis() }
 ) : AutoCloseable {
 
     private val http = client.newBuilder()
@@ -70,8 +72,13 @@ internal class AccountBalanceClient(
 
             val observed = elapsed()
 
-            val serverTime =
-                clock.getLong("serverTime")
+            val serverTime = when (
+                val value = clock.opt("serverTime")
+            ) {
+                is Long -> value
+                is Int -> value.toLong()
+                else -> 0L
+            }
 
             if (
                 serverTime <= 0L ||
@@ -90,9 +97,13 @@ internal class AccountBalanceClient(
                 )
             }
 
-            val timestamp = Math.addExact(
-                serverTime, age
-            )
+            val timestamp = try {
+                Math.addExact(serverTime, age)
+            } catch (_: ArithmeticException) {
+                throw AccountBalanceError(
+                    "Waktu Binance belum sinkron"
+                )
+            }
 
             val query = Signer.signQueryString(
                 listOf(
@@ -161,47 +172,66 @@ internal class AccountBalanceClient(
         try {
             return call.execute().use { response ->
 
-                if (!response.isSuccessful) {
+                val status = response.code
 
-                    val code = response.code
-
-                    val limited =
-                        code == 418 || code == 429
-
-                    val retry = if (limited) {
-                        val minimum =
-                            if (code == 418) 300L else 120L
-
-                        val seconds = response
-                            .header("Retry-After")
-                            ?.toLongOrNull()
-                            ?: minimum
-
-                        seconds.coerceIn(
-                            minimum, 86400L
-                        ) * 1000L
-                    } else {
-                        0L
-                    }
-
-                    val message = when (code) {
-                        418, 429 ->
-                            "Batas permintaan Binance"
-
-                        401, 403 ->
-                            "Akses akun Binance ditolak"
-
-                        else ->
-                            "Data akun Binance belum tersedia"
-                    }
-
+                if (status == 418 || status == 429) {
                     throw AccountBalanceError(
-                        message,
-                        retry
+                        "Batas permintaan Binance",
+                        AccountRetryAfter.delayMs(
+                            status,
+                            response.header("Retry-After"),
+                            wallClock
+                        )
                     )
                 }
 
-                JSONObject(response.body.string())
+                val source = response.body.source()
+
+                if (source.request(MAX_BODY_BYTES + 1L)) {
+                    throw AccountBalanceError(
+                        "Respons akun Binance terlalu besar"
+                    )
+                }
+
+                val raw = source.readUtf8()
+
+                val body = runCatching {
+                    JSONObject(raw)
+                }.getOrNull()
+
+                val code = body?.optInt("code", 0) ?: 0
+
+                if (code == -1003) {
+                    throw AccountBalanceError(
+                        "Batas permintaan Binance",
+                        AccountRetryAfter.delayMs(
+                            429,
+                            response.header("Retry-After"),
+                            wallClock
+                        )
+                    )
+                }
+
+                if (
+                    status == 401 ||
+                    status == 403 ||
+                    code == -2014 ||
+                    code == -2015
+                ) {
+                    throw AccountBalanceError(
+                        "Akses akun Binance ditolak"
+                    )
+                }
+
+                if (!response.isSuccessful || code < 0) {
+                    throw AccountBalanceError(
+                        "Data akun Binance belum tersedia"
+                    )
+                }
+
+                body ?: throw AccountBalanceError(
+                    "Data akun Binance belum dapat dibaca"
+                )
             }
 
         } catch (error: AccountBalanceError) {
@@ -227,5 +257,9 @@ internal class AccountBalanceClient(
             pending?.cancel()
             pending = null
         }
+    }
+
+    private companion object {
+        const val MAX_BODY_BYTES = 2097152L
     }
 }

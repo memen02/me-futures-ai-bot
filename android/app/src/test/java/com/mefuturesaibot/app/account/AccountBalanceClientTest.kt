@@ -62,6 +62,8 @@ class AccountBalanceClientTest {
 
     private fun client(
         elapsed: () -> Long = { 1000L },
+        wallClock: () -> Long =
+            { System.currentTimeMillis() },
         answer: (Request) -> Response
     ): AccountBalanceClient {
 
@@ -73,7 +75,8 @@ class AccountBalanceClientTest {
 
         return AccountBalanceClient(
             http,
-            elapsed
+            elapsed,
+            wallClock
         )
     }
 
@@ -453,4 +456,336 @@ class AccountBalanceClientTest {
             )
         }
     }
+
+    @Test
+    fun retryAfterBeyondOneDayIsPreserved() {
+        client { request ->
+            response(request, 429, "{}", "172800")
+        }.use { api ->
+            val error = assertThrows(
+                AccountBalanceError::class.java
+            ) {
+                api.read(keys, FuturesVenue.DEMO)
+            }
+
+            assertEquals(
+                172800000L,
+                error.retryAfterMs
+            )
+        }
+    }
+
+    @Test
+    fun numericRetryAfterSaturatesSafely() {
+        client { request ->
+            response(
+                request,
+                429,
+                "{}",
+                "9".repeat(100)
+            )
+        }.use { api ->
+            val error = assertThrows(
+                AccountBalanceError::class.java
+            ) {
+                api.read(keys, FuturesVenue.DEMO)
+            }
+
+            assertEquals(
+                Long.MAX_VALUE,
+                error.retryAfterMs
+            )
+        }
+    }
+
+    @Test
+    fun supportsHttpDateRetryAfter() {
+        client(
+            wallClock = { 1700000000000L }
+        ) { request ->
+            response(
+                request,
+                429,
+                "{}",
+                "Tue, 14 Nov 2023 22:23:20 GMT"
+            )
+        }.use { api ->
+            val error = assertThrows(
+                AccountBalanceError::class.java
+            ) {
+                api.read(keys, FuturesVenue.DEMO)
+            }
+
+            assertEquals(
+                600000L,
+                error.retryAfterMs
+            )
+        }
+    }
+
+    @Test
+    fun recognizesBinanceRateLimitCode() {
+        client { request ->
+            response(
+                request,
+                400,
+                """{"code":-1003}""",
+                "600"
+            )
+        }.use { api ->
+            val error = assertThrows(
+                AccountBalanceError::class.java
+            ) {
+                api.read(keys, FuturesVenue.DEMO)
+            }
+
+            assertEquals(
+                600000L,
+                error.retryAfterMs
+            )
+        }
+    }
+
+    @Test
+    fun recognizesRateLimitOnAccountRequest() {
+        var calls = 0
+
+        client { request ->
+            calls++
+
+            if (request.url.encodedPath.endsWith("/time")) {
+                response(request, 200, clockBody)
+            } else {
+                response(
+                    request,
+                    400,
+                    """{"code":-1003}"""
+                )
+            }
+        }.use { api ->
+            val error = assertThrows(
+                AccountBalanceError::class.java
+            ) {
+                api.read(keys, FuturesVenue.DEMO)
+            }
+
+            assertEquals(120000L, error.retryAfterMs)
+            assertEquals(2, calls)
+        }
+    }
+
+    @Test
+    fun rejectsOversizedClockResponse() {
+        var calls = 0
+
+        client { request ->
+            calls++
+
+            response(
+                request,
+                200,
+                "x".repeat(2097153)
+            )
+        }.use { api ->
+            val error = assertThrows(
+                AccountBalanceError::class.java
+            ) {
+                api.read(keys, FuturesVenue.DEMO)
+            }
+
+            assertEquals(
+                "Respons akun Binance terlalu besar",
+                error.explanation
+            )
+
+            assertEquals(1, calls)
+        }
+    }
+
+    @Test
+    fun rejectsOversizedAccountResponse() {
+        var calls = 0
+
+        client { request ->
+            calls++
+
+            if (request.url.encodedPath.endsWith("/time")) {
+                response(request, 200, clockBody)
+            } else {
+                response(
+                    request,
+                    200,
+                    "x".repeat(2097153)
+                )
+            }
+        }.use { api ->
+            val error = assertThrows(
+                AccountBalanceError::class.java
+            ) {
+                api.read(keys, FuturesVenue.DEMO)
+            }
+
+            assertEquals(
+                "Respons akun Binance terlalu besar",
+                error.explanation
+            )
+
+            assertEquals(2, calls)
+        }
+    }
+
+    @Test
+    fun oversized429PreservesCooldown() {
+        client { request ->
+            response(
+                request,
+                429,
+                "x".repeat(2097153),
+                "600"
+            )
+        }.use { api ->
+            val error = assertThrows(
+                AccountBalanceError::class.java
+            ) {
+                api.read(keys, FuturesVenue.DEMO)
+            }
+
+            assertEquals(600000L, error.retryAfterMs)
+        }
+    }
+
+    @Test
+    fun oversized418PreservesCooldown() {
+        client { request ->
+            response(
+                request,
+                418,
+                "x".repeat(2097153)
+            )
+        }.use { api ->
+            val error = assertThrows(
+                AccountBalanceError::class.java
+            ) {
+                api.read(keys, FuturesVenue.DEMO)
+            }
+
+            assertEquals(300000L, error.retryAfterMs)
+        }
+    }
+
+    @Test
+    fun rejectsStringServerTimeBeforePrivateRequest() {
+        var calls = 0
+
+        client { request ->
+            calls++
+
+            response(
+                request,
+                200,
+                """{"serverTime":"1700000000000"}"""
+            )
+        }.use { api ->
+            val error = assertThrows(
+                AccountBalanceError::class.java
+            ) {
+                api.read(keys, FuturesVenue.DEMO)
+            }
+
+            assertEquals(
+                "Waktu Binance belum sinkron",
+                error.explanation
+            )
+
+            assertEquals(1, calls)
+        }
+    }
+
+    @Test
+    fun rejectsMissingServerTime() {
+        var calls = 0
+
+        client { request ->
+            calls++
+            response(request, 200, "{}")
+        }.use { api ->
+            val error = assertThrows(
+                AccountBalanceError::class.java
+            ) {
+                api.read(keys, FuturesVenue.DEMO)
+            }
+
+            assertEquals(
+                "Waktu Binance belum sinkron",
+                error.explanation
+            )
+
+            assertEquals(1, calls)
+        }
+    }
+
+    @Test
+    fun timestampOverflowHasSafeError() {
+        val times = listOf(1000L, 1000L, 1001L)
+            .iterator()
+
+        var calls = 0
+
+        client(
+            elapsed = { times.next() }
+        ) { request ->
+            calls++
+
+            response(
+                request,
+                200,
+                """{"serverTime":9223372036854775807}"""
+            )
+        }.use { api ->
+            val error = assertThrows(
+                AccountBalanceError::class.java
+            ) {
+                api.read(keys, FuturesVenue.DEMO)
+            }
+
+            assertEquals(
+                "Waktu Binance belum sinkron",
+                error.explanation
+            )
+
+            assertEquals(1, calls)
+        }
+    }
+
+    @Test
+    fun rejectsNegativeBinanceCodeOnSuccess() {
+        client { request ->
+            if (request.url.encodedPath.endsWith("/time")) {
+                response(request, 200, clockBody)
+            } else {
+                response(
+                    request,
+                    200,
+                    """{"code":-2015,"msg":"private fixture"}"""
+                )
+            }
+        }.use { api ->
+            val error = assertThrows(
+                AccountBalanceError::class.java
+            ) {
+                api.read(keys, FuturesVenue.DEMO)
+            }
+
+            assertEquals(
+                "Akses akun Binance ditolak",
+                error.explanation
+            )
+
+            assertFalse(
+                error.message.orEmpty()
+                    .contains("private fixture")
+            )
+        }
+    }
+
 }

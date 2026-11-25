@@ -4,8 +4,6 @@ import com.mefuturesaibot.app.BuildConfig
 import com.mefuturesaibot.app.demo.FuturesVenue
 import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
 import java.io.IOException
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 import okhttp3.Call
 import okhttp3.OkHttpClient
@@ -252,36 +250,11 @@ internal class AccountListenKeyClient(
         retryAfter: String?
     ): AccountListenKeyError {
 
-        val minimum =
-            if (status == 418) 300L else 120L
-
-        val raw = retryAfter?.trim()
-
-        val numeric = raw?.toLongOrNull()
-
-        val delay = if (numeric != null) {
-            numeric.coerceIn(
-                minimum,
-                Long.MAX_VALUE / 1000L
-            ) * 1000L
-        } else {
-            val dateDelay = runCatching {
-                val target = ZonedDateTime.parse(
-                    raw ?: "",
-                    DateTimeFormatter.RFC_1123_DATE_TIME
-                ).toInstant().toEpochMilli()
-
-                val now = wallClock()
-
-                if (target <= now) {
-                    0L
-                } else {
-                    Math.subtractExact(target, now)
-                }
-            }.getOrDefault(0L)
-
-            maxOf(minimum * 1000L, dateDelay)
-        }
+        val delay = AccountRetryAfter.delayMs(
+            if (status == 418) 418 else 429,
+            retryAfter,
+            wallClock
+        )
 
         return AccountListenKeyError(
             "Batas permintaan sesi Binance",
