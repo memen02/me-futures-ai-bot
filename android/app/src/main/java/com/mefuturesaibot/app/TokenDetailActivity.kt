@@ -10,14 +10,13 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.View
 import android.widget.Button
 import android.widget.Switch
 import android.widget.TextView
 import com.mefuturesaibot.app.exchange.*
 import com.mefuturesaibot.app.scanner.*
-import org.json.JSONArray
-import org.json.JSONObject
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -30,7 +29,10 @@ class TokenDetailActivity : SecureActivity() {
     private lateinit var chart: ClosePriceChart
     private lateinit var feed: PublicChartFeed
     private lateinit var depth: DashboardDepth
-    private val ticker = PublicReader()
+    private var lastTicker: Ticker? = null
+    private var lastTickerFresh: Boolean? = null
+    private var cachedModel = MarketModel()
+    private var nextModelRefresh = 0L
     private val main = Handler(Looper.getMainLooper())
     private val signals = TokenSignals { _, signal -> renderSignal(signal) }
     private val clock = DateTimeFormatter.ofPattern("dd/MM HH:mm:ss").withZone(ZoneId.systemDefault())
@@ -39,6 +41,8 @@ class TokenDetailActivity : SecureActivity() {
     private var active = false
     private val tick = object : Runnable {
         override fun run() {
+            if (!active) return
+            renderLiveTicker()
             signals.watch(listOf(contract.symbol))
             renderSignal(signals.signal(contract.symbol))
             main.postDelayed(this, 1000)
@@ -111,7 +115,9 @@ class TokenDetailActivity : SecureActivity() {
         active = true
         feed.setVisible(true)
         depth.start()
-        loadTicker()
+        lastTickerFresh = null
+        nextModelRefresh = 0L
+        main.removeCallbacks(tick)
         tick.run()
     }
     override fun onStop() {
@@ -120,7 +126,6 @@ class TokenDetailActivity : SecureActivity() {
             feed.setVisible(false)
             depth.stop()
             signals.stop()
-            ticker.cancel()
             main.removeCallbacksAndMessages(null)
         }
         super.onStop()
@@ -130,23 +135,86 @@ class TokenDetailActivity : SecureActivity() {
         if (::feed.isInitialized) { out.putString("interval", feed.state.interval); out.putBoolean("overlay", chart.overlays) }
     }
 
-    private fun loadTicker() {
-        ticker.read("ticker/24hr?symbol=${PublicReader.encode(contract.symbol)}") { body, now, error ->
-            val t = body?.let { runCatching {
-                MarketData.tickers(JSONArray().put(JSONObject(it)).toString())[contract.symbol]
-            }.getOrNull() }?.takeIf { now != null && it.fresh(now) }
-            val model = store.read().first
-            val score = t?.let(model::score)
-            label(R.id.token_price).text = t?.price?.let { BigDecimal.valueOf(it).plain() } ?: "—"
-            label(R.id.token_stats).text = if (t == null) error.ifBlank { "Menunggu ticker mutakhir" } else
-                String.format(Locale.US, "%+.2f%% · 24j   H %s   L %s\nVolume %,.0f %s · %s",
-                    t.change, BigDecimal.valueOf(t.high).plain(), BigDecimal.valueOf(t.low).plain(), t.volume, contract.quote, at(t.time))
-            label(R.id.token_model).text = when {
-                model.rounds < MarketModel.WARMUP -> "Regresi logistik · Pemanasan ${model.rounds}/${MarketModel.WARMUP} ronde scanner"
-                score == null -> "Regresi logistik · Menunggu ticker valid"
-                else -> String.format(Locale.US, "Regresi logistik · Skor arah naik %.1f/100\nInput: perubahan 24j, posisi dalam rentang, harga relatif terhadap rata-rata. Skor belum dikalibrasi.", score * 100)
+    private fun renderLiveTicker() {
+        val snapshot = ScreeningService.displayLatest
+        val elapsed = SystemClock.elapsedRealtime()
+        val current = detailTicker(
+            snapshot,
+            contract.symbol,
+            elapsed,
+            lastTicker
+        )
+
+        val fresh = current != null
+        if (current != null) lastTicker = current
+
+        val t = lastTicker
+        val priceText = t?.price?.let {
+            BigDecimal.valueOf(it).plain()
+        } ?: "—"
+
+        val statsText = if (t == null) {
+            "Menunggu data Binance"
+        } else {
+            val status = if (fresh) {
+                "Data pasar"
+            } else {
+                "STALE · Harga terakhir"
             }
-            if (active) main.postDelayed(::loadTicker, 30_000)
+            String.format(
+                Locale.US,
+                "%+.2f%% · 24j   H %s   L %s\nVolume %,.0f %s · %s\n%s",
+                t.change,
+                BigDecimal.valueOf(t.high).plain(),
+                BigDecimal.valueOf(t.low).plain(),
+                t.volume,
+                contract.quote,
+                at(t.time),
+                status
+            )
+        }
+
+        val priceView = label(R.id.token_price)
+        if (priceView.text.toString() != priceText) {
+            priceView.text = priceText
+        }
+
+        if (lastTickerFresh != fresh) {
+            priceView.setTextColor(getColor(
+                if (fresh) R.color.me_text
+                else R.color.me_muted
+            ))
+            lastTickerFresh = fresh
+        }
+
+        val statsView = label(R.id.token_stats)
+        if (statsView.text.toString() != statsText) {
+            statsView.text = statsText
+        }
+
+        if (elapsed >= nextModelRefresh) {
+            cachedModel = store.read().first
+            nextModelRefresh = elapsed + 30_000L
+        }
+
+        val model = cachedModel
+        val score = current?.let(model::score)
+
+        val modelText = when {
+            model.rounds < MarketModel.WARMUP ->
+                "Regresi logistik · Pemanasan ${model.rounds}/${MarketModel.WARMUP} ronde scanner"
+            score == null ->
+                "Regresi logistik · Menunggu ticker valid"
+            else -> String.format(
+                Locale.US,
+                "Regresi logistik · Skor arah naik %.1f/100\nInput: perubahan 24j, posisi dalam rentang, harga relatif terhadap rata-rata. Skor belum dikalibrasi.",
+                score * 100
+            )
+        }
+
+        val modelView = label(R.id.token_model)
+        if (modelView.text.toString() != modelText) {
+            modelView.text = modelText
         }
     }
 
