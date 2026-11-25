@@ -61,10 +61,10 @@ class StartupActivity : SecureActivity() {
                 marks[i].setTextColor(getColor(color))
             }
             progress.progress = complete
-            val ready = complete == rows.size
+            val ready = startupReady(rows)
             startupAnimation.setLoading(!ready && !timedOut)
             val title = when {
-                ready -> "Semua koneksi siap"
+                ready -> "Koneksi pasar siap"
                 timedOut -> "Pemeriksaan belum lengkap · $complete/3"
                 else -> "Memeriksa koneksi · $complete/3"
             }

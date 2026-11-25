@@ -33,4 +33,42 @@ class StartupChecksTest {
         val offline = startupRows(ConnectionStatus.RECONNECTING, quote, history, clock, 100, true)
         assertEquals(listOf(CheckState.FAILED, CheckState.FAILED, CheckState.PASSED), offline.map { it.state })
     }
+
+    @Test fun dashboardReadyWhileCandlesPending() {
+        val rows = startupRows(
+            ConnectionStatus.CONNECTED, quote,
+            CandleHistory(), clock, 100, false
+        )
+        assertTrue(startupReady(rows))
+        assertEquals(CheckState.PENDING, rows.last().state)
+    }
+
+    @Test fun dashboardReadyWhileCandlesFailed() {
+        val failure = CandleHistory(
+            status = "Riwayat gagal dimuat"
+        )
+        val rows = startupRows(
+            ConnectionStatus.CONNECTED, quote,
+            failure, clock, 100, false
+        )
+        assertTrue(startupReady(rows))
+        assertEquals(CheckState.FAILED, rows.last().state)
+    }
+
+    @Test fun dashboardNotReadyWithoutFreshPrice() {
+        val rows = startupRows(
+            ConnectionStatus.CONNECTED, null,
+            history, clock, 100, false
+        )
+        assertFalse(startupReady(rows))
+    }
+
+    @Test fun dashboardNotReadyWhenDisconnected() {
+        val rows = startupRows(
+            ConnectionStatus.RECONNECTING, quote,
+            history, clock, 100, false
+        )
+        assertFalse(startupReady(rows))
+        assertFalse(startupReady(emptyList()))
+    }
 }

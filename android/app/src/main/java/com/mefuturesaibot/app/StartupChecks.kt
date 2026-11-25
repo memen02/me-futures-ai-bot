@@ -36,3 +36,10 @@ internal fun startupRows(
     }
     return listOf(market, price, candles)
 }
+
+
+/** Dashboard readiness is independent of candle analysis readiness. */
+internal fun startupReady(rows: List<StartupRow>): Boolean =
+    rows.size == 3 &&
+        rows[0].state == CheckState.PASSED &&
+        rows[1].state == CheckState.PASSED
