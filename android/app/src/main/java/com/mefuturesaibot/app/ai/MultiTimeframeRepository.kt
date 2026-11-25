@@ -7,6 +7,7 @@ import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 internal class MultiTimeframeRepository(
     private val cache: MultiTimeframeCache =
@@ -16,7 +17,16 @@ internal class MultiTimeframeRepository(
     private val clock: AiExchangeClock =
         AiExchangeClock(),
     private val client: Call.Factory =
-        ReconnectingWebSocket.sharedHttpClient,
+        ReconnectingWebSocket.sharedHttpClient
+            .newBuilder()
+            .callTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(false)
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .build(),
     private val elapsed: () -> Long =
         { SystemClock.elapsedRealtime() }
 ) : AutoCloseable {
@@ -152,6 +162,15 @@ internal class MultiTimeframeRepository(
         }
     }
 
+    private fun statusUnlessClosed(
+        status: Status
+    ): Status {
+        synchronized(lifecycle) {
+            return if (closed) Status.CLOSED
+            else status
+        }
+    }
+
     @Synchronized
     fun refresh(
         symbol: String,
@@ -173,7 +192,9 @@ internal class MultiTimeframeRepository(
 
                 // Beri kesempatan rate limiter
                 // sebelum permintaan candle berikutnya.
-                return Status.WAIT_CLOCK
+                return statusUnlessClosed(
+                    Status.WAIT_CLOCK
+                )
             }
 
             val existing = cache.get(
@@ -186,11 +207,15 @@ internal class MultiTimeframeRepository(
                 existing != null &&
                 existing.fresh(bounds.earliest)
             ) {
-                return Status.CACHED
+                return statusUnlessClosed(
+                    Status.CACHED
+                )
             }
 
             bounds = clock.bounds(elapsed())
-                ?: return Status.WAIT_CLOCK
+                ?: return statusUnlessClosed(
+                    Status.WAIT_CLOCK
+                )
 
             val cutoff = bounds.earliest
 
@@ -216,13 +241,17 @@ internal class MultiTimeframeRepository(
             )
 
             val current = clock.bounds(elapsed())
-                ?: return Status.WAIT_CLOCK
+                ?: return statusUnlessClosed(
+                    Status.WAIT_CLOCK
+                )
 
             if (
                 !history.fresh(current.earliest) ||
                 !history.fresh(current.latest)
             ) {
-                return Status.WAIT_DATA
+                return statusUnlessClosed(
+                    Status.WAIT_DATA
+                )
             }
 
             synchronized(lifecycle) {
@@ -240,6 +269,26 @@ internal class MultiTimeframeRepository(
         } catch (_: Exception) {
             if (closed) Status.CLOSED
             else Status.FAILED
+        }
+    }
+
+    fun cooldownRemaining(): Long =
+        guard.cooldownRemaining(elapsed())
+
+    fun availableFrames(
+        symbol: String
+    ): Set<Timeframe> {
+        synchronized(lifecycle) {
+            if (closed) return emptySet()
+
+            val bounds = clock.bounds(elapsed())
+                ?: return emptySet()
+
+            return cache.availableFrames(
+                symbol,
+                bounds.earliest,
+                bounds.latest
+            )
         }
     }
 

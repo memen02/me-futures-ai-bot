@@ -79,6 +79,26 @@ internal class MultiTimeframeCache(
     }
 
     @Synchronized
+    fun availableFrames(
+        symbol: String,
+        earliest: Long,
+        latest: Long
+    ): Set<Timeframe> {
+        require(earliest <= latest)
+
+        val frames = data[symbol]
+            ?: return emptySet()
+
+        return frames.entries
+            .filter {
+                it.value.fresh(earliest) &&
+                    it.value.fresh(latest)
+            }
+            .map { it.key }
+            .toSet()
+    }
+
+    @Synchronized
     fun missing(
         symbol: String,
         exchangeTime: Long
