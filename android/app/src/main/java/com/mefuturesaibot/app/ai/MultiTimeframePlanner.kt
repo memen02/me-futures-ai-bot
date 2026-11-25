@@ -60,13 +60,30 @@ internal class MultiTimeframePlanner(
             if (symbols.isEmpty()) 0
             else cursor / symbols.size
 
+        val symbolIndex =
+            if (symbols.isEmpty()) 0
+            else cursor % symbols.size
+
+        val nextSymbol =
+            symbols.getOrNull(symbolIndex)
+
         symbols = next
 
         cursor = if (symbols.isEmpty()) {
             0
         } else {
+            val preservedIndex =
+                symbols.indexOf(nextSymbol)
+
+            val offset =
+                if (preservedIndex >= 0) {
+                    preservedIndex
+                } else {
+                    symbolIndex % symbols.size
+                }
+
             (frameIndex % priority.size) *
-                symbols.size
+                symbols.size + offset
         }
     }
 

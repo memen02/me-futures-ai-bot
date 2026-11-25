@@ -4,6 +4,7 @@ import android.os.SystemClock
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.ScheduledExecutorService
 
 internal class MultiTimeframeSchedulerWorker(
     private val repository: MultiTimeframeRepository =
@@ -11,13 +12,12 @@ internal class MultiTimeframeSchedulerWorker(
     private val core: MultiTimeframeSchedulerCore =
         MultiTimeframeSchedulerCore(),
     private val elapsed: () -> Long =
-        { SystemClock.elapsedRealtime() }
+        { SystemClock.elapsedRealtime() },
+    private val worker: ScheduledExecutorService =
+        Executors.newSingleThreadScheduledExecutor()
 ) : AutoCloseable {
 
     private val lifecycle = Any()
-
-    private val worker =
-        Executors.newSingleThreadScheduledExecutor()
 
     private var pending: ScheduledFuture<*>? = null
 
@@ -102,10 +102,18 @@ internal class MultiTimeframeSchedulerWorker(
             repository.availableFrames(it)
         }
 
-        val decision = core.next(
-            available,
-            elapsed()
-        )
+        val decision = synchronized(lifecycle) {
+            if (closed) return 0L
+
+            if (generation != currentGeneration) {
+                return 500L
+            }
+
+            core.next(
+                available,
+                elapsed()
+            )
+        }
 
         if (decision.stopped) {
             close()
