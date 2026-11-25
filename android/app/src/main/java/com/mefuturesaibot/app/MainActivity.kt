@@ -71,22 +71,13 @@ class MainActivity : SecureActivity() {
 
     private fun setupSecuritySettings() {
         val biometric = findViewById<Button>(R.id.settings_biometric)
-        val pin = findViewById<Button>(R.id.settings_pin)
         val autoLock = findViewById<Button>(R.id.settings_autolock)
 
         biometric.isEnabled = true
-        pin.isEnabled = true
         autoLock.isEnabled = true
 
         biometric.setOnClickListener {
             configureAppLock(true)
-        }
-
-        pin.setOnClickListener {
-            configureAppLock(
-                true,
-                credentialOnly = true
-            )
         }
 
         autoLock.setOnClickListener {

@@ -57,12 +57,6 @@
                 android:enabled="false" />
 
             <Button
-                android:id="@+id/settings_pin"
-                style="@style/AccountSecondary"
-                android:text="PIN dan pola"
-                android:enabled="false" />
-
-            <Button
                 android:id="@+id/settings_autolock"
                 style="@style/AccountSecondary"
                 android:text="Penguncian otomatis"

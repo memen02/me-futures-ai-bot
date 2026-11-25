@@ -8,7 +8,6 @@ import android.os.CancellationSignal
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
-import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -86,7 +85,6 @@ open class SecureActivity : Activity() {
         }
     }
     private var generation = 0
-    private var legacyPending = false
 
     internal fun canUseProtectedUi(): Boolean =
         resumed &&
@@ -162,10 +160,8 @@ open class SecureActivity : Activity() {
             showLock()
         }
 
-        if (!legacyPending) {
-            cancelAuthentication()
-            autoPromptAttempted = false
-        }
+        cancelAuthentication()
+        autoPromptAttempted = false
 
         super.onStop()
     }
@@ -238,14 +234,6 @@ open class SecureActivity : Activity() {
         panel.addView(status)
         unlockStatus = status
 
-        panel.addView(Button(this).apply {
-            text = "Gunakan PIN atau pola"
-            isAllCaps = false
-            setOnClickListener {
-                requestUnlock(status, credentialOnly = true)
-            }
-        })
-
         cover.addView(
             panel,
             FrameLayout.LayoutParams(
@@ -278,15 +266,14 @@ open class SecureActivity : Activity() {
     }
 
     internal fun configureAppLock(
-        enable: Boolean,
-        credentialOnly: Boolean = false
+        enable: Boolean
     ) {
         if (!canUseProtectedUi() || authenticating) return
 
-        if (!AppLock.deviceSecure(this)) {
+        if (!DeviceAuthentication.available(this)) {
             android.widget.Toast.makeText(
                 this,
-                "Aktifkan PIN, pola atau password Android terlebih dahulu.",
+                "Daftarkan sidik jari pada pengaturan Android terlebih dahulu.",
                 android.widget.Toast.LENGTH_LONG
             ).show()
             return
@@ -295,12 +282,10 @@ open class SecureActivity : Activity() {
         authenticating = true
         val request = ++generation
         pendingLockSetting = enable
-        legacyPending = credentialOnly ||
-            android.os.Build.VERSION.SDK_INT < 30
+
 
         cancellation = DeviceAuthentication.authenticate(
             this,
-            credentialOnly = credentialOnly,
             onSuccess = {
                 if (request == generation &&
                     !isFinishing && !isDestroyed) {
@@ -310,7 +295,6 @@ open class SecureActivity : Activity() {
             onFailure = { message ->
                 if (request == generation) {
                     authenticating = false
-                    legacyPending = false
                     pendingLockSetting = null
                     cancellation = null
                     android.widget.Toast.makeText(
@@ -329,7 +313,6 @@ open class SecureActivity : Activity() {
 
         pendingLockSetting = null
         authenticating = false
-        legacyPending = false
         cancellation = null
 
         AppLock.markAuthenticated()
@@ -373,27 +356,23 @@ open class SecureActivity : Activity() {
     }
 
     private fun requestUnlock(
-        status: TextView,
-        credentialOnly: Boolean = false
+        status: TextView
     ) {
         if (authenticating || !resumed) return
 
         authenticating = true
         val request = ++generation
 
-        legacyPending = credentialOnly ||
-            android.os.Build.VERSION.SDK_INT < 30
+
 
         cancellation = DeviceAuthentication.authenticate(
             this,
-            credentialOnly = credentialOnly,
             onSuccess = {
                 if (request == generation &&
                     !isFinishing &&
                     !isDestroyed &&
                     AppLock.deviceSecure(this)) {
                     authenticating = false
-                    legacyPending = false
                     cancellation = null
                     AppLock.markAuthenticated()
                     if (resumed) hideLock()
@@ -402,7 +381,6 @@ open class SecureActivity : Activity() {
             onFailure = { message ->
                 if (request == generation) {
                     authenticating = false
-                    legacyPending = false
                     cancellation = null
                     status.text = message
 
@@ -418,45 +396,8 @@ open class SecureActivity : Activity() {
         pendingLockSetting = null
         generation++
         authenticating = false
-        legacyPending = false
         cancellation?.cancel()
         cancellation = null
-    }
-
-    @Deprecated("Native activity result")
-    override fun onActivityResult(
-        requestCode: Int,
-        resultCode: Int,
-        data: Intent?
-    ) {
-        super.onActivityResult(
-            requestCode, resultCode, data
-        )
-
-        if (requestCode ==
-            DeviceAuthentication.REQUEST_CREDENTIAL &&
-            legacyPending
-        ) {
-            legacyPending = false
-            authenticating = false
-
-            if (resultCode == RESULT_OK &&
-                AppLock.deviceSecure(this)
-            ) {
-                if (pendingLockSetting != null) {
-                    completeLockSetting()
-                } else {
-                    AppLock.markAuthenticated()
-                }
-            } else {
-                pendingLockSetting = null
-                AppLock.lock()
-
-                if (AppLock.requiresUnlock(this)) {
-                    moveTaskToBack(true)
-                }
-            }
-        }
     }
 
     @Deprecated("Native back navigation")

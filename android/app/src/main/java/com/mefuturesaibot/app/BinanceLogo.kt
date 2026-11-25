@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.LruCache
 import android.view.View
 import android.widget.ImageView
@@ -18,69 +19,260 @@ import okhttp3.Request
 import okhttp3.Response
 import java.io.File
 import java.io.IOException
+import java.util.WeakHashMap
+import java.util.concurrent.TimeUnit
 
-/** Binance's public assetCode/logoUrl catalog. No credential client or exchange requests are involved. */
 internal object BinanceLogo {
-    private val bitmaps = LruCache<String, Bitmap>(48)
+
+    private const val RETRY_MS = 300_000L
+    private const val MAX_BYTES = 512_000L
+    private const val MAX_PENDING = 32
+
     private val main = Handler(Looper.getMainLooper())
+    private val bitmaps = LruCache<String, Bitmap>(48)
+    private val failures = LruCache<String, Long>(256)
+
+    private val bindings = WeakHashMap<View, String>()
+    private val pending = mutableSetOf<String>()
+
     private var paths: Map<String, String>? = null
     private var client: OkHttpClient? = null
-    private class Binding(val asset: String, val path: String, val icon: ImageView, val initials: TextView,
-        val http: OkHttpClient) : View.OnAttachStateChangeListener {
-        private var call: Call? = null
+
+    fun catalogUpdated() {
+        val visible = bindings.entries.map {
+            it.key to it.value
+        }
+
+        visible.forEach { (view, asset) ->
+            if (view.isAttachedToWindow) {
+                bind(view, asset, true)
+            }
+        }
+    }
+
+    private class Binding(
+        val path: String,
+        val icon: ImageView,
+        val initials: TextView,
+        val http: OkHttpClient
+    ) : View.OnAttachStateChangeListener {
+
         override fun onViewAttachedToWindow(v: View) {
-            val cached = bitmaps.get(asset)
-            if (cached != null) { show(cached); return }
-            if (call != null) return
-            val request = Request.Builder().url("https://bin.bnbstatic.com$path").build()
-            val current = http.newCall(request)
-            call = current
-            current.enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {}
-                override fun onResponse(call: Call, response: Response) {
-                    val bitmap = response.use {
-                        if (!it.isSuccessful || it.body.contentLength() > 512_000) return
-                        val source = it.body.source()
-                        if (source.request(512_001)) return
-                        val bytes = source.readByteArray()
-                        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-                        if (options.outWidth !in 1..4096 || options.outHeight !in 1..4096) return
-                        options.inJustDecodeBounds = false
-                        while (maxOf(options.outWidth, options.outHeight) / maxOf(1, options.inSampleSize) > 128)
-                            options.inSampleSize = maxOf(1, options.inSampleSize) * 2
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-                    } ?: return
-                    main.post {
-                        bitmaps.put(asset, bitmap)
-                        if (icon.tag === this@Binding && this@Binding.call === current) show(bitmap)
+            val cached = bitmaps.get(path)
+
+            if (cached != null) {
+                show(cached)
+                return
+            }
+
+            fetch(path, http)
+        }
+
+        override fun onViewDetachedFromWindow(v: View) {
+            // Shared downloads continue for other visible rows.
+        }
+
+        fun show(bitmap: Bitmap) {
+            if (icon.tag !== this ||
+                !icon.isAttachedToWindow
+            ) return
+
+            icon.setImageBitmap(bitmap)
+            initials.visibility = View.INVISIBLE
+        }
+    }
+
+    private fun fetch(
+        path: String,
+        http: OkHttpClient
+    ) {
+        if (path in pending) return
+        if (pending.size >= MAX_PENDING) return
+
+        val retryAt = failures.get(path) ?: 0L
+        if (SystemClock.elapsedRealtime() < retryAt) return
+
+        val request = try {
+            Request.Builder()
+                .url("https://bin.bnbstatic.com$path")
+                .build()
+        } catch (_: IllegalArgumentException) {
+            failures.put(
+                path,
+                SystemClock.elapsedRealtime() + RETRY_MS
+            )
+            return
+        }
+
+        pending.add(path)
+
+        http.newCall(request).enqueue(object : Callback {
+
+            override fun onFailure(
+                call: Call,
+                e: IOException
+            ) {
+                finish(path, null)
+            }
+
+            override fun onResponse(
+                call: Call,
+                response: Response
+            ) {
+                val bitmap = try {
+                    response.use { decode(it) }
+                } catch (_: Exception) {
+                    null
+                }
+
+                finish(path, bitmap)
+            }
+        })
+    }
+
+    private fun decode(response: Response): Bitmap? {
+        if (!response.isSuccessful) return null
+
+        val body = response.body
+        if (body.contentLength() > MAX_BYTES) return null
+
+        val source = body.source()
+        if (source.request(MAX_BYTES + 1)) return null
+
+        val bytes = source.readByteArray()
+
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+
+        BitmapFactory.decodeByteArray(
+            bytes, 0, bytes.size, options
+        )
+
+        if (options.outWidth !in 1..4096 ||
+            options.outHeight !in 1..4096
+        ) return null
+
+        options.inJustDecodeBounds = false
+        options.inSampleSize = 1
+
+        while (
+            maxOf(options.outWidth, options.outHeight) /
+            options.inSampleSize > 128
+        ) {
+            options.inSampleSize *= 2
+        }
+
+        return BitmapFactory.decodeByteArray(
+            bytes, 0, bytes.size, options
+        )
+    }
+
+    private fun finish(path: String, bitmap: Bitmap?) {
+        main.post {
+            pending.remove(path)
+
+            if (bitmap == null) {
+                failures.put(
+                    path,
+                    SystemClock.elapsedRealtime() + RETRY_MS
+                )
+            } else {
+                failures.remove(path)
+                bitmaps.put(path, bitmap)
+
+                val visible = bindings.keys.toList()
+
+                visible.forEach { view ->
+                    val icon = view.findViewById<ImageView>(
+                        R.id.asset_logo
+                    )
+
+                    val binding = icon.tag as? Binding
+
+                    if (binding?.path == path) {
+                        binding.show(bitmap)
                     }
                 }
-            })
+            }
         }
-        private fun show(bitmap: Bitmap) { icon.setImageBitmap(bitmap); initials.visibility = View.INVISIBLE }
-        override fun onViewDetachedFromWindow(v: View) { call?.cancel(); call = null }
     }
 
     fun bind(view: View, base: String, needed: Boolean) {
-        val icon = view.findViewById<ImageView>(R.id.asset_logo)
-        (icon.tag as? Binding)?.let { it.onViewDetachedFromWindow(icon); icon.removeOnAttachStateChangeListener(it) }
-        icon.tag = null
-        if (!needed) return
-        val context = view.context.applicationContext
-        if (paths == null) paths = context.assets.open("binance_logos.tsv").bufferedReader().useLines { lines ->
-            lines.associate { it.substringBefore('\t') to it.substringAfter('\t') }
+        val icon = view.findViewById<ImageView>(
+            R.id.asset_logo
+        )
+
+        (icon.tag as? Binding)?.let {
+            icon.removeOnAttachStateChangeListener(it)
         }
-        val path = paths?.get(base) ?: return
-        val http = client ?: makeClient(context).also { client = it }
-        val binding = Binding(base, path, icon, view.findViewById(R.id.asset_initials), http)
+
+        icon.tag = null
+        bindings.remove(view)
+
+        if (!needed) return
+
+        bindings[view] = base
+
+        val context = view.context.applicationContext
+
+        if (paths == null) {
+            paths = context.assets
+                .open("binance_logos.tsv")
+                .bufferedReader()
+                .useLines { lines ->
+                    lines.associate {
+                        it.substringBefore('\t') to
+                            it.substringAfter('\t')
+                    }
+                }
+        }
+
+        DynamicLogoCatalog.refreshIfNeeded()
+
+        val path = DynamicLogoCatalog.path(base)
+            ?: paths?.get(base)
+            ?: return
+
+        if (!path.startsWith("/image/") &&
+            !path.startsWith("/images/")
+        ) return
+
+        val http = client ?: makeClient(context).also {
+            client = it
+        }
+
+        val binding = Binding(
+            path,
+            icon,
+            view.findViewById(R.id.asset_initials),
+            http
+        )
+
         icon.tag = binding
         icon.addOnAttachStateChangeListener(binding)
-        if (icon.isAttachedToWindow) binding.onViewAttachedToWindow(icon)
+
+        if (icon.isAttachedToWindow) {
+            binding.onViewAttachedToWindow(icon)
+        }
     }
 
-    private fun makeClient(context: Context) = OkHttpClient.Builder()
-        .dispatcher(Dispatcher().apply { maxRequests = 2; maxRequestsPerHost = 2 })
-        .cache(Cache(File(context.cacheDir, "asset-logos"), 4L * 1024 * 1024))
-        .followRedirects(false).build()
+    private fun makeClient(context: Context) =
+        OkHttpClient.Builder()
+            .dispatcher(Dispatcher().apply {
+                maxRequests = 2
+                maxRequestsPerHost = 2
+            })
+            .cache(
+                Cache(
+                    File(context.cacheDir, "asset-logos"),
+                    16L * 1024 * 1024
+                )
+            )
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .callTimeout(25, TimeUnit.SECONDS)
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .build()
 }

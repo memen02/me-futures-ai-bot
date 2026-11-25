@@ -56,7 +56,7 @@ internal class MarketScanner(private val store: DeskStore, private val botEnable
         worker.execute {
             try {
                 val elapsed = SystemClock.elapsedRealtime()
-                if (registry.isEmpty() || elapsed - registryAt >= 3_600_000L) {
+                if (registry.isEmpty() || elapsed - registryAt >= 300_000L) {
                     registry = MarketData.contracts(get("exchangeInfo").body)
                     registryAt = elapsed
                 }

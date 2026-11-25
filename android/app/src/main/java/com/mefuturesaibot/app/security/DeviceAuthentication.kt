@@ -1,95 +1,105 @@
 package com.mefuturesaibot.app.security
 
 import android.app.Activity
-import android.app.KeyguardManager
+import android.content.Context
+import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
+import android.hardware.fingerprint.FingerprintManager
 import android.os.Build
 import android.os.CancellationSignal
 
 internal object DeviceAuthentication {
 
-    const val REQUEST_CREDENTIAL = 8201
+    @Suppress("DEPRECATION")
+    fun available(context: Context): Boolean {
+        if (!AppLock.deviceSecure(context)) return false
+
+        return when {
+            Build.VERSION.SDK_INT >= 30 ->
+                context.getSystemService(BiometricManager::class.java)
+                    ?.canAuthenticate(
+                        BiometricManager.Authenticators.BIOMETRIC_STRONG
+                    ) == BiometricManager.BIOMETRIC_SUCCESS
+
+            Build.VERSION.SDK_INT >= 28 ->
+                context.getSystemService(FingerprintManager::class.java)
+                    ?.let {
+                        it.isHardwareDetected && it.hasEnrolledFingerprints()
+                    } == true
+
+            else -> false
+        }
+    }
 
     fun authenticate(
         activity: Activity,
         onSuccess: () -> Unit,
-        onFailure: (String) -> Unit,
-        credentialOnly: Boolean = false
+        onFailure: (String) -> Unit
     ): CancellationSignal? {
 
-        val manager =
-            activity.getSystemService(KeyguardManager::class.java)
-
-        if (manager == null || !manager.isDeviceSecure) {
-            onFailure("Aktifkan keamanan layar kunci Android terlebih dahulu.")
+        if (Build.VERSION.SDK_INT < 28 || !available(activity)) {
+            onFailure("Biometrik tidak tersedia. Periksa pengaturan sidik jari Android.")
             return null
         }
 
-        if (Build.VERSION.SDK_INT >= 30 && !credentialOnly) {
-            val cancellation = CancellationSignal()
+        val cancellation = CancellationSignal()
+        var completed = false
 
-            try {
-                val prompt = BiometricPrompt.Builder(activity)
-                    .setTitle("ME Project")
-                    .setSubtitle("Verifikasi identitas Anda")
-                    .setAllowedAuthenticators(
-                        android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_STRONG or
-                        android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL
-                    )
-                    .build()
-
-                prompt.authenticate(
-                    cancellation,
-                    activity.mainExecutor,
-                    object : BiometricPrompt.AuthenticationCallback() {
-
-                        override fun onAuthenticationSucceeded(
-                            result: BiometricPrompt.AuthenticationResult
-                        ) {
-                            if (!activity.isFinishing &&
-                                !activity.isDestroyed &&
-                                !cancellation.isCanceled
-                            ) {
-                                onSuccess()
-                            }
-                        }
-
-                        override fun onAuthenticationError(
-                            errorCode: Int,
-                            errString: CharSequence
-                        ) {
-                            onFailure(errString.toString())
-                        }
-                    }
-                )
-                return cancellation
-
-            } catch (_: RuntimeException) {
-                onFailure("Autentikasi tidak dapat dimulai.")
-                return null
-            }
-        }
-
-        @Suppress("DEPRECATION")
-        val intent = manager.createConfirmDeviceCredentialIntent(
-            "ME Project",
-            "Verifikasi keamanan perangkat"
-        )
-
-        if (intent == null) {
-            onFailure("Autentikasi perangkat tidak tersedia.")
-            return null
+        fun fail(message: String) {
+            if (completed || cancellation.isCanceled) return
+            completed = true
+            onFailure(message)
         }
 
         try {
-            @Suppress("DEPRECATION")
-            activity.startActivityForResult(
-                intent, REQUEST_CREDENTIAL
-            )
-        } catch (_: RuntimeException) {
-            onFailure("Autentikasi perangkat gagal dimulai.")
-        }
+            val builder = BiometricPrompt.Builder(activity)
+                .setTitle("ME Project")
+                .setSubtitle("Verifikasi biometrik")
+                .setNegativeButton(
+                    "Batal",
+                    activity.mainExecutor
+                ) { _, _ ->
+                    fail("Autentikasi dibatalkan")
+                }
 
-        return null
+            if (Build.VERSION.SDK_INT >= 30) {
+                builder.setAllowedAuthenticators(
+                    BiometricManager.Authenticators.BIOMETRIC_STRONG
+                )
+            }
+
+            builder.build().authenticate(
+                cancellation,
+                activity.mainExecutor,
+                object : BiometricPrompt.AuthenticationCallback() {
+
+                    override fun onAuthenticationSucceeded(
+                        result: BiometricPrompt.AuthenticationResult
+                    ) {
+                        if (!completed &&
+                            !activity.isFinishing &&
+                            !activity.isDestroyed &&
+                            !cancellation.isCanceled
+                        ) {
+                            completed = true
+                            onSuccess()
+                        }
+                    }
+
+                    override fun onAuthenticationError(
+                        errorCode: Int,
+                        errString: CharSequence
+                    ) {
+                        fail(errString.toString())
+                    }
+                }
+            )
+
+            return cancellation
+
+        } catch (_: RuntimeException) {
+            fail("Autentikasi tidak dapat dimulai.")
+            return null
+        }
     }
 }
