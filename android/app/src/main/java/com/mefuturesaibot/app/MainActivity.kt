@@ -75,6 +75,7 @@ class MainActivity : SecureActivity() {
     }
 
     override fun onDestroy() {
+        visible = false
         pollHandler.removeCallbacks(pollRunnable)
         try {
             if (::desk.isInitialized) desk.close()
