@@ -54,7 +54,10 @@ internal class TradingDesk(
     private var paperSummary = ""
     private var paperWallet = ""
     private var demo = DemoControls(activity, start)
-    private val accountPage = AccountPage(activity, credentialsChanged = { demo.render() })
+    private val accountPage = AccountPage(activity, credentialsChanged = {
+        pauseAccountMonitoring()
+        demo.render()
+    })
     private val query = view<EditText>(R.id.scan_query)
     private val filter = view<Spinner>(R.id.scan_filter)
     private val sort = view<Spinner>(R.id.scan_sort)
