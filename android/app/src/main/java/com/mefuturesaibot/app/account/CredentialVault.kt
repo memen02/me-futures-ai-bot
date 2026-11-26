@@ -30,9 +30,35 @@ internal class CredentialVault(
         { keyStore().deleteEntry(if (demo) DEMO_ALIAS else ALIAS) })
 
     private val file = AtomicFile(location)
-    fun exists() = file.baseFile.exists() || File(file.baseFile.path + ".bak").exists()
+    private val identity = location.canonicalPath
+
+    fun exists(): Boolean = synchronized(lock) {
+        file.baseFile.exists() ||
+            File(file.baseFile.path + ".bak").exists()
+    }
+
+    fun revision(): CredentialRevisionGuard.Revision =
+        synchronized(lock) {
+            revisions.current(identity)
+        }
+
+    fun isCurrent(
+        expected: CredentialRevisionGuard.Revision
+    ): Boolean = synchronized(lock) {
+        revisions.isCurrent(identity, expected)
+    }
+
+    fun readVersioned(): CredentialRevisionSnapshot =
+        synchronized(lock) {
+            CredentialRevisionSnapshot(
+                read(),
+                revisions.current(identity)
+            )
+        }
 
     fun save(credentials: BinanceCredentials) = synchronized(lock) {
+        // Invalidate before attempting any credential mutation.
+        revisions.invalidate(identity)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, loadKey(true))
         val buffer = ByteArrayOutputStream()
@@ -67,6 +93,8 @@ internal class CredentialVault(
     }
 
     fun remove() = synchronized(lock) {
+        // Even partial removal must invalidate previous sessions.
+        revisions.invalidate(identity)
         file.delete()
         if (exists()) throw IOException("File masih tersedia")
         eraseKey()
@@ -76,6 +104,7 @@ internal class CredentialVault(
         const val ALIAS = "me_project_binance_account_v1"
         const val DEMO_ALIAS = "me_project_binance_demo_v1"
         val lock = Any()
+        val revisions = CredentialRevisionGuard()
         fun keyStore(): KeyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         fun androidKey(alias: String, create: Boolean): SecretKey {
             val existing = keyStore().getKey(alias, null) as? SecretKey
