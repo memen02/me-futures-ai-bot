@@ -17,6 +17,7 @@ internal class AccountMonitoringDisplay(private val activity: Activity) : AutoCl
     private var session: Long? = null
     private var nextAttempt = 0L
     private var closed = false
+    private companion object { const val RETRY_MS = 15000L }
 
     fun refresh(target: FuturesVenue): String {
         if (closed || !UiAccess.allowed(activity)) {
