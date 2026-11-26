@@ -187,6 +187,19 @@ internal class MultiTimeframeSchedulerWorker(
         }
     }
 
+    // Analysis consumers must call off the UI thread.
+    fun indicatorSnapshot(symbol: String): com.mefuturesaibot.app.ai.indicators.MultiTimeframeIndicators? {
+        val capturedGeneration = synchronized(lifecycle) {
+            if (closed || !started || symbol !in core.activeSymbols()) return null
+            generation
+        }
+        val result = repository.indicatorSnapshot(symbol) ?: return null
+        return synchronized(lifecycle) {
+            if (closed || generation != capturedGeneration || symbol !in core.activeSymbols()) null
+            else result
+        }
+    }
+
     fun isRunning(): Boolean {
         synchronized(lifecycle) {
             return started && !closed
