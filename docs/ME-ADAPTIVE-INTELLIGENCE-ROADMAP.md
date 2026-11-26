@@ -73,3 +73,16 @@ Proposed requirements; no forecast accuracy or implementation is established by 
 - Exit planner: target zones, optional tested partial exits and trailing stops, time-based expiry and thesis invalidation; account for multi-day funding costs, gaps/slippage, margin and liquidation risk. Distinguish planned versus actual fills.
 - Evaluate swing strategies separately from intraday strategies with walk-forward tests, realistic costs, non-overlapping or appropriately purged labels, sufficient independent trades and paper validation longer than 30 days when needed. No automatic real-money promotion.
 - Use lazy chart loading, bounded candle history and incremental indicator calculations for 4 GB devices. Preserve all existing intelligence, cleaner, UI and safety requirements.
+
+## Universal Trend Intelligence Engine
+
+Proposed implementation requirements; preserve all preceding modules.
+
+- Analyze every supported timeframe independently using closed candles, then reconcile higher-timeframe context and lower-timeframe entry evidence. Support intraday and multi-day swing horizons separately.
+- Represent direction (bullish, bearish, neutral, unknown), strength (weak/moderate/strong), regime (trending/ranging/transitional), structure (HH/HL, LH/LL, BOS/CHoCH), phase (emerging, established, accelerating, decelerating, exhausted), and event (continuation, reversal, pullback, countertrend, breakout, failed breakout) as separate dimensions rather than mutually exclusive labels.
+- Detect volatility compression/expansion, possible accumulation/distribution and liquidity sweeps as conditional hypotheses, not certainty about hidden participant intent.
+- Combine structure, EMA/SMA slopes, ADX/DMI, momentum, ATR-normalized movement, volume/order flow and liquidity evidence; avoid double-counting correlated indicators. Use hysteresis, minimum history and explicit unknown/stale states.
+- Detect timeframe disagreement, distinguish a lower-timeframe correction from higher-timeframe reversal, and require strategy-specific confirmation before entry. WAIT when conflict or uncertainty is unresolved.
+- Token detail must show trend per timeframe, dominant trend, strength, phase, evidence for/against, invalidation, conditional entry/SL/TP, estimated holding horizon, timestamp and strategy version in plain Indonesian.
+- Validate labels on synthetic and historical sequences, mirrored trends, flat/choppy markets, gaps, missing data and transitions; test no look-ahead, walk-forward net expectancy and calibration by regime. Do not treat trend classification as a guaranteed forecast.
+- Bound computation and cache usage on 4 GB Android devices. No automatic promotion to REAL; preserve risk and execution gates.
