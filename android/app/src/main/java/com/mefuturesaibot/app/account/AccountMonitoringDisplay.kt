@@ -35,7 +35,7 @@ internal class AccountMonitoringDisplay(private val activity: Activity) : AutoCl
             if (!coordinator.refresh()) {
                 val now = SystemClock.elapsedRealtime()
                 if (now < nextAttempt) return "$label · Menunggu koneksi"
-                nextAttempt = now + 15000L
+                nextAttempt = now + RETRY_MS
                 val source = vault(target)
                 if (!source.exists()) return "$label · API belum tersimpan"
                 if (!coordinator.start(target, source.readVersioned())) {
@@ -45,7 +45,7 @@ internal class AccountMonitoringDisplay(private val activity: Activity) : AutoCl
             val snapshot = coordinator.snapshot()
             if (!UiAccess.allowed(activity, currentSession) || snapshot?.venue != target) {
                 coordinator.stop()
-                nextAttempt = SystemClock.elapsedRealtime() + 15000L
+                nextAttempt = SystemClock.elapsedRealtime() + RETRY_MS
                 return "$label · Saldo belum tersedia"
             }
             val balance = snapshot.balance
@@ -55,7 +55,7 @@ internal class AccountMonitoringDisplay(private val activity: Activity) : AutoCl
                 "PnL berjalan ${balance.unrealizedPnl.toPlainString()} USDT"
         } catch (_: Exception) {
             runCatching { coordinator.stop() }
-            nextAttempt = SystemClock.elapsedRealtime() + 15000L
+            nextAttempt = SystemClock.elapsedRealtime() + RETRY_MS
             "$label · Monitoring belum tersedia"
         }
     }
