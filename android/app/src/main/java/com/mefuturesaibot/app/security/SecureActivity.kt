@@ -26,6 +26,7 @@ open class SecureActivity : Activity() {
                 if (intent.action != Intent.ACTION_SCREEN_OFF) return
 
                 AppLock.lock()
+                onProtectedUiRevoked()
                 cancelAuthentication()
                 autoPromptAttempted = false
                 dismissProtectedDialogs()
