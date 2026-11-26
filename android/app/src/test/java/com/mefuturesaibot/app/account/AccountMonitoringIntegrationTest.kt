@@ -13,10 +13,11 @@ class AccountMonitoringIntegrationTest {
         val workers = mutableListOf<BalanceTestWorker>()
         val sockets = mutableListOf<FakeSocket>()
         val clock = java.util.concurrent.atomic.AtomicLong(0L)
+        val owner = Thread.currentThread()
         val dependencies = AccountMonitoringDependencies(
             balanceFactory = { target, _ ->
                 AccountBalanceFactory {
-                    FakeBalanceAccess(1, Thread.currentThread()) {
+                    FakeBalanceAccess(1, owner) {
                         AccountBalance(target, BigDecimal("100"), BigDecimal("105"),
                             BigDecimal("80"), BigDecimal("5"), clock.get())
                     }
