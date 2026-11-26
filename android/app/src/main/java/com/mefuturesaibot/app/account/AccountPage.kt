@@ -69,7 +69,9 @@ internal class AccountPage(
         } else {
             clearFields()
             editing = false
-            if (activity !is com.mefuturesaibot.app.security.SecureActivity) {
+            if (activity !is com.mefuturesaibot.app.security.SecureActivity ||
+                (com.mefuturesaibot.app.BuildConfig.BUILD_TYPE == "dev" &&
+                    !com.mefuturesaibot.app.BuildConfig.MAINNET_ORDERS)) {
                 activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
             }
         }
@@ -111,6 +113,7 @@ internal class AccountPage(
     }
 
     private fun save() {
+        if (!visible || !UiAccess.allowed(activity)) return
         val api = key.text.toString().trim()
         val signing = secret.text.toString().trim()
         if (!valid(api)) { key.error = "Masukkan API Key HMAC tanpa spasi."; key.requestFocus(); return }
@@ -125,6 +128,7 @@ internal class AccountPage(
     }
 
     private fun verify() {
+        if (!visible || !UiAccess.allowed(activity)) return
         info.text = ""
         run("Menghubungi Binance…", "Gagal menguji key. Periksa jaringan atau ganti kredensial tersimpan.",
             { checker.verify(vault.read()) }) { access ->
@@ -140,6 +144,7 @@ internal class AccountPage(
     }
 
     private fun remove() {
+        if (!visible || !UiAccess.allowed(activity)) return
         run("Menghapus dari perangkat…", "Penghapusan gagal. Coba lagi.", { changeCredentials { vault.remove() } }) {
             editing = false
             clearFields()
@@ -151,7 +156,8 @@ internal class AccountPage(
     private fun valid(value: String) = value.isNotEmpty() && value.length <= 512 && value.all { it.code in 33..126 }
 
     private fun <T> run(progress: String, error: String, task: () -> T, done: (T) -> Unit) {
-        if (busy || disposed) return
+        if (busy || disposed || !visible || !UiAccess.allowed(activity)) return
+        val uiSession = UiAccess.session()
         busy = true
         message = progress
         render()
@@ -162,6 +168,14 @@ internal class AccountPage(
                 busy = false
                 saved = vault.exists()
                 credentialsChanged()
+                if (!visible || !UiAccess.allowed(activity, uiSession)) {
+                    clearFields()
+                    editing = false
+                    message = null
+                    info.text = ""
+                    render()
+                    return@post
+                }
                 result.fold(done) { e -> message = (e as? AccountCheckError)?.explanation ?: error }
                 render()
             }
