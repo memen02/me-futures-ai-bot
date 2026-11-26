@@ -2433,19 +2433,40 @@ class AccountSessionManagerTest {
 
     @Test
     fun expiredSocketPreventsQueuedKeepAliveRequest() {
-        val socket = connect()
-
         val interval =
             AccountSessionPolicy.KEEPALIVE_MS
 
         val rotationAge =
             AccountSessionPolicy.SOCKET_MAX_AGE_MS
 
-        val renewals =
-            (rotationAge / interval).toInt() - 2
+        val socketStartedAt = 12345L
 
-        repeat(renewals) {
-            scheduler.advanceBy(interval)
+        manager.start()
+
+        worker.drain()
+
+        scheduler.now = socketStartedAt
+        scheduler.drain()
+
+        val socket = sockets.single()
+
+        socket.open()
+
+        assertState(AccountSessionState.CONNECTED)
+
+        val renewals =
+            (rotationAge / interval).toInt() - 1
+
+        repeat(renewals) { index ->
+            val deadline =
+                (index + 1L) * interval
+
+            scheduler.advanceBy(
+                deadline - scheduler.now
+            )
+
+            assertEquals(1, worker.queued)
+
             completeRest()
 
             assertState(AccountSessionState.CONNECTED)
@@ -2456,11 +2477,30 @@ class AccountSessionManagerTest {
             keys.single().keepAliveCalls
         )
 
+        val lastRenewedAt = scheduler.now
+
         scheduler.advanceBy(interval)
 
         assertEquals(1, worker.queued)
 
-        scheduler.now = rotationAge
+        scheduler.now =
+            socketStartedAt + rotationAge
+
+        // Isolate socket expiration: the listen key
+        // must still be valid when the worker runs.
+        assertTrue(
+            AccountSessionPolicy.isKeyUsable(
+                lastRenewedAt,
+                scheduler.now
+            )
+        )
+
+        assertFalse(
+            AccountSessionPolicy.isSocketUsable(
+                socketStartedAt,
+                scheduler.now
+            )
+        )
 
         completeRest()
 
