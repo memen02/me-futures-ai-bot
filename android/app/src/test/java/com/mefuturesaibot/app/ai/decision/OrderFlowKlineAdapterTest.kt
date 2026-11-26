@@ -4,10 +4,7 @@ import com.mefuturesaibot.app.ai.Timeframe
 import org.json.JSONArray
 import org.junit.Test
 import org.junit.Assert.*
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
-@RunWith(RobolectricTestRunner::class)
 class OrderFlowKlineAdapterTest {
     private fun row(buy: String = "70", close: Long = 119999L) =
         JSONArray(listOf(60000L,"100","101","99","100","1",close,"100",10,"0.7",buy,"0"))
