@@ -94,6 +94,10 @@ internal class AccountMonitoringCoordinator(
 
         var previousState = AccountSessionState.STOPPED
 
+        // Observer exceptions may be swallowed by the session manager.
+        // Never publish a balance after an invalidation callback fails.
+        var callbackFailed = false
+
         override fun close() {
             balanceGeneration = null
 
@@ -239,7 +243,12 @@ internal class AccountMonitoringCoordinator(
             state.state == AccountSessionState.CONNECTED
 
         if (wasConnected != isConnected) {
-            resources.balance.invalidate(generation)
+            try {
+                resources.balance.invalidate(generation)
+            } catch (failure: Exception) {
+                resources.callbackFailed = true
+                throw failure
+            }
         }
     }
 
@@ -259,10 +268,12 @@ internal class AccountMonitoringCoordinator(
         val generation =
             resources.balanceGeneration ?: return
 
-        resources.balance.onAccountEvent(
-            generation,
-            event
-        )
+        try {
+            resources.balance.onAccountEvent(generation, event)
+        } catch (failure: Exception) {
+            resources.callbackFailed = true
+            throw failure
+        }
     }
 
     fun start(
@@ -309,6 +320,11 @@ internal class AccountMonitoringCoordinator(
 
             resources.session.start()
 
+            if (resources.callbackFailed) {
+                stop()
+                return false
+            }
+
             if (!lifecycle.refresh()) {
                 active = null
                 return false
@@ -347,6 +363,7 @@ internal class AccountMonitoringCoordinator(
             }
 
             if (
+                resources.callbackFailed ||
                 resources.session.snapshot().state ==
                     AccountSessionState.CLOSED ||
                 resources.balance.snapshot().status ==
@@ -376,6 +393,8 @@ internal class AccountMonitoringCoordinator(
 
         val resources =
             accepted(current.token) ?: return null
+
+        if (resources.callbackFailed) return null
 
         val session = resources.session.snapshot()
 
