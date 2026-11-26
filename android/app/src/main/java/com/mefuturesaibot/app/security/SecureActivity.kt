@@ -115,7 +115,7 @@ open class SecureActivity : Activity() {
 
         // DEV permits dashboard screenshots for UI testing.
         // REAL and other variants retain screen capture protection.
-        if (BuildConfig.FLAVOR != "dev" || BuildConfig.MAINNET_ORDERS) {
+        if (BuildConfig.BUILD_TYPE != "dev" || BuildConfig.MAINNET_ORDERS) {
             window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
     }
