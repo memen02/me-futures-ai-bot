@@ -43,7 +43,8 @@ internal class AccountMonitoringDisplay(private val activity: Activity) : AutoCl
             }
             val snapshot = coordinator.snapshot()
             if (!UiAccess.allowed(activity, currentSession) || snapshot?.venue != target) {
-                stop()
+                coordinator.stop()
+                nextAttempt = SystemClock.elapsedRealtime() + 15000L
                 return "$label · Saldo belum tersedia"
             }
             val balance = snapshot.balance
