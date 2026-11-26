@@ -35,7 +35,7 @@ class MainActivity : SecureActivity() {
         findViewById<Button>(R.id.scan_stop).setOnClickListener { onStopClicked() }
         desk = TradingDesk(this, DeskTab.restore(savedInstanceState), ::onStartClicked)
         desk.onTabSelected = ::refreshStatusText
-        userRequestedStop = savedInstanceState?.getBoolean("userRequestedStop") ?: false
+        userRequestedStop = !BotPreferences.shouldRun(this)
         ensureNotificationPermission()
     }
 
