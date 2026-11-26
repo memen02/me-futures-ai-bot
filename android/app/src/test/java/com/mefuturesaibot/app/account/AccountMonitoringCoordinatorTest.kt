@@ -88,4 +88,51 @@ class AccountMonitoringCoordinatorTest {
             assertNull(it.snapshot())
         }
     }
+
+    @Test fun closedCoordinatorCannotRestart() {
+        coordinator().use {
+            it.close()
+            assertThrows(IllegalStateException::class.java) {
+                it.start(venue, credentials())
+            }
+            assertNull(it.snapshot())
+        }
+    }
+
+    @Test fun staleReplacementRetiresPreviousSession() {
+        coordinator().use {
+            val old = credentials()
+            assertTrue(it.start(venue, old))
+            revisions.invalidate(venue.name)
+            assertFalse(it.start(venue, old))
+            assertNull(it.snapshot())
+            assertFalse(it.refresh())
+        }
+    }
+
+    @Test fun realAndDemoRevisionsRemainIsolated() {
+        if (!BuildConfig.MAINNET_ORDERS) return
+        coordinator().use {
+            val real = FuturesVenue.REAL
+            assertTrue(it.start(venue, credentials()))
+            assertTrue(it.start(real, credentials(real)))
+            revisions.invalidate(venue.name)
+            assertTrue(it.refresh())
+            assertEquals(real, it.snapshot()?.venue)
+            assertNull(it.snapshot()?.balance)
+            revisions.invalidate(real.name)
+            assertNull(it.snapshot())
+            assertFalse(it.refresh())
+        }
+    }
+
+    @Test fun repeatedStopDoesNotPreventFreshStart() {
+        coordinator().use {
+            assertTrue(it.start(venue, credentials()))
+            repeat(3) { _ -> it.stop() }
+            assertNull(it.snapshot())
+            assertTrue(it.start(venue, credentials()))
+            assertNull(it.snapshot()?.balance)
+        }
+    }
 }
