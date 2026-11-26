@@ -345,6 +345,8 @@ open class SecureActivity : Activity() {
 
     protected open fun onSecuritySettingsChanged() {}
 
+    protected open fun onProtectedUiRevoked() {}
+
     private fun hideLock() {
         val cover = shield ?: return
         (cover.parent as? FrameLayout)?.removeView(cover)
