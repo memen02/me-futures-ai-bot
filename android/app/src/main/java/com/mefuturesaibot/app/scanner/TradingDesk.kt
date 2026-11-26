@@ -178,7 +178,7 @@ internal class TradingDesk(
     }
 
     fun close() {
-        accountMonitoring.close()
+        runCatching { accountMonitoring.close() }
         FuturesVenue.settings(activity).unregisterOnSharedPreferenceChangeListener(modeListener)
         signals.stop()
         demo.close()
