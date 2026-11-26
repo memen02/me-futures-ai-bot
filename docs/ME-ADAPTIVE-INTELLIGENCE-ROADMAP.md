@@ -43,3 +43,18 @@ Proposed requirements, not implemented yet. Target Android devices with limited 
 - Provide a resource-health dashboard, last cleanup time, reclaimed cache bytes, and a safe manual cleanup action. Report unavailable metrics honestly.
 - Test low-memory behavior, repeated start/stop, reconnect storms, cleanup during active monitoring, database integrity, bounded storage and long-duration device stability.
 - Audit existing cache and worker ownership before implementation. Preserve all intelligence modules and safety gates above.
+
+## Premium Trading Dashboard and UX requirements
+
+Proposed UI requirements; audit existing screens and preserve working features before implementation.
+
+- Dark black/gold theme, modern consistent icons, Indonesian plain-language labels, accessible contrast, scalable text, touch targets and screen-reader descriptions. Do not rely on color alone.
+- Five primary tabs: Home, Market, AI, Trading, Account. Progressive disclosure keeps the overview simple and advanced detail available.
+- Home: explicit PAPER/DEMO/REAL labels, connection and freshness, venue-specific balance/equity/available margin, realized and unrealized PnL, fees, performance, active positions, bot controls and monitoring health. Never mix simulated and real balances.
+- Market: searchable/filterable token scanner, watchlist, 15 timeframe analysis, candles, trend/regime, liquidity, volume, funding/OI, spread and data freshness.
+- AI: LONG/SHORT/WAIT, independent evidence groups, explanations, veto reasons, calibrated confidence only when validated, strategy version, learning progress, shadow evaluation, drift alerts and per-engine details. Distinguish evidence count from win probability.
+- Trading: separate signal monitoring and auto-trading modes, position size, leverage, entry/SL/TP, net RR, risk, fees, orders, reconciliation, history and emergency entry stop. Confirm sensitive actions and preserve existing real-trading approval gates.
+- Account: credential security, App Lock, venue settings, reports, paper statistics and Device Health (heap/cache/storage/thermal/connection/worker metrics, last cleanup and safe cleanup action).
+- Reports: equity curve, realized net PnL, drawdown, win rate with sample count, profit factor, expectancy, costs and strategy breakdown; show unavailable data explicitly.
+- Use real measured values only in production; distinguish loading, stale, unavailable, error and empty states. Never display fake account metrics or expose secrets.
+- Optimize rendering for 4 GB Android devices: bounded lists, lifecycle-aware updates, lazy detail screens, no unnecessary animations, no blocking UI thread. Test accessibility, small screens, lock/background transitions, venue switching and low-memory behavior.
