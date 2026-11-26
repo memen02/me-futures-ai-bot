@@ -51,6 +51,11 @@ class MainActivity : SecureActivity() {
         pollRunnable.run()
     }
 
+    override fun onPause() {
+        if (::desk.isInitialized) desk.pauseAccountMonitoring()
+        super.onPause()
+    }
+
     override fun onStop() {
         visible = false
         pollHandler.removeCallbacks(pollRunnable)
