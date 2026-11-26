@@ -1212,10 +1212,13 @@ class AccountBalanceControllerTest {
     fun escapedCompletionCannotOverwriteNewSession() {
         AccountBalanceControllerFixture().use { f ->
             f.readAction = {
+                f.gate.block()
                 f.balance(wallet = "999.00")
             }
 
             f.start()
+            f.gate.awaitEntered()
+            f.gate.release()
             f.worker.awaitIdle()
 
             assertEquals(1, f.scheduler.readyCount)
