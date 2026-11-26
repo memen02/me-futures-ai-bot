@@ -1,6 +1,7 @@
 package com.mefuturesaibot.app.security
 
 import android.app.Activity
+import com.mefuturesaibot.app.BuildConfig
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -112,9 +113,11 @@ open class SecureActivity : Activity() {
 
         screenReceiverRegistered = true
 
-        window.addFlags(
-            WindowManager.LayoutParams.FLAG_SECURE
-        )
+        // DEV permits dashboard screenshots for UI testing.
+        // REAL and other variants retain screen capture protection.
+        if (BuildConfig.FLAVOR != "dev" || BuildConfig.MAINNET_ORDERS) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
     }
 
     override fun onResume() {
