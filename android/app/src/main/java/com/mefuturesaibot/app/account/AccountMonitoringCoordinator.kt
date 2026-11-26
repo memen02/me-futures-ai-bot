@@ -2,6 +2,10 @@ package com.mefuturesaibot.app.account
 
 import android.os.SystemClock
 import android.os.Looper
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import com.mefuturesaibot.app.exchange.Scheduler
 import com.mefuturesaibot.app.BuildConfig
 import com.mefuturesaibot.app.demo.FuturesVenue
@@ -33,6 +37,10 @@ internal class AccountMonitoringDependencies(
             "Production monitoring requires main thread"
         }
         AndroidHandlerScheduler()
+    },
+    val workerFactory: () -> ExecutorService = {
+        ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+            ArrayBlockingQueue<Runnable>(1), ThreadPoolExecutor.AbortPolicy())
     }
 )
 
@@ -120,28 +128,48 @@ internal class AccountMonitoringCoordinator(
         val venue = token.venue
 
         val balanceScheduler = dependencies.schedulerFactory()
-        val balance = AccountBalanceController(
-            venue = venue,
-            factory = dependencies.balanceFactory(venue, keys),
-            scheduler = balanceScheduler,
-            rateLimitGuard = scope.guard,
-            elapsed = elapsed
-        )
+        val balanceFactory = dependencies.balanceFactory(venue, keys)
+        val balanceWorker = dependencies.workerFactory()
+        val balance = try {
+            AccountBalanceController(
+                venue = venue,
+                factory = balanceFactory,
+                scheduler = balanceScheduler,
+                rateLimitGuard = scope.guard,
+                worker = balanceWorker,
+                elapsed = elapsed
+            )
+        } catch (failure: Exception) {
+            try { balanceWorker.shutdownNow() }
+            catch (cleanup: Exception) {
+                if (cleanup !== failure) failure.addSuppressed(cleanup)
+            }
+            throw failure
+        }
 
+        var sessionWorker: ExecutorService? = null
         try {
             val sessionScheduler = dependencies.schedulerFactory()
             check(sessionScheduler !== balanceScheduler) {
                 "Monitoring schedulers must be isolated"
             }
-            val session = AccountSessionManager(
-                keyFactory = dependencies.keyFactory(venue, keys.key),
-                socketFactory = dependencies.socketFactory(venue) {
+            val keyFactory = dependencies.keyFactory(venue, keys.key)
+            val socketFactory = dependencies.socketFactory(venue) {
                     dependencies.schedulerFactory().also {
                         check(it !== balanceScheduler && it !== sessionScheduler) {
                             "Socket scheduler must be isolated"
                         }
                     }
-                },
+                }
+            val worker = dependencies.workerFactory()
+            check(worker !== balanceWorker) {
+                "Monitoring workers must be isolated"
+            }
+            sessionWorker = worker
+            val session = AccountSessionManager(
+                keyFactory = keyFactory,
+                socketFactory = socketFactory,
+                worker = worker,
                 scheduler = sessionScheduler,
                 rateLimitGuard = scope.guard,
                 onState = { state ->
@@ -160,6 +188,10 @@ internal class AccountMonitoringCoordinator(
             )
 
         } catch (failure: Exception) {
+            try { sessionWorker?.shutdownNow() }
+            catch (cleanup: Exception) {
+                if (cleanup !== failure) failure.addSuppressed(cleanup)
+            }
             try {
                 balance.close()
             } catch (cleanup: Exception) {
