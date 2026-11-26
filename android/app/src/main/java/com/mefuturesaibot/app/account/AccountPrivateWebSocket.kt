@@ -81,6 +81,11 @@ internal class AccountPrivateWebSocket(
 
     private val queueLock = Any()
 
+    // Callback identity observed while the factory
+    // is still creating the actual socket.
+    private var creatingSocket = false
+    private var callbackSource: WebSocket? = null
+
     private var pendingCallbacks = 0
 
     private var terminalQueued = false
@@ -100,7 +105,11 @@ internal class AccountPrivateWebSocket(
         if (closed || generation != current) return
 
         try {
-            socket = factory.newWebSocket(
+            synchronized(queueLock) {
+                creatingSocket = true
+            }
+
+            val created = factory.newWebSocket(
                 request,
                 object : WebSocketListener() {
 
@@ -122,7 +131,12 @@ internal class AccountPrivateWebSocket(
                         webSocket: WebSocket,
                         text: String
                     ) {
-                        if (closed) return
+                        val allowed = synchronized(queueLock) {
+                            !terminalQueued &&
+                                acceptsSourceLocked(webSocket)
+                        }
+
+                        if (!allowed) return
 
                         if (text.length > MAX_MESSAGE_LENGTH) {
                             queueFailure(
@@ -195,6 +209,29 @@ internal class AccountPrivateWebSocket(
                 }
             )
 
+            val identityMatches = synchronized(queueLock) {
+                socket = created
+                creatingSocket = false
+
+                val matches = callbackSource == null ||
+                    callbackSource === created
+
+                callbackSource = null
+
+                if (!matches) {
+                    // Do not preserve failure metadata
+                    // from an unverified callback source.
+                    terminalFailure = null
+                }
+
+                matches
+            }
+
+            if (!identityMatches) {
+                disconnect(AccountSocketFailure())
+                return
+            }
+
             scheduler.postDelayed(CONNECT_TIMEOUT_MS) {
                 if (
                     !closed &&
@@ -212,8 +249,46 @@ internal class AccountPrivateWebSocket(
             }
 
         } catch (_: Exception) {
+            synchronized(queueLock) {
+                if (creatingSocket) {
+                    creatingSocket = false
+                    callbackSource = null
+                    terminalFailure = null
+                }
+            }
+
             disconnect(AccountSocketFailure())
         }
+    }
+
+    /**
+     * Called only while queueLock is held.
+     *
+     * During factory creation, bind provisional callbacks
+     * to one source. Verify that source against the socket
+     * returned by the factory before delivering callbacks.
+     */
+    private fun acceptsSourceLocked(
+        source: WebSocket
+    ): Boolean {
+        if (closed) return false
+
+        val active = socket
+
+        if (active != null) {
+            return active === source
+        }
+
+        if (!creatingSocket) return false
+
+        val provisional = callbackSource
+
+        if (provisional == null) {
+            callbackSource = source
+            return true
+        }
+
+        return provisional === source
     }
 
     private fun dispatch(
@@ -222,7 +297,10 @@ internal class AccountPrivateWebSocket(
         action: () -> Unit
     ) {
         synchronized(queueLock) {
-            if (closed || terminalQueued) return
+            if (
+                terminalQueued ||
+                !acceptsSourceLocked(source)
+            ) return
 
             if (pendingCallbacks >= MAX_PENDING_CALLBACKS) {
                 queueFailure(
@@ -260,7 +338,7 @@ internal class AccountPrivateWebSocket(
         failure: AccountSocketFailure
     ) {
         synchronized(queueLock) {
-            if (closed) return
+            if (!acceptsSourceLocked(source)) return
 
             val previous = terminalFailure
 
@@ -377,21 +455,23 @@ internal class AccountPrivateWebSocket(
     }
 
     private fun terminate() {
-        synchronized(queueLock) {
+        val previous = synchronized(queueLock) {
             closed = true
+            creatingSocket = false
+            callbackSource = null
             pendingCallbacks = 0
             terminalQueued = false
             terminalFailure = null
 
             scheduler.cancelAll()
+
+            val active = socket
+            socket = null
+            active
         }
 
         connected = false
         generation++
-
-        val previous = socket
-
-        socket = null
 
         previous?.cancel()
     }

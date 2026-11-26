@@ -2,6 +2,9 @@ package com.mefuturesaibot.app.account
 
 import com.mefuturesaibot.app.exchange.Scheduler
 import java.io.IOException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
@@ -944,6 +947,399 @@ class AccountPrivateWebSocketTest {
         assertTrue(events.isEmpty())
         assertTrue(scheduler.ready.isEmpty())
         assertEquals(before, statuses)
+    }
+
+
+    @Test
+    fun foreignSocketCannotConsumeCallbackQueue() {
+        connection().use {
+            val active = openConnection(it)
+
+            val foreign = TestSocket(
+                request,
+                active.listener
+            )
+
+            repeat(1000) {
+                foreign.open()
+                foreign.message(accountEvent)
+            }
+
+            assertTrue(scheduler.ready.isEmpty())
+            assertTrue(failures.isEmpty())
+
+            active.message(accountEvent)
+            scheduler.drain()
+
+            assertEquals(1, events.size)
+            assertFalse(active.cancelled)
+        }
+    }
+
+    @Test
+    fun foreignSocketCannotTerminateActiveSession() {
+        connection().use {
+            val active = openConnection(it)
+
+            val foreign = TestSocket(
+                request,
+                active.listener
+            )
+
+            foreign.fail(418, "900")
+
+            foreign.listener.onClosing(
+                foreign,
+                1000,
+                "foreign"
+            )
+
+            foreign.listener.onClosed(
+                foreign,
+                1000,
+                "foreign"
+            )
+
+            assertTrue(scheduler.ready.isEmpty())
+
+            active.message(accountEvent)
+            scheduler.drain()
+
+            assertEquals(1, events.size)
+            assertTrue(failures.isEmpty())
+            assertFalse(active.cancelled)
+        }
+    }
+
+    @Test
+    fun foreignFailureCannotReplaceValidCooldown() {
+        connection().use {
+            val active = openConnection(it)
+
+            val foreign = TestSocket(
+                request,
+                active.listener
+            )
+
+            active.fail(429, "600")
+            foreign.fail(418, "900")
+
+            scheduler.drain()
+
+            assertEquals(
+                AccountSocketFailure(429, "600"),
+                failures.single()
+            )
+
+            assertTrue(active.cancelled)
+        }
+    }
+
+    @Test
+    fun foreignOversizedMessageCannotTerminateSession() {
+        connection().use {
+            val active = openConnection(it)
+
+            val foreign = TestSocket(
+                request,
+                active.listener
+            )
+
+            foreign.message("x".repeat(262145))
+
+            assertTrue(scheduler.ready.isEmpty())
+
+            active.message(accountEvent)
+            scheduler.drain()
+
+            assertEquals(1, events.size)
+            assertTrue(failures.isEmpty())
+            assertFalse(active.cancelled)
+        }
+    }
+
+    @Test
+    fun callbacksBeforeFactoryReturnAreDelivered() {
+        val earlyFactory = object : WebSocket.Factory {
+            override fun newWebSocket(
+                request: Request,
+                listener: WebSocketListener
+            ): WebSocket {
+                return TestSocket(
+                    request,
+                    listener
+                ).also {
+                    sockets.add(it)
+                    it.open()
+                    it.message(accountEvent)
+                }
+            }
+        }
+
+        connection(factory = earlyFactory).use {
+            it.connect()
+
+            assertEquals(
+                listOf(AccountSocketStatus.CONNECTING),
+                statuses
+            )
+
+            assertTrue(events.isEmpty())
+
+            scheduler.drain()
+
+            assertEquals(
+                listOf(
+                    AccountSocketStatus.CONNECTING,
+                    AccountSocketStatus.CONNECTED
+                ),
+                statuses
+            )
+
+            assertEquals(1, events.size)
+            assertTrue(failures.isEmpty())
+        }
+    }
+
+    @Test
+    fun earlyValidFailurePreservesRateLimit() {
+        val earlyFactory = object : WebSocket.Factory {
+            override fun newWebSocket(
+                request: Request,
+                listener: WebSocketListener
+            ): WebSocket {
+                return TestSocket(
+                    request,
+                    listener
+                ).also {
+                    sockets.add(it)
+                    it.fail(418, "900")
+                }
+            }
+        }
+
+        connection(factory = earlyFactory).use {
+            it.connect()
+
+            assertTrue(failures.isEmpty())
+
+            scheduler.drain()
+
+            assertEquals(
+                AccountSocketFailure(418, "900"),
+                failures.single()
+            )
+
+            assertTrue(sockets.single().cancelled)
+        }
+    }
+
+    @Test
+    fun mismatchedFactorySocketFailsClosed() {
+        val wrongFactory = object : WebSocket.Factory {
+            override fun newWebSocket(
+                request: Request,
+                listener: WebSocketListener
+            ): WebSocket {
+                val foreign = TestSocket(
+                    request,
+                    listener
+                )
+
+                foreign.open()
+                foreign.message(accountEvent)
+                foreign.fail(418, "900")
+
+                return TestSocket(
+                    request,
+                    listener
+                ).also {
+                    sockets.add(it)
+                }
+            }
+        }
+
+        connection(factory = wrongFactory).use {
+            it.connect()
+            scheduler.drain()
+
+            assertTrue(events.isEmpty())
+
+            assertEquals(
+                AccountSocketFailure(),
+                failures.single()
+            )
+
+            assertEquals(
+                listOf(
+                    AccountSocketStatus.CONNECTING,
+                    AccountSocketStatus.DISCONNECTED
+                ),
+                statuses
+            )
+
+            assertTrue(sockets.single().cancelled)
+            assertTrue(scheduler.ready.isEmpty())
+        }
+    }
+
+    @Test
+    fun factoryExceptionDiscardsUnverifiedFailure() {
+        val brokenFactory = object : WebSocket.Factory {
+            override fun newWebSocket(
+                request: Request,
+                listener: WebSocketListener
+            ): WebSocket {
+                TestSocket(
+                    request,
+                    listener
+                ).fail(418, "900")
+
+                throw IOException("factory failure")
+            }
+        }
+
+        connection(factory = brokenFactory).use {
+            it.connect()
+            scheduler.drain()
+
+            assertEquals(
+                AccountSocketFailure(),
+                failures.single()
+            )
+
+            assertTrue(events.isEmpty())
+            assertTrue(scheduler.ready.isEmpty())
+            assertTrue(scheduler.delayed.isEmpty())
+        }
+    }
+
+    @Test
+    fun concurrentProducersRespectQueueCapacity() {
+        connection().use {
+            val active = openConnection(it)
+
+            val workers = Executors.newFixedThreadPool(4)
+            val gate = CountDownLatch(1)
+
+            try {
+                val tasks = (0 until 4).map {
+                    workers.submit {
+                        check(
+                            gate.await(
+                                5,
+                                TimeUnit.SECONDS
+                            )
+                        )
+
+                        repeat(8) {
+                            active.message(accountEvent)
+                        }
+                    }
+                }
+
+                gate.countDown()
+
+                tasks.forEach {
+                    it.get(5, TimeUnit.SECONDS)
+                }
+
+                assertEquals(
+                    32,
+                    scheduler.ready.size
+                )
+
+                assertTrue(events.isEmpty())
+
+                scheduler.drain()
+
+                assertEquals(32, events.size)
+                assertTrue(failures.isEmpty())
+                assertFalse(active.cancelled)
+
+            } finally {
+                gate.countDown()
+                workers.shutdownNow()
+
+                assertTrue(
+                    workers.awaitTermination(
+                        5,
+                        TimeUnit.SECONDS
+                    )
+                )
+            }
+        }
+    }
+
+    @Test
+    fun concurrentOverflowPreservesValidRateLimit() {
+        connection().use {
+            val active = openConnection(it)
+
+            val foreign = TestSocket(
+                request,
+                active.listener
+            )
+
+            val workers = Executors.newFixedThreadPool(4)
+            val gate = CountDownLatch(1)
+
+            try {
+                val tasks = (0 until 4).map {
+                    workers.submit {
+                        check(
+                            gate.await(
+                                5,
+                                TimeUnit.SECONDS
+                            )
+                        )
+
+                        repeat(100) {
+                            active.message(accountEvent)
+                            foreign.message(accountEvent)
+                        }
+                    }
+                }
+
+                gate.countDown()
+
+                tasks.forEach {
+                    it.get(5, TimeUnit.SECONDS)
+                }
+
+                active.fail(429, "600")
+                foreign.fail(418, "900")
+
+                assertTrue(
+                    scheduler.ready.size <= 33
+                )
+
+                assertTrue(events.isEmpty())
+                assertTrue(failures.isEmpty())
+
+                scheduler.drain()
+
+                assertEquals(
+                    AccountSocketFailure(429, "600"),
+                    failures.single()
+                )
+
+                assertTrue(active.cancelled)
+                assertTrue(events.isEmpty())
+                assertTrue(scheduler.ready.isEmpty())
+
+            } finally {
+                gate.countDown()
+                workers.shutdownNow()
+
+                assertTrue(
+                    workers.awaitTermination(
+                        5,
+                        TimeUnit.SECONDS
+                    )
+                )
+            }
+        }
     }
 
 }
