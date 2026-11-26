@@ -51,7 +51,7 @@ internal class AccountMonitoringDisplay(private val activity: Activity) : AutoCl
             val balance = snapshot.balance
             if (balance == null) "$label · ${snapshot.session.state.name} · Saldo belum tersedia"
             else "$label · Saldo ${balance.wallet.toPlainString()} USDT\n" +
-                "Ekuitas ${balance.equity.toPlainString()} · Tersedia ${balance.available.toPlainString()}\n" +
+                "Ekuitas ${balance.equity.toPlainString()} USDT · Tersedia ${balance.available.toPlainString()} USDT\n" +
                 "PnL berjalan ${balance.unrealizedPnl.toPlainString()} USDT"
         } catch (_: Exception) {
             runCatching { coordinator.stop() }
