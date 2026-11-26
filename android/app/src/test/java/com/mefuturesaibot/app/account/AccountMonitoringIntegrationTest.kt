@@ -6,7 +6,11 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AccountMonitoringIntegrationTest {
-    @Test fun balanceRequiresConnectedSessionAndFreshRead() {
+    @Test fun balanceRequiresConnectedSessionAndFreshRead() = exercise(false)
+
+    @Test fun failedInvalidationHidesBalanceAndRetiresSession() = exercise(true)
+
+    private fun exercise(failInvalidation: Boolean) {
         val venue = FuturesVenue.DEMO
         val revisions = CredentialRevisionGuard()
         val schedulers = mutableListOf<BalanceTestScheduler>()
@@ -14,6 +18,7 @@ class AccountMonitoringIntegrationTest {
         val sockets = mutableListOf<FakeSocket>()
         val clock = java.util.concurrent.atomic.AtomicLong(0L)
         val owner = Thread.currentThread()
+        var rejectBalanceTimer = false
         val dependencies = AccountMonitoringDependencies(
             balanceFactory = { target, _ ->
                 AccountBalanceFactory {
@@ -37,10 +42,20 @@ class AccountMonitoringIntegrationTest {
                     FakeSocket(status, event, failure).also { sockets.add(it) }
                 }
             },
-            schedulerFactory = { BalanceTestScheduler().also {
-                it.moveClockTo(clock.get())
-                schedulers.add(it)
-            } },
+            schedulerFactory = {
+                val scheduler = BalanceTestScheduler()
+                scheduler.moveClockTo(clock.get())
+                val isFirstBalance = schedulers.isEmpty()
+                schedulers.add(scheduler)
+                object : com.mefuturesaibot.app.exchange.Scheduler by scheduler {
+                    override fun postDelayed(delayMs: Long, action: () -> Unit) {
+                        check(!isFirstBalance || !rejectBalanceTimer) {
+                            "Injected balance timer failure"
+                        }
+                        scheduler.postDelayed(delayMs, action)
+                    }
+                }
+            },
             workerFactory = { BalanceTestWorker().also { workers.add(it) } }
         )
         val guard = AccountRateLimitGuard(elapsed = { clock.get() }, wallClock = { 0L })
@@ -69,6 +84,15 @@ class AccountMonitoringIntegrationTest {
             workers[0].awaitIdle()
             schedulers[0].drainReady()
             assertEquals(BigDecimal("100"), coordinator.snapshot()?.balance?.wallet)
+            if (failInvalidation) {
+                rejectBalanceTimer = true
+                oldSocket.changed()
+                assertNull(coordinator.snapshot())
+                assertFalse(coordinator.refresh())
+                assertTrue(oldSocket.closed)
+                assertNull(coordinator.snapshot())
+                return
+            }
             oldSocket.changed()
             assertNull(coordinator.snapshot()?.balance)
             clock.set(6000L)
