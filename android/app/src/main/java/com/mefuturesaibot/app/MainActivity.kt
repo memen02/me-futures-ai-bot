@@ -22,8 +22,9 @@ class MainActivity : SecureActivity() {
 
     private val pollRunnable = object : Runnable {
         override fun run() {
+            if (!visible) return
             refreshStatusText()
-            pollHandler.postDelayed(this, 1000)
+            if (visible) pollHandler.postDelayed(this, 1000)
         }
     }
 
