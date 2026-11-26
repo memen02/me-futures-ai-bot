@@ -12,19 +12,7 @@
             android:layout_height="220dp"
             android:layout_gravity="center_horizontal"
             android:importantForAccessibility="no" />
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="12dp" android:gravity="center" android:text="@string/app_name"
-            android:textAllCaps="true" android:textColor="@color/me_text" android:fontFamily="sans-serif-medium"
-            android:textStyle="normal" android:textSize="26sp" android:letterSpacing="0.14" />
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:gravity="center"
-            android:text="INTELLIGENT TRADING SYSTEM"
-            android:textColor="@color/me_gold_light"
-            android:textSize="10sp"
-            android:letterSpacing="0.16" />
+
 
         <TextView android:id="@+id/startup_summary" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:layout_marginTop="24dp" android:gravity="center"
