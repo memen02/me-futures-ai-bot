@@ -1,0 +1,12 @@
+# Order execution safety — Batch 07 acceptance contract
+
+DEMO and REAL share execution safety rules, but credentials, journals, account identities and positions are isolated. User opt-in to REAL is not a bypass of these rules.
+
+- Use a durable intent identity scoped to venue, account, symbol, strategy and closed signal epoch. Deduplicate the same signal even after a position closes. Persist a unique Binance client order ID before sending; never assume exchange client IDs guarantee permanent idempotency.
+- Use a transactional journal with unique constraints and atomic risk reservation across symbols. One active entry/position per account and symbol initially, including opposite direction and pending orders. Include external/manual orders and positions in reconciliation. Serialize execution ownership; multiple devices sharing an account require coordinated ownership or must be disallowed.
+- States: RESERVED, SUBMITTING, UNKNOWN, ACKNOWLEDGED, PARTIALLY_FILLED, FILLED, REJECTED, CANCELED. Persist transitions before network side effects; release reservation only after authoritative terminal reconciliation and accounting for fills.
+- Timeout, lost response, crash, HTTP ambiguity or uncertain status: freeze new entries for affected scope. Query by original client order ID and reconcile open orders, trades and positions. A single not-found response is not proof of nonexecution. Never blindly retry or generate a replacement ID. Escalate unresolved cases for manual reconciliation.
+- On restart, reconcile all nonterminal intents before allowing new entries. Fail closed on database failure, stale account data or mismatched account identity. Keep protective exits available through a separately reconciled path; use venue/position-mode appropriate reduce-only or close semantics. Partial fills require protection and accounting. Do not cancel existing protection before replacement safety is established.
+- Disable automatic retries of ambiguous order submissions in HTTP clients. Respect rate limits. Never log credentials.
+- Tests: concurrent duplicate signals, cross-symbol risk reservation, opposite direction, partial fills, accepted order with lost response, crash before/after send, restart, stale snapshots, manual positions, repeated signal after close, venue isolation, journal failure and protective exit retries.
+- Release gate: demonstrate these tests plus DEMO integration and recovery before enabling new REAL execution path. No claim of exactly-once delivery across a network.
