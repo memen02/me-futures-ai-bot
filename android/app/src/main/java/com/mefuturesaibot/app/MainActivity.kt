@@ -51,6 +51,10 @@ class MainActivity : SecureActivity() {
         pollRunnable.run()
     }
 
+    override fun onProtectedUiRevoked() {
+        if (::desk.isInitialized) desk.pauseAccountMonitoring()
+    }
+
     override fun onPause() {
         if (::desk.isInitialized) desk.pauseAccountMonitoring()
         super.onPause()
