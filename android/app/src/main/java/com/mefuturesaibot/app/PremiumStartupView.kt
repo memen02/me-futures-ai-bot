@@ -34,7 +34,7 @@ class PremiumStartupView @JvmOverloads constructor(
     )
 
     private val robot = requireNotNull(
-        context.getDrawable(R.drawable.ic_robot_gold)
+        context.getDrawable(R.drawable.ic_yellow_robot)
     ).mutate()
 
     private val gold = Color.rgb(240, 185, 11)
@@ -51,7 +51,7 @@ class PremiumStartupView @JvmOverloads constructor(
     )
 
     private val face = RectF(
-        78f, 85.4f, 122f, 120.8f
+        65.35f, 80.2f, 134.65f, 126.4f
     )
 
     private val visorClip = Path().apply {
