@@ -4,10 +4,10 @@ import com.mefuturesaibot.app.ai.Timeframe
 import com.mefuturesaibot.app.ai.trend.MultiTimeframeTrendContext
 
 internal object EvidenceAggregator {
-    // External market evidence is deliberately missing until timestamped,
-    // symbol-bound order flow and synchronized depth adapters are available.
+    // Missing external snapshots remain missing; never infer order flow from price.
     fun evaluate(context: MultiTimeframeTrendContext, primary: Timeframe,
-                 required: Set<Timeframe>, nowMs: Long): MasterDecision {
+                 required: Set<Timeframe>, nowMs: Long,
+                 orderFlow: OrderFlowSnapshot? = null, liquidity: LiquiditySnapshot? = null): MasterDecision {
         val wait = MasterDecision(MasterDirection.WAIT,DecisionReason.INVALID_EVIDENCE,0)
         if (context.evaluatedAtMs != nowMs || nowMs <= 0 || primary !in required) return wait
         val value = context.frames[primary] ?: return wait
@@ -20,8 +20,8 @@ internal object EvidenceAggregator {
             EvidenceGroup.TREND to TrendEvidenceEngine.direction(value),
             EvidenceGroup.MOMENTUM to MomentumEvidenceEngine.direction(snapshot),
             EvidenceGroup.STRUCTURE to StructureEvidenceEngine.direction(value),
-            EvidenceGroup.VOLUME_ORDER_FLOW to EvidenceDirection.MISSING,
-            EvidenceGroup.LIQUIDITY to EvidenceDirection.MISSING,
+            EvidenceGroup.VOLUME_ORDER_FLOW to (orderFlow?.direction(value) ?: EvidenceDirection.MISSING),
+            EvidenceGroup.LIQUIDITY to (liquidity?.direction(context.symbol,nowMs) ?: EvidenceDirection.MISSING),
             EvidenceGroup.CROSS_TIMEFRAME to TimeframeEvidenceEngine.direction(context,required,nowMs)
         ).map { (group,direction) -> DecisionEvidence(group,direction,end,expiry) }
         return MasterDecisionEngine.evaluate(votes,nowMs,MasterGuardian.blocks(value))
