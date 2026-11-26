@@ -50,6 +50,9 @@ internal class TradingDesk(
 ) {
     private fun <T : View> view(id: Int): T = activity.findViewById(id)
     private val store = DeskStore(activity)
+    private val accountMonitoring = com.mefuturesaibot.app.account.AccountMonitoringDisplay(activity)
+    private var paperSummary = ""
+    private var paperWallet = ""
     private var demo = DemoControls(activity, start)
     private val accountPage = AccountPage(activity, credentialsChanged = { demo.render() })
     private val query = view<EditText>(R.id.scan_query)
@@ -172,6 +175,7 @@ internal class TradingDesk(
     }
 
     fun close() {
+        accountMonitoring.close()
         FuturesVenue.settings(activity).unregisterOnSharedPreferenceChangeListener(modeListener)
         signals.stop()
         demo.close()
@@ -189,6 +193,7 @@ internal class TradingDesk(
         if (tab == DeskTab.TRADING && destination != tab) manual.close()
         if (tab == DeskTab.MARKET && destination != tab) clearTokenList()
         tab = destination
+        pauseAccountMonitoring()
         accountPage.show(tab == DeskTab.ACCOUNT)
         DeskTab.values().forEach { dest ->
             view<View>(dest.pageId).visibility = if (dest == tab) View.VISIBLE else View.GONE
@@ -250,7 +255,8 @@ internal class TradingDesk(
             else -> "Trading nonaktif"
         }
         view<TextView>(R.id.desk_bot).text = state
-        view<TextView>(R.id.home_summary).text = "Paper · ${money(store.read().second.balance)} USDT   ·   USDⓈ-M Perpetual"
+        paperSummary = "Paper · ${money(store.read().second.balance)} USDT   ·   USDⓈ-M Perpetual"
+        view<TextView>(R.id.home_summary).text = paperSummary
         val rising = rows.count { it.ticker!!.change > 0 }
         val falling = rows.count { it.ticker!!.change < 0 }
         val flat = rows.size - rising - falling
@@ -342,7 +348,18 @@ internal class TradingDesk(
     }
 
     private var displayedPaper: Pair<PaperPosition?,com.mefuturesaibot.app.exchange.PositionMark?>? = null
+    fun pauseAccountMonitoring() {
+        accountMonitoring.stop()
+        view<TextView>(R.id.home_summary).text = paperSummary
+        view<TextView>(R.id.account_wallet).text = paperWallet
+    }
+
     fun refreshSignals() {
+        if (tab == DeskTab.HOME || tab == DeskTab.ACCOUNT) {
+            val balance = accountMonitoring.refresh(FuturesVenue.selected(activity))
+            if (tab == DeskTab.HOME) view<TextView>(R.id.home_summary).text = "$paperSummary\n$balance"
+            else view<TextView>(R.id.account_wallet).text = "$paperWallet\n\n$balance"
+        }
         if (tab == DeskTab.TRADING) {
             val key = store.read().second.position to PaperPositionMonitor.mark?.takeIf { it.fresh(SystemClock.elapsedRealtime()) }
             if (key != displayedPaper) { displayedPaper = key; renderAccount() } else reports.render()
@@ -415,6 +432,7 @@ internal class TradingDesk(
     }
 
     fun releaseDisplayData() {
+        pauseAccountMonitoring()
         manual.close()
         clearTokenList()
         snapshot = Scan()
@@ -494,8 +512,9 @@ internal class TradingDesk(
             if (date == null) event else time(date) + "\n" + event.substringAfter('|')
         }.ifEmpty { "Transaksi simulasi akan tercatat di sini." }
         val equity = if (position == null) money(account.balance) else unrealized?.let { money(account.balance + it) }
-        view<TextView>(R.id.account_wallet).text = "Saldo virtual   ${money(account.balance)} USDT\n" +
+        paperWallet = "Saldo virtual   ${money(account.balance)} USDT\n" +
             "Ekuitas virtual   ${equity ?: "menunggu harga"}\nModal awal   1.000 USDT\nTransaksi selesai   ${account.trades}"
+        view<TextView>(R.id.account_wallet).text = paperWallet
         view<TextView>(R.id.account_build).text = activity.getString(R.string.build_identity)
     }
 
