@@ -32,8 +32,8 @@ class AccountMonitoringIntegrationTest {
                 }
             },
             socketFactory = { _, _ ->
-                AccountSessionSocketFactory { _, status, event, _ ->
-                    FakeSocket(status, event).also { sockets.add(it) }
+                AccountSessionSocketFactory { _, status, event, failure ->
+                    FakeSocket(status, event, failure).also { sockets.add(it) }
                 }
             },
             schedulerFactory = { BalanceTestScheduler().also {
@@ -70,7 +70,36 @@ class AccountMonitoringIntegrationTest {
             assertEquals(BigDecimal("100"), coordinator.snapshot()?.balance?.wallet)
             oldSocket.changed()
             assertNull(coordinator.snapshot()?.balance)
+            clock.set(6000L)
+            schedulers.forEach { it.moveClockTo(clock.get()) }
+            schedulers[0].runDue()
+            workers[0].awaitIdle()
+            schedulers[0].drainReady()
+            assertEquals(BigDecimal("100"), coordinator.snapshot()?.balance?.wallet)
+
+            oldSocket.disconnect()
+            assertEquals(AccountSessionState.RETRY_WAIT, coordinator.snapshot()?.session?.state)
+            assertNull(coordinator.snapshot()?.balance)
+            val retryAt = checkNotNull(schedulers[1].nextDue)
+            clock.set(retryAt)
+            schedulers.forEach { it.moveClockTo(clock.get()) }
+            schedulers[1].runDue()
+            workers[1].awaitIdle()
+            schedulers[1].drainReady()
+            assertEquals(2, sockets.size)
+            val newSocket = sockets.last()
+            newSocket.open()
+            assertNull(coordinator.snapshot()?.balance)
+            clock.addAndGet(AccountBalancePolicy.MIN_READ_INTERVAL_MS)
+            schedulers.forEach { it.moveClockTo(clock.get()) }
+            schedulers[0].runDue()
+            workers[0].awaitIdle()
+            schedulers[0].drainReady()
+            assertEquals(BigDecimal("100"), coordinator.snapshot()?.balance?.wallet)
+            oldSocket.changed()
+            assertEquals(BigDecimal("100"), coordinator.snapshot()?.balance?.wallet)
             coordinator.stop()
+            assertTrue(newSocket.closed)
             assertTrue(oldSocket.closed)
             assertNull(coordinator.snapshot())
             assertTrue(coordinator.start(venue, credentials()))
@@ -91,12 +120,17 @@ class AccountMonitoringIntegrationTest {
 
     private class FakeSocket(
         private val status: (AccountSocketStatus) -> Unit,
-        private val event: (AccountStreamEvent) -> Unit
+        private val event: (AccountStreamEvent) -> Unit,
+        private val failure: (AccountSocketFailure) -> Unit
     ) : AccountSessionSocket {
         var closed = false
         override fun connect() = status(AccountSocketStatus.CONNECTING)
         fun open() = status(AccountSocketStatus.CONNECTED)
         fun changed() = event(AccountStreamEvent(AccountStreamEventType.ACCOUNT_CHANGED, 1L))
+        fun disconnect() {
+            status(AccountSocketStatus.DISCONNECTED)
+            failure(AccountSocketFailure())
+        }
         override fun close() { closed = true }
     }
 }
