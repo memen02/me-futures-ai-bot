@@ -8,6 +8,8 @@ internal data class IndicatorSnapshot(
     val timeframe: Timeframe,
     val closedAtMs: Long,
     val candleCount: Int,
+    val close: Double,
+    val macd: MacdPoint?,
     val ema20: Double?,
     val ema50: Double?,
     val rsi14: Double?,
@@ -26,6 +28,8 @@ internal object IndicatorSnapshotEngine {
         val input = IndicatorInput.from(stable, exchangeTimeMs) ?: return null
         return IndicatorSnapshot(
             input.symbol, input.timeframe, input.closedAtMs, input.candleCount,
+            input.close,
+            MacdEngine.series(input.closes)?.lastOrNull(),
             IndicatorMath.ema(input.closes, 20),
             IndicatorMath.ema(input.closes, 50),
             RsiEngine.series(input.closes)?.lastOrNull(),
