@@ -310,6 +310,26 @@ internal class MultiTimeframeRepository(
         }
     }
 
+    // Call from an analysis worker, not the Android UI thread.
+    fun indicatorSnapshot(symbol: String): com.mefuturesaibot.app.ai.indicators.MultiTimeframeIndicators? {
+        val captured = synchronized(lifecycle) {
+            if (closed) return null
+            val bounds = clock.bounds(elapsed()) ?: return null
+            bounds.latest to cache.snapshot(symbol, bounds.latest).filterValues {
+                it.fresh(bounds.earliest)
+            }
+        }
+        val result = com.mefuturesaibot.app.ai.indicators.MultiTimeframeIndicatorEngine.calculate(
+            symbol, captured.second, captured.first
+        )
+        return synchronized(lifecycle) {
+            if (closed) return null
+            val bounds = clock.bounds(elapsed()) ?: return null
+            if (captured.second.values.any { !it.fresh(bounds.earliest) || !it.fresh(bounds.latest) }) return null
+            result
+        }
+    }
+
     override fun close() {
         synchronized(lifecycle) {
             closed = true
