@@ -7,8 +7,8 @@ import com.mefuturesaibot.app.security.UiAccess
 
 /** Foreground-only display monitoring; never supplies execution balances. */
 internal class AccountMonitoringDisplay(private val activity: Activity) : AutoCloseable {
-    private val demo = CredentialVault(activity, demo = true)
-    private val real = CredentialVault(activity)
+    private val demo by lazy { CredentialVault(activity.applicationContext, demo = true) }
+    private val real by lazy { CredentialVault(activity.applicationContext) }
     private fun vault(venue: FuturesVenue) = if (venue == FuturesVenue.DEMO) demo else real
     private val coordinator = AccountMonitoringCoordinator(
         currentRevision = { vault(it).revision() }
