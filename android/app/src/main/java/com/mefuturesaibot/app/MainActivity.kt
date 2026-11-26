@@ -47,7 +47,11 @@ class MainActivity : SecureActivity() {
 
     override fun onStart() {
         super.onStart()
-        startForegroundService(Intent(this, ScreeningService::class.java))
+        try {
+            startForegroundService(Intent(this, ScreeningService::class.java))
+        } catch (_: RuntimeException) {
+            android.widget.Toast.makeText(this, "Scanner gagal dimulai", android.widget.Toast.LENGTH_LONG).show()
+        }
         visible = true
         pollRunnable.run()
     }
