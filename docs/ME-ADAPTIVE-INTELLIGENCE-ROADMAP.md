@@ -27,3 +27,19 @@ Status: proposed development requirements; not implemented or validated by this 
 ## Delivery order
 
 Complete account monitoring integration/concurrency tests and security lifecycle first. Audit existing AI modules to avoid duplication. Implement feature/data contracts, deterministic engines, risk vetoes, backtest and replay, shadow evaluation, bounded adaptation, UI explanations, then paper validation. Each increment requires source review, tests and CI evidence before being marked complete.
+
+## Smart Resource Manager and Auto Cleaner
+
+Proposed requirements, not implemented yet. Target Android devices with limited RAM, including 4 GB devices.
+
+- Bound memory caches by size, age and priority. Respond to Android memory-pressure callbacks by releasing nonessential cached objects; do not force garbage collection or clear other apps.
+- Expire disposable market cache entries with per-data-type TTLs; preserve indicator warm-up windows and mark missing or stale data unavailable until refreshed.
+- Bound worker queues, cancel obsolete tasks, close unused sockets and executors, and prevent duplicate connections. Preserve active position monitoring and reconciliation.
+- Rotate sanitized logs by size and age. Deduplicate market data using stable identifiers. Perform database maintenance off the UI thread and only when safe; use transactional retention policies.
+- Monitor app heap, cache sizes, queue depths, storage, reconnect counts, thermal status and task latency. Use supported Android APIs and avoid requesting root or broad storage access.
+- Reduce nonessential scan frequency and parallelism under thermal, memory or battery pressure; never silently relax risk checks. Block new entries when critical data or monitoring is degraded.
+- Schedule bounded, non-overlapping cleanup during idle opportunities; use monotonic clocks and backoff. Android background execution is not guaranteed.
+- Never delete API credentials, consent records, active orders, positions, reconciliation state, trade ledger, audit evidence, strategy versions or training data needed for reproducibility. No automatic clearing of all app data.
+- Provide a resource-health dashboard, last cleanup time, reclaimed cache bytes, and a safe manual cleanup action. Report unavailable metrics honestly.
+- Test low-memory behavior, repeated start/stop, reconnect storms, cleanup during active monitoring, database integrity, bounded storage and long-duration device stability.
+- Audit existing cache and worker ownership before implementation. Preserve all intelligence modules and safety gates above.
