@@ -130,9 +130,18 @@ class MainActivity : SecureActivity() {
         // Catatan: permintaan izin notifikasi sudah dipindah ke onCreate() (lihat
         // komentar di sana) -- tidak diulang di sini supaya tidak memunculkan
         // dialog dua kali kalau pengguna menekan Start berulang.
+        if (!com.mefuturesaibot.app.security.UiAccess.allowed(this)) return
+        val previous = BotPreferences.shouldRun(this)
         userRequestedStop = false
         BotPreferences.setShouldRun(this, true)
-        startForegroundService(Intent(this, BotForegroundService::class.java))
+        try {
+            startForegroundService(Intent(this, BotForegroundService::class.java))
+        } catch (_: RuntimeException) {
+            BotPreferences.setShouldRun(this, previous)
+            userRequestedStop = !previous
+            android.widget.Toast.makeText(this, "Bot gagal dimulai", android.widget.Toast.LENGTH_LONG).show()
+            refreshStatusText()
+        }
     }
 
     private fun onStopClicked() {
