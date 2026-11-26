@@ -117,6 +117,7 @@ class MainActivity : SecureActivity() {
 
     override fun onSecuritySettingsChanged() {
         super.onSecuritySettingsChanged()
+        if (::desk.isInitialized) desk.pauseAccountMonitoring()
         refreshSecuritySettings()
     }
 
