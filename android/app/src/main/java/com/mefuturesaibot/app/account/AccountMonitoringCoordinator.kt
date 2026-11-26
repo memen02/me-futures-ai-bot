@@ -70,11 +70,20 @@ internal class AccountMonitoringCoordinator(
         override fun close() {
             balanceGeneration = null
 
+            var failure: Exception? = null
             try {
                 session.close()
-            } finally {
-                balance.close()
+            } catch (error: Exception) {
+                failure = error
             }
+            try {
+                balance.close()
+            } catch (error: Exception) {
+                val first = failure
+                if (first == null) failure = error
+                else if (first !== error) first.addSuppressed(error)
+            }
+            failure?.let { throw it }
         }
     }
 
@@ -293,7 +302,11 @@ internal class AccountMonitoringCoordinator(
             return true
 
         } catch (failure: Exception) {
-            active = null
+            try {
+                stop()
+            } catch (cleanup: Exception) {
+                if (cleanup !== failure) failure.addSuppressed(cleanup)
+            }
             throw failure
         }
     }
@@ -329,7 +342,10 @@ internal class AccountMonitoringCoordinator(
         return AccountMonitoringSnapshot(
             venue = resources.token.venue,
             session = session,
-            balanceStatus = balance.status,
+            balanceStatus = if (visible == null &&
+                (balance.status == AccountBalanceStatus.READY ||
+                    balance.status == AccountBalanceStatus.REFRESHING)
+            ) AccountBalanceStatus.STALE else balance.status,
             balance = visible
         )
     }
