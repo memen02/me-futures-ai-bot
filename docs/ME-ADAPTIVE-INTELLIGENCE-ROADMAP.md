@@ -58,3 +58,18 @@ Proposed UI requirements; audit existing screens and preserve working features b
 - Reports: equity curve, realized net PnL, drawdown, win rate with sample count, profit factor, expectancy, costs and strategy breakdown; show unavailable data explicitly.
 - Use real measured values only in production; distinguish loading, stale, unavailable, error and empty states. Never display fake account metrics or expose secrets.
 - Optimize rendering for 4 GB Android devices: bounded lists, lifecycle-aware updates, lazy detail screens, no unnecessary animations, no blocking UI thread. Test accessibility, small screens, lock/background transitions, venue switching and low-memory behavior.
+
+## Swing Trading Intelligence and Token Detail
+
+Proposed requirements; no forecast accuracy or implementation is established by this document.
+
+- Use closed 1D, 3D and 1W candles for primary directional bias and multi-day swing scenarios; 1M for broader context and 4H/1H for entry refinement. Preserve existing intraday modes and timeframe support. Explicitly label incomplete candles and never use future data.
+- Token detail: verified original project logo mapped to exchange instrument identity, cached with bounded storage and safe fallback; actual Binance OHLCV candlestick chart, zoom/pan/crosshair, timeframe selector, OHLC and volume, EMA/SMA, optional overlays, support/resistance, liquidity, BOS/CHoCH, entry/SL/TP and invalidation levels.
+- Candlestick registry: single-candle hammer, inverted hammer, hanging man, shooting star, doji variants, spinning top, marubozu; two-candle bullish/bearish engulfing, harami, piercing line, dark cloud cover, tweezers, inside/outside bars; three/multi-candle morning/evening star, three white soldiers/black crows, rising/falling three methods. Extend with documented definitions, tolerances, mirrored cases, context and deterministic tests; avoid claiming exhaustive coverage of all named variants.
+- Explain every token decision: bullish/bearish/sideways regime, trend strength, continuation/reversal/pullback/countertrend/breakout/fake breakout, candle pattern and timestamp, evidence for and against LONG/SHORT, independent confirmations, vetoes, uncertainty, data freshness and strategy version.
+- Multi-day scenarios for 1–3, 3–7 and 7–14 days: conditional bullish/base/bearish paths, price zones, invalidation and calibrated uncertainty when supported by held-out validation. No guaranteed future prices or exact entry/exit times.
+- Entry planner: conditional price zone, closed-candle confirmation, retest/pullback or breakout trigger, order expiry and WAIT state; cancel plan if regime changes, data stale, invalidation reached or net RR below minimum.
+- Stop loss set before entry from market structure and volatility, with exchange filters and liquidation buffer. Position sizing based on stop distance and all costs; reject infeasible risk. Protective orders and reconciliation must follow existing execution safety gates. Never widen SL merely to avoid realizing loss.
+- Exit planner: target zones, optional tested partial exits and trailing stops, time-based expiry and thesis invalidation; account for multi-day funding costs, gaps/slippage, margin and liquidation risk. Distinguish planned versus actual fills.
+- Evaluate swing strategies separately from intraday strategies with walk-forward tests, realistic costs, non-overlapping or appropriately purged labels, sufficient independent trades and paper validation longer than 30 days when needed. No automatic real-money promotion.
+- Use lazy chart loading, bounded candle history and incremental indicator calculations for 4 GB devices. Preserve all existing intelligence, cleaner, UI and safety requirements.
