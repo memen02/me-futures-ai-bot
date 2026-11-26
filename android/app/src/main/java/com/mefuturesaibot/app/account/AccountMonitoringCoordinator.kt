@@ -1,6 +1,8 @@
 package com.mefuturesaibot.app.account
 
 import android.os.SystemClock
+import android.os.Looper
+import com.mefuturesaibot.app.exchange.Scheduler
 import com.mefuturesaibot.app.BuildConfig
 import com.mefuturesaibot.app.demo.FuturesVenue
 import com.mefuturesaibot.app.exchange.AndroidHandlerScheduler
@@ -18,6 +20,22 @@ internal data class AccountMonitoringSnapshot(
     val balance: AccountBalance?
 )
 
+/** Injectable factories must return fresh resources on the owner thread. */
+internal class AccountMonitoringDependencies(
+    val balanceFactory: (FuturesVenue, BinanceCredentials) -> AccountBalanceFactory =
+        AccountBalanceDependencies::balanceFactory,
+    val keyFactory: (FuturesVenue, String) -> AccountSessionKeyFactory =
+        AccountSessionDependencies::keyFactory,
+    val socketFactory: (FuturesVenue, () -> Scheduler) -> AccountSessionSocketFactory =
+        AccountSessionDependencies::socketFactory,
+    val schedulerFactory: () -> Scheduler = {
+        check(Looper.myLooper() === Looper.getMainLooper()) {
+            "Production monitoring requires main thread"
+        }
+        AndroidHandlerScheduler()
+    }
+)
+
 /**
  * Coordinates one immutable venue and credential
  * revision at a time.
@@ -33,7 +51,8 @@ internal class AccountMonitoringCoordinator(
     private val scope: AccountMonitoringRateLimitScope =
         AccountMonitoringRateLimitScope.processWide,
     private val elapsed: () -> Long =
-        { SystemClock.elapsedRealtime() }
+        { SystemClock.elapsedRealtime() },
+    private val dependencies: AccountMonitoringDependencies = AccountMonitoringDependencies()
 ) : AutoCloseable {
 
     private val owner = Thread.currentThread()
@@ -100,24 +119,30 @@ internal class AccountMonitoringCoordinator(
 
         val venue = token.venue
 
+        val balanceScheduler = dependencies.schedulerFactory()
         val balance = AccountBalanceController(
             venue = venue,
-            factory = AccountBalanceDependencies
-                .balanceFactory(venue, keys),
-            scheduler = AndroidHandlerScheduler(),
+            factory = dependencies.balanceFactory(venue, keys),
+            scheduler = balanceScheduler,
             rateLimitGuard = scope.guard,
             elapsed = elapsed
         )
 
         try {
+            val sessionScheduler = dependencies.schedulerFactory()
+            check(sessionScheduler !== balanceScheduler) {
+                "Monitoring schedulers must be isolated"
+            }
             val session = AccountSessionManager(
-                keyFactory = AccountSessionDependencies
-                    .keyFactory(venue, keys.key),
-                socketFactory = AccountSessionDependencies
-                    .socketFactory(venue) {
-                        AndroidHandlerScheduler()
-                    },
-                scheduler = AndroidHandlerScheduler(),
+                keyFactory = dependencies.keyFactory(venue, keys.key),
+                socketFactory = dependencies.socketFactory(venue) {
+                    dependencies.schedulerFactory().also {
+                        check(it !== balanceScheduler && it !== sessionScheduler) {
+                            "Socket scheduler must be isolated"
+                        }
+                    }
+                },
+                scheduler = sessionScheduler,
                 rateLimitGuard = scope.guard,
                 onState = { state ->
                     handleSessionState(token, state)
