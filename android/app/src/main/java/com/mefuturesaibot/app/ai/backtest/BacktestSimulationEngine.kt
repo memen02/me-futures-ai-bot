@@ -3,12 +3,18 @@ package com.mefuturesaibot.app.ai.backtest
 internal enum class BacktestSide { LONG, SHORT }
 internal data class BacktestSignal(val side: BacktestSide, val stop: Double, val target: Double)
 internal data class BacktestTrade(val entryTime: Long, val exitTime: Long,
-    val side: BacktestSide, val entry: Double, val exit: Double, val netReturn: Double)
+    val side: BacktestSide, val entry: Double, val exit: Double, val netReturn: Double,
+    val plannedRisk: Double? = null)
 
 // Research-only, single position, next-bar open entry, stop-first ambiguity.
 // Fixed per-side fee and adverse slippage assumptions; no leverage or funding model.
 internal object BacktestSimulationEngine {
     fun run(data: HistoricalMarketData, fee: Double, slippage: Double,
+        strategy: (List<HistoricalBar>) -> BacktestSignal?): List<BacktestTrade> =
+        runFiltered(data,fee,slippage,null,strategy)
+
+    fun runFiltered(data: HistoricalMarketData, fee: Double, slippage: Double,
+        risk: ((BacktestSignal, Double) -> Double?)?,
         strategy: (List<HistoricalBar>) -> BacktestSignal?): List<BacktestTrade> {
         require(fee.isFinite() && fee in 0.0..0.01)
         require(slippage.isFinite() && slippage in 0.0..0.01)
@@ -26,6 +32,8 @@ internal object BacktestSimulationEngine {
                 i++
                 continue
             }
+            val planned = risk?.invoke(signal,entry)
+            if (risk != null && (planned == null || !planned.isFinite() || planned <= 0)) { i++; continue }
             val start = i
             while (i < bars.size) {
                 val bar = bars[i]
@@ -42,7 +50,7 @@ internal object BacktestSimulationEngine {
                     val net = (if (long) exit-entry else entry-exit)/entry - fee*(1+exit/entry)
                     check(net.isFinite())
                     trades.add(BacktestTrade(bars[start].openTime,bar.openTime+data.intervalMs,
-                        signal.side,entry,exit,net))
+                        signal.side,entry,exit,net,planned))
                     i++
                     break
                 }
