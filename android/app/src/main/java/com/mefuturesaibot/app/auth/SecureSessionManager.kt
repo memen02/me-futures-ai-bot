@@ -1,0 +1,38 @@
+package com.mefuturesaibot.app.auth
+
+import android.os.SystemClock
+
+// Memory-only access token. Process restart requires login. Server remains
+// authoritative for expiry, revocation and role checks on every operation.
+internal class SecureSessionManager(private val clock: () -> Long = { SystemClock.elapsedRealtime() }) {
+    private var grant: AuthGrant? = null
+    private var issuedAt = 0L
+    @Synchronized fun install(value: AuthGrant): Boolean {
+        clear()
+        if (!AccountApprovalPolicy.showTrading(value.identity) ||
+            value.lifetimeSeconds !in 1L..900L ||
+            value.accessToken.length !in 32..4096 ||
+            value.accessToken.any { it.code !in 33..126 }) return false
+        val now = clock()
+        if (now < 0) return false
+        issuedAt = now
+        grant = value
+        return true
+    }
+    @Synchronized private fun active(): AuthGrant? {
+        val value = grant ?: return null
+        val now = clock()
+        if (now < issuedAt || now-issuedAt >= value.lifetimeSeconds*1000L) {
+            clear()
+            return null
+        }
+        return value
+    }
+    @Synchronized fun identity(): AccountIdentity? = active()?.identity
+    @Synchronized fun clear(): String? {
+        val token = grant?.accessToken
+        grant = null
+        issuedAt = 0L
+        return token
+    }
+}
