@@ -1,7 +1,7 @@
 package com.mefuturesaibot.app.ai.resource
 
 import android.content.Context
-import androidx.test.core.app.ApplicationProvider
+import org.robolectric.RuntimeEnvironment
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,7 +21,7 @@ class ResourceSafetyTest {
     }
 
     @Test fun cleanerOnlyDeletesExpiredOwnedFiles() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+        val context = RuntimeEnvironment.getApplication()
         val root = File(context.cacheDir,"ai_disposable_research_v1").apply { mkdirs() }
         val old = File(root,"a".repeat(64)+".cache").apply { writeText("old") }
         val fresh = File(root,"b".repeat(64)+".cache").apply { writeText("fresh") }
