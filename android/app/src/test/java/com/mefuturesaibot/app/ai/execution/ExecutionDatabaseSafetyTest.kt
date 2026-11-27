@@ -1,7 +1,7 @@
 package com.mefuturesaibot.app.ai.execution
 
 import android.content.Context
-import androidx.test.core.app.ApplicationProvider
+import org.robolectric.RuntimeEnvironment
 import com.mefuturesaibot.app.demo.FuturesVenue
 import org.junit.Assert.*
 import org.junit.Test
@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[35])
 class ExecutionDatabaseSafetyTest {
-    private val context = ApplicationProvider.getApplicationContext<Context>()
+    private val context = RuntimeEnvironment.getApplication()
     private val identity = OrderIntentIdentity(FuturesVenue.DEMO,"a".repeat(64),"BTCUSDT","v1",1000)
 
     @Test fun concurrentReservationAndRestart() {
