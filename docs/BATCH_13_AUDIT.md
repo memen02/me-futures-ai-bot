@@ -121,3 +121,6 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 ## Recovery challenge foundation
 - Prior runs 46176907895 and 46176907902 passed. Added isolated 60-second challenge, signature validation, invalidation on rotation and successful recovery, and regression test. New CI pending.
 - Offline compatibility without challenge remains; never expose remotely. Mandatory proof, separate signature domain, Android integration and deployment remain open.
+
+## Mandatory recovery proof
+- Removed unsigned offline recovery compatibility; all successful recovery now requires issued unexpired challenge and matching signature. Updated existing tests and added missing/expired challenge regressions. New CI pending. Separate signature domain, Android integration and deployment remain open.
