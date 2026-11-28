@@ -30,3 +30,11 @@ Setiap perubahan: periksa kode dan audit, perbaiki temuan terverifikasi, tambah 
 - Target APK Owner terpisah dengan package ID berbeda, distribusi melalui repository GitHub private yang hanya dapat diakses Owner dan pihak yang secara eksplisit diberi akses. Owner dapat mengunduh rilis sendiri. Repository private belum dibuat; jangan ubah visibility repository saat ini tanpa persetujuan.
 - Satu perangkat Owner aktif lintas Android/iOS; migrasi dengan verifikasi tambahan, pencabutan sesi/perangkat lama secara atomik dan recovery aman. Backend dan data akun tetap sama.
 - Step 6: device proof Owner dan revocation setelah process death masih terbuka. Step 8: validasi migrasi dan recovery. Step 10: packaging, signing, private distribution dan pengujian akses unduhan. Tidak boleh dianggap selesai sebelum implementasi dan pengujian.
+
+## Owner disaster recovery — explicit requirement
+- Owner approved making the existing repository private at distribution finalization; visibility remains unchanged for now.
+- Lost phone, factory reset, uninstall and damaged device must not permanently lock out Owner. Private downloadable signed APK releases must remain available independently of the original phone.
+- Preserve signing identity securely off-device, never commit private signing keys. Maintain independent GitHub account recovery and ME Project recovery credentials.
+- Recover on a new device without the old phone using independently stored recovery credentials; require additional verification, rate limits, one-time recovery credentials stored as hashes, atomic old-device/session revocation and audit trail. No password-only recovery bypass.
+- Back up backend database securely and test restore, including accounts, licenses and approvals. APK download alone does not restore server data or grant access.
+- Acceptance tests: lost-device recovery, old device denied, replay denied, reinstall, signed APK update, backup restore and private download access. Implementation and deployment pending.
