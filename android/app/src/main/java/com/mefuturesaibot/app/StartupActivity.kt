@@ -2,6 +2,9 @@ package com.mefuturesaibot.app
 
 import android.animation.ValueAnimator
 import com.mefuturesaibot.app.auth.ApplicationAuthentication
+import com.mefuturesaibot.app.auth.AuthenticationView
+import com.mefuturesaibot.app.auth.AuthenticatedNavigation
+import android.widget.ScrollView
 import com.mefuturesaibot.app.security.SecureActivity
 import android.content.Intent
 import android.graphics.Typeface
@@ -23,6 +26,8 @@ import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
 import com.mefuturesaibot.app.exchange.ReconnectingWebSocket.ConnectionStatus
 
 class StartupActivity : SecureActivity() {
+    private var loginView: AuthenticationView? = null
+    private var navigation: AuthenticatedNavigation? = null
     private val handler = Handler(Looper.getMainLooper())
     private val clock = ExchangeClock()
     private var connection = ConnectionStatus.CONNECTING
@@ -142,7 +147,39 @@ class StartupActivity : SecureActivity() {
             )
         }
 
-        beginChecks()
+        if (ApplicationAuthentication.allowsDashboard()) beginChecks()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!ApplicationAuthentication.allowsDashboard() && canUseProtectedUi()) showAccountLogin()
+    }
+
+    private fun showAccountLogin() {
+        if (loginView != null || isFinishing || isDestroyed) return
+        stopChecks()
+        val runtime = runCatching { ApplicationAuthentication.initializeConfigured() }.getOrNull()
+        if (runtime == null) {
+            summary.text = "Server autentikasi belum tersedia"
+            return
+        }
+        val nav = AuthenticatedNavigation(this, runtime.sessions, runtime.accessGate)
+        navigation = nav
+        val view = AuthenticationView(this, runtime) {
+            if (canUseProtectedUi()) nav.open(
+                onOwner = { openDashboard() },
+                onUser = { openDashboard() },
+                onDenied = { android.widget.Toast.makeText(this, "Verifikasi perangkat diperlukan", android.widget.Toast.LENGTH_SHORT).show() }
+            )
+        }
+        loginView = view
+        setContentView(ScrollView(this).apply { addView(view) })
+    }
+
+    override fun onDestroy() {
+        navigation?.close()
+        loginView?.close()
+        super.onDestroy()
     }
 
     override fun onStop() {
@@ -198,7 +235,7 @@ class StartupActivity : SecureActivity() {
         if (!canUseProtectedUi()) return
         if (!ApplicationAuthentication.allowsDashboard()) {
             stopChecks()
-            summary.text = "Akses akun diperlukan"
+            showAccountLogin()
             return
         }
         if (isFinishing) return
