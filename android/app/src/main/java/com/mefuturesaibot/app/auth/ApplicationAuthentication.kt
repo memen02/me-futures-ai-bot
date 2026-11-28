@@ -1,6 +1,8 @@
 package com.mefuturesaibot.app.auth
 
 import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import com.mefuturesaibot.app.BuildConfig
 
 // Process-wide runtime. Initialize from trusted deployment configuration only,
 // never from a user-supplied URL or an incoming Intent.
@@ -17,6 +19,13 @@ internal object ApplicationAuthentication {
         configuredOrigin = origin
         runtime = created
         return created
+    }
+
+    // Empty configuration is intentional for existing development builds.
+    fun initializeConfigured(): AuthenticationRuntime? {
+        val origin = BuildConfig.AUTH_ORIGIN
+        if (origin.isBlank()) return null
+        return initialize(origin.toHttpUrl())
     }
 
     @Synchronized fun current(): AuthenticationRuntime? = runtime
