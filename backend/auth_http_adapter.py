@@ -22,11 +22,14 @@ def decode_binary(value, maximum):
         raise ValueError("invalid binary")
     return raw
 
+def reject_constant(value):
+    raise ValueError("invalid JSON constant")
+
 def dispatch(service, route, body, authorization=None):
     if not isinstance(body,bytes) or len(body)>MAX_BODY:
         return 413, {"error":"INVALID_REQUEST"}
     try:
-        data = json.loads(body.decode("utf-8"),object_pairs_hook=unique_object)
+        data = json.loads(body.decode("utf-8"),object_pairs_hook=unique_object,parse_constant=reject_constant)
         if not isinstance(data,dict):
             raise ValueError("invalid object")
         if route == "/v1/auth/logout":
