@@ -142,6 +142,29 @@ class AuthTest(unittest.TestCase):
         admin = login(self.path,"owner",self.password)
         self.assertEqual(grant(self.path,admin["accessToken"],admin["accountId"],"FAMILY"),"DENIED")
 
+    def test_enrolled_owner_requires_device_proof(self):
+        import hashlib
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from auth_device_challenges import issue_authenticated
+        from auth_verified_login import verified_login
+        bootstrap_owner(self.path,"owner",self.password)
+        key = ec.generate_private_key(ec.SECP256R1())
+        der = key.public_key().public_bytes(serialization.Encoding.DER,serialization.PublicFormat.SubjectPublicKeyInfo)
+        digest = hashlib.sha256(der).hexdigest()
+        with transaction(self.path) as db:
+            account = db.execute("SELECT id FROM accounts WHERE role='SUPER_ADMIN'").fetchone()[0]
+            db.execute("INSERT INTO device_bindings VALUES(?,?)",(account,digest))
+        self.assertIsNone(login(self.path,"owner",self.password))
+        challenge = issue_authenticated(self.path,"owner",self.password,digest)
+        self.assertIsNotNone(challenge)
+        nonce = challenge["nonce"]
+        message = ("ME-PROJECT-DEVICE-LOGIN-V1:"+account+":"+digest+":"+nonce).encode("ascii")
+        signature = key.sign(message,ec.ECDSA(hashes.SHA256()))
+        result = verified_login(self.path,"owner",self.password,digest,nonce,der,signature)
+        self.assertEqual(result["role"],"SUPER_ADMIN")
+        self.assertIsNone(verified_login(self.path,"owner",self.password,digest,nonce,der,signature))
+
     def test_rate_limit(self):
         for _ in range(5):
             self.assertTrue(permit(self.path,"login_user","tester"))
