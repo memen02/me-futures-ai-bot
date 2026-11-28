@@ -98,7 +98,7 @@ internal class AuthenticationView(
     }
 
     override fun close() {
-        closed = true
+        runtime.sessions.withSessionLock { closed = true }
         worker.close()
         password.text.clear()
         repeated.text.clear()

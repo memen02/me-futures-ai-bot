@@ -36,3 +36,7 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 - Review existing logout paths before further edits. Preserve immediate local logout and protective trading exits.
 - Add regression coverage for App Lock, owner actions, concurrent requests and session invalidation.
 - Only advance to trading authorization audit after documenting verified results. No release approval.
+
+## Authentication view closure follow-up
+- 2f85908: check originating view closure before login and conditional installation.
+- Serialize closure flag with session installation using the existing session monitor. This orders closure and installation, but does not revoke a session installed before closure or address background pause. Verify lifecycle behavior and regression tests before approval.
