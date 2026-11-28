@@ -1,0 +1,38 @@
+package com.mefuturesaibot.app.auth
+
+import org.junit.Assert.*
+import org.junit.Test
+
+class AuthenticationRepositoryRevocationTest {
+    private val identity = AccountIdentity("account_1234567890", "tester", UserRole.USER, AccountStatus.APPROVED)
+    private val token = "a".repeat(64)
+    private class FakeApi : AuthenticationApi {
+        var offline = true
+        var logins = 0
+        var revokes = 0
+        override fun register(username: String, password: CharArray) = RegistrationResult.REJECTED
+        override fun login(username: String, password: CharArray): AuthGrant? {
+            logins++
+            return null
+        }
+        override fun revoke(accessToken: String) {
+            revokes++
+            if (offline) throw IllegalStateException("offline")
+        }
+    }
+    @Test fun failedReplacementBlocksOtherRepositoryUntilRevoked() {
+        val sessions = SecureSessionManager { 1000L }
+        val api = FakeApi()
+        val first = AuthenticationRepository(api, sessions)
+        val second = AuthenticationRepository(api, sessions)
+        assertTrue(sessions.install(AuthGrant(identity, token, 60)))
+        assertFalse(first.login("tester", charArrayOf('x')))
+        assertNull(sessions.identity())
+        assertFalse(second.login("tester", charArrayOf('x')))
+        assertEquals(0, api.logins)
+        api.offline = false
+        assertFalse(second.login("tester", charArrayOf('x')))
+        assertEquals(1, api.logins)
+        assertEquals(3, api.revokes)
+    }
+}
