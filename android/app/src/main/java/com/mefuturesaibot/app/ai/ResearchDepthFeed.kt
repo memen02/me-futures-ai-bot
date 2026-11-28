@@ -2,24 +2,62 @@ package com.mefuturesaibot.app.ai
 
 import com.mefuturesaibot.app.exchange.ReconnectingWebSocket
 import org.json.JSONObject
+import org.json.JSONArray
+import android.os.SystemClock
+import okhttp3.Request
+import java.util.concurrent.TimeUnit
 
-// Public observation only. Partial depth is not accepted as synchronized liquidity
-// until snapshot semantics and coverage have been verified against the venue.
 internal class ResearchDepthFeed {
-    @Volatile private var event: String? = null
-    private val socket = ReconnectingWebSocket(
-        url="wss://fstream.binance.com/public/ws/btcusdt@depth20@500ms",
-        onStatusChange={ event = null },
-        onMessage={ raw ->
-            event = if (raw.length <= 16384 && valid(raw)) raw else null
-        })
-    private fun valid(raw: String): Boolean = try {
-        val obj = JSONObject(raw)
-        obj.getString("s") == "BTCUSDT" && obj.getString("e") == "depthUpdate" &&
-            obj.getLong("E") > 0 && obj.getJSONArray("b").length() in 1..20 &&
-            obj.getJSONArray("a").length() in 1..20
-    } catch (_: Exception) { false }
-    fun start() = socket.connect()
-    fun observed(): Boolean = event != null
-    fun close() { socket.close(); event = null }
+    private val book=ResearchDepthBook()
+    private val client=ReconnectingWebSocket.sharedHttpClient.newBuilder()
+        .callTimeout(5,TimeUnit.SECONDS).retryOnConnectionFailure(false)
+        .followRedirects(false).followSslRedirects(false).build()
+    @Volatile private var closed=false
+    @Volatile private var generation=0L
+    private val socket=ReconnectingWebSocket(
+        url="wss://fstream.binance.com/public/ws/btcusdt@depth@500ms",
+        onStatusChange={ synchronized(this) { generation++; book.clear() } },
+        onMessage={ raw -> synchronized(this) {
+            if (!closed) try {
+                require(raw.length<=131072)
+                val o=JSONObject(raw)
+                require(o.getString("s")=="BTCUSDT" && o.getString("e")=="depthUpdate")
+                book.delta(DepthDelta(o.getLong("U"),o.getLong("u"),o.getLong("pu"),o.getLong("E"),
+                    levels(o.getJSONArray("b")),levels(o.getJSONArray("a"))))
+            } catch (_: Exception) { generation++; book.clear() }
+        } })
+    private fun levels(a: JSONArray): List<Pair<java.math.BigDecimal,java.math.BigDecimal>> {
+        require(a.length()<=1000)
+        return (0 until a.length()).map { i ->
+            val row=a.getJSONArray(i)
+            require(row.length()==2)
+            val p=row.getString(0); val q=row.getString(1)
+            require(p.length<=40 && q.length<=40)
+            p.toBigDecimal() to q.toBigDecimal()
+        }
+    }
+    fun start()=socket.connect()
+    fun refreshSnapshot() {
+        val token=synchronized(this) { if (closed||!book.needsSnapshot()) return; generation }
+        val guard=ResearchApiBudget.guard
+        if (!guard.acquire(SystemClock.elapsedRealtime(),20)) return
+        try {
+            client.newCall(Request.Builder().url("https://fapi.binance.com/fapi/v1/depth?symbol=BTCUSDT&limit=500").build()).execute().use { response ->
+                guard.onHttpResponse(response.code,response.header("Retry-After")?.toLongOrNull(),SystemClock.elapsedRealtime())
+                if (!response.isSuccessful) return
+                val source=response.body.source()
+                if (source.request(262145L)) return
+                val o=JSONObject(source.readUtf8())
+                val bids=levels(o.getJSONArray("bids")); val asks=levels(o.getJSONArray("asks"))
+                synchronized(this) { if (!closed && generation==token) book.anchor(o.getLong("lastUpdateId"),bids,asks) }
+            }
+        } catch (_: Exception) { synchronized(this) { if (generation==token) book.clear() } }
+        finally { guard.release() }
+    }
+    fun liquidity(bounds: AiExchangeClock.Bounds): com.mefuturesaibot.app.ai.decision.LiquiditySnapshot? {
+        val value=book.liquidity() ?: return null
+        return value.takeIf { !closed && it.observedAtMs<=bounds.earliest && bounds.latest-it.observedAtMs in 0..1999 }
+    }
+    fun observed()=book.liquidity()!=null
+    fun close() { synchronized(this) { closed=true; generation++; book.clear() }; socket.close() }
 }
