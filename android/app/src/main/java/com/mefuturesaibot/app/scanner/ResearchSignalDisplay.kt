@@ -9,7 +9,8 @@ internal object ResearchSignalDisplay {
         val parsed = rows.map { it.split(" · ", limit = 4) }
         if (parsed.any { it.size < 3 || it[0] !in setOf("BTCUSDT","ETHUSDT") ||
                 it[1] !in setOf("LONG","SHORT","WAIT") } ||
-            parsed.map { it[0] }.distinct().size != parsed.size) return "Master AI · WAIT"
+            parsed.map { it[0] }.distinct().size != parsed.size ||
+            parsed.any { it[1] != "WAIT" && (it[2] != "AGREEMENT" || it.getOrNull(3)?.toIntOrNull() !in 5..6) }) return "Master AI · WAIT"
         return "Master AI · Riset (bukan order)\n" + parsed.joinToString("\n") {
             val direction = when(it[1]) { "LONG" -> "↑ LONG"; "SHORT" -> "↓ SHORT"; else -> "— WAIT" }
             val reason = when(it[2]) {
