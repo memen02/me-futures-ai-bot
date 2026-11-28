@@ -42,3 +42,5 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 - Serialize closure flag with session installation using the existing session monitor. This orders closure and installation, but does not revoke a session installed before closure or address background pause. Verify lifecycle behavior and regression tests before approval.
 
 - Cancel pending login on Startup pause/close, conditionally clear an installed grant using its expected revision. Review revision ownership assumptions, biometric navigation lifecycle, remote revocation and tests; not yet verified.
+
+- Distinguish individual UI login attempts by object identity, not revision alone, so a canceled callback cannot match a later attempt with the same revision. Remaining: explicit installed-grant ownership instead of revision arithmetic, biometric lifecycle, revocation, logout call sites and CI.

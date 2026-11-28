@@ -16,7 +16,8 @@ internal class AuthenticationView(
 ) : LinearLayout(activity), AutoCloseable {
     private val worker = OwnerRequestWorker()
     @Volatile private var closed = false
-    @Volatile private var pendingLogin: Long? = null
+    private class LoginAttempt(val revision: Long)
+    @Volatile private var pendingLogin: LoginAttempt? = null
     private val username = EditText(activity).apply {
         hint = "Username"
         isSingleLine = true
@@ -71,9 +72,10 @@ internal class AuthenticationView(
         repeated.text.clear()
         val expected = runtime.sessions.revision()
         if (pendingLogin != null) { p.fill('\u0000'); return }
-        pendingLogin = expected
-        if (!worker.submit({ runtime.login(role,name,p,expected) { !closed && pendingLogin == expected } }) { result ->
-            if (pendingLogin != expected) return@submit
+        val attempt = LoginAttempt(expected)
+        pendingLogin = attempt
+        if (!worker.submit({ runtime.login(role,name,p,expected) { !closed && pendingLogin === attempt } }) { result ->
+            if (pendingLogin !== attempt) return@submit
             if (closed || activity.isFinishing || activity.isDestroyed ||
                 (activity as? SecureActivity)?.canUseProtectedUi() != true) {
                 cancelPendingLogin()
@@ -95,7 +97,7 @@ internal class AuthenticationView(
     fun cancelPendingLogin() {
         var token: String? = null
         runtime.sessions.withSessionLock {
-            val expected = pendingLogin
+            val expected = pendingLogin?.revision
             pendingLogin = null
             if (expected != null && runtime.sessions.revision() == expected + 2L) {
                 token = runtime.sessions.clear()
