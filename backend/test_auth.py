@@ -233,6 +233,15 @@ class AuthTest(unittest.TestCase):
         self.assertTrue(recover(self.path,"owner",self.password,secret,digest,nonce=nonce,public_der=der,signature=signature))
         self.assertFalse(recover(self.path,"owner",self.password,secret,digest,nonce=nonce,public_der=der,signature=signature))
 
+    def test_owner_recovery_without_issued_challenge_denied(self):
+        from auth_owner_recovery import provision, recover
+        bootstrap_owner(self.path,"owner",self.password)
+        secret = provision(self.path,"owner")
+        self.assertFalse(recover(self.path,"owner",self.password,secret,"a"*64))
+        with transaction(self.path) as db:
+            self.assertIsNotNone(db.execute("SELECT 1 FROM owner_recovery").fetchone())
+            self.assertIsNone(db.execute("SELECT 1 FROM device_bindings").fetchone())
+
     def test_rate_limit(self):
         for _ in range(5):
             self.assertTrue(permit(self.path,"login_user","tester"))
