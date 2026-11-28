@@ -46,3 +46,9 @@ def initialize(path):
             account_id TEXT PRIMARY KEY REFERENCES accounts(id),
             public_key_digest TEXT NOT NULL UNIQUE
         )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS device_challenges(
+            nonce TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL UNIQUE REFERENCES accounts(id),
+            key_digest TEXT NOT NULL,
+            expires INTEGER NOT NULL
+        )""")
