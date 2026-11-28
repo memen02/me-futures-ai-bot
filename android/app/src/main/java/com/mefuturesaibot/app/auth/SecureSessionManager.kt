@@ -15,8 +15,8 @@ internal class SecureSessionManager(private val clock: () -> Long = { SystemCloc
         val previous = clear()
         return previous to generation
     }
-    @Synchronized fun installIfUnchanged(value: AuthGrant, expected: Long): Boolean {
-        if (generation != expected) return false
+    @Synchronized fun installIfUnchanged(value: AuthGrant, expected: Long, allowed: () -> Boolean = { true }): Boolean {
+        if (generation != expected || !allowed()) return false
         return install(value)
     }
     @Synchronized fun install(value: AuthGrant): Boolean {

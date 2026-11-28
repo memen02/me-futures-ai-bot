@@ -15,7 +15,7 @@ internal class AuthenticationView(
     private val onAuthenticated: () -> Unit
 ) : LinearLayout(activity), AutoCloseable {
     private val worker = OwnerRequestWorker()
-    private var closed = false
+    @Volatile private var closed = false
     private val username = EditText(activity).apply {
         hint = "Username"
         isSingleLine = true
@@ -69,7 +69,7 @@ internal class AuthenticationView(
         val p = take(password)
         repeated.text.clear()
         val expected = runtime.sessions.revision()
-        if (!worker.submit({ runtime.login(role,name,p,expected) }) { result ->
+        if (!worker.submit({ runtime.login(role,name,p,expected) { !closed } }) { result ->
             if (closed || activity.isFinishing || activity.isDestroyed) return@submit
             if (result.getOrNull() == true) {
                 if ((activity as? SecureActivity)?.canUseProtectedUi() == true) onAuthenticated()

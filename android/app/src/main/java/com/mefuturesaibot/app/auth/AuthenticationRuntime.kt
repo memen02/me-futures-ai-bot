@@ -14,9 +14,9 @@ internal class AuthenticationRuntime(origin: HttpUrl) {
     private val user = AuthenticationRepository(
         RoleAuthenticationApi(transport, verified, UserRole.USER), sessions)
 
-    @Synchronized fun login(role: UserRole, username: String, password: CharArray, expected: Long = sessions.revision()): Boolean {
+    @Synchronized fun login(role: UserRole, username: String, password: CharArray, expected: Long = sessions.revision(), allowed: () -> Boolean = { true }): Boolean {
         accessGate.lock()
-        return (if (role == UserRole.SUPER_ADMIN) owner else user).login(username, password, expected)
+        return (if (role == UserRole.SUPER_ADMIN) owner else user).login(username, password, expected, allowed)
     }
 
     @Synchronized fun register(username: String, password: CharArray, repeated: CharArray): RegistrationResult =
