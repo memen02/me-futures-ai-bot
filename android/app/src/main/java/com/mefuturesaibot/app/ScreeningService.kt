@@ -26,6 +26,21 @@ class ScreeningService : Service() {
 
     private val liveTick = object : Runnable {
         override fun run() {
+            val bounds = researchRepository.clockBounds()
+            val book = bounds?.let(researchDepth::liquidity)
+            val active = BotPreferences.shouldRun(this@ScreeningService) && BotForegroundService.isRunning
+            researchStatus = if (!active) "OFFLINE" else if (book == null) "WAIT · depth tidak valid"
+                else {
+                    val decision = researchWorker.read("BTCUSDT")
+                    val expected = when (decision.direction) {
+                        com.mefuturesaibot.app.ai.decision.MasterDirection.LONG -> com.mefuturesaibot.app.ai.decision.EvidenceDirection.LONG
+                        com.mefuturesaibot.app.ai.decision.MasterDirection.SHORT -> com.mefuturesaibot.app.ai.decision.EvidenceDirection.SHORT
+                        else -> null
+                    }
+                    if (expected != null && book.direction("BTCUSDT",bounds!!.latest) != expected)
+                        "WAIT · likuiditas berubah"
+                    else "BTCUSDT · ${decision.direction} · ${decision.reason} · ${decision.confirmations}"
+                }
             val base = marketBase
             val elapsed = SystemClock.elapsedRealtime()
             val marketTime = base.time + elapsed - base.received
@@ -137,6 +152,7 @@ class ScreeningService : Service() {
         researchRepository.close()
         liveHandler.removeCallbacksAndMessages(null)
         liveFeed.close()
+        researchStatus = "OFFLINE"
         marketStatus = "OFFLINE"
         monitor.close()
         scanner.close()
