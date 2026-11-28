@@ -30,7 +30,7 @@ class ScreeningService : Service() {
             val bounds = researchRepository.clockBounds()
             
             val active = BotPreferences.shouldRun(this@ScreeningService) && BotForegroundService.isRunning
-            researchStatus = if (!active) "OFFLINE" else researchDepth.entries.joinToString("\n") { (symbol,feed) ->
+            val nextResearchStatus = if (!active) "OFFLINE" else researchDepth.entries.joinToString("\n") { (symbol,feed) ->
                 val book = bounds?.let(feed::liquidity)
                 if (book == null) "$symbol · WAIT · depth tidak valid"
                 else {
@@ -45,7 +45,7 @@ class ScreeningService : Service() {
                     else "$symbol · ${decision.direction} · ${decision.reason} · ${decision.confirmations}"
                 }
             }
-            researchUpdatedElapsed = SystemClock.elapsedRealtime()
+            researchDisplay = ResearchDisplaySnapshot(nextResearchStatus, SystemClock.elapsedRealtime())
             val base = marketBase
             val elapsed = SystemClock.elapsedRealtime()
             val marketTime = base.time + elapsed - base.received
@@ -167,8 +167,7 @@ class ScreeningService : Service() {
         if (::researchRepository.isInitialized) researchRepository.close()
         liveHandler.removeCallbacksAndMessages(null)
         liveFeed.close()
-        researchStatus = "OFFLINE"
-        researchUpdatedElapsed = 0L
+        researchDisplay = ResearchDisplaySnapshot("OFFLINE",0L)
         marketStatus = "OFFLINE"
         monitor.close()
         scanner.close()
@@ -179,11 +178,11 @@ class ScreeningService : Service() {
         super.onDestroy()
     }
     companion object {
-        @Volatile internal var researchUpdatedElapsed = 0L
+        internal data class ResearchDisplaySnapshot(val status:String,val updatedElapsed:Long)
+        @Volatile internal var researchDisplay = ResearchDisplaySnapshot("OFFLINE",0L)
             private set
-
-        @Volatile internal var researchStatus = "OFFLINE"
-            private set
+        internal val researchStatus get() = researchDisplay.status
+        internal val researchUpdatedElapsed get() = researchDisplay.updatedElapsed
 
         @Volatile internal var latest = Scan()
             private set
