@@ -15,7 +15,7 @@ internal class AuthenticationRepository(private val api: AuthenticationApi,
             repeated.fill('\u0000')
         }
     }
-    @Synchronized fun login(username: String, password: CharArray, expected: Long = sessions.revision(), allowed: () -> Boolean = { true }): Boolean {
+    @Synchronized fun login(username: String, password: CharArray, expected: Long = sessions.revision(), owner: Any? = null, allowed: () -> Boolean = { true }): Boolean {
         try {
             // Fail closed if the previous server session cannot be revoked.
             if (!allowed()) return false
@@ -27,7 +27,7 @@ internal class AuthenticationRepository(private val api: AuthenticationApi,
             if (password.size !in 1..128) return false
             if (!allowed()) return false
             val grant = api.login(normalized,password) ?: return false
-            if (grant.identity.username != normalized || !sessions.installIfUnchanged(grant, revision, allowed)) {
+            if (grant.identity.username != normalized || !sessions.installIfUnchanged(grant, revision, owner, allowed)) {
                 try { api.revoke(grant.accessToken) } catch (_: Exception) { /* rejected locally */ }
                 return false
             }

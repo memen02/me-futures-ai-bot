@@ -74,7 +74,7 @@ internal class AuthenticationView(
         if (pendingLogin != null) { p.fill('\u0000'); return }
         val attempt = LoginAttempt(expected)
         pendingLogin = attempt
-        if (!worker.submit({ runtime.login(role,name,p,expected) { !closed && pendingLogin === attempt } }) { result ->
+        if (!worker.submit({ runtime.login(role,name,p,expected,attempt) { !closed && pendingLogin === attempt } }) { result ->
             if (pendingLogin !== attempt) return@submit
             if (closed || activity.isFinishing || activity.isDestroyed ||
                 (activity as? SecureActivity)?.canUseProtectedUi() != true) {
@@ -97,11 +97,9 @@ internal class AuthenticationView(
     fun cancelPendingLogin() {
         var token: String? = null
         runtime.sessions.withSessionLock {
-            val expected = pendingLogin?.revision
+            val attempt = pendingLogin
             pendingLogin = null
-            if (expected != null && runtime.sessions.revision() == expected + 2L) {
-                token = runtime.sessions.clear()
-            }
+            if (attempt != null) token = runtime.sessions.clearOwnedGrant(attempt)
         }
         token?.let { value -> Thread { runtime.revokeSession(value) }.start() }
     }

@@ -8,6 +8,9 @@ internal class SecureSessionManager(private val clock: () -> Long = { SystemCloc
     private var grant: AuthGrant? = null
     private var issuedAt = 0L
     private var generation = 0L
+    private var grantOwner: Any? = null
+    @Synchronized fun clearOwnedGrant(owner: Any): String? =
+        if (grantOwner === owner) clear() else null
     @Synchronized fun sessionGeneration(): Long? = if (active() != null) generation else null
     @Synchronized fun withSessionLock(action: () -> Unit) = action()
     @Synchronized fun revision(): Long = generation
@@ -16,9 +19,11 @@ internal class SecureSessionManager(private val clock: () -> Long = { SystemCloc
         val previous = clear()
         return previous to generation
     }
-    @Synchronized fun installIfUnchanged(value: AuthGrant, expected: Long, allowed: () -> Boolean = { true }): Boolean {
+    @Synchronized fun installIfUnchanged(value: AuthGrant, expected: Long, owner: Any? = null, allowed: () -> Boolean = { true }): Boolean {
         if (generation != expected || !allowed()) return false
-        return install(value)
+        if (!install(value)) return false
+        grantOwner = owner
+        return true
     }
     @Synchronized fun install(value: AuthGrant): Boolean {
         clear()
@@ -53,6 +58,7 @@ internal class SecureSessionManager(private val clock: () -> Long = { SystemCloc
         generation++
         val token = grant?.accessToken
         grant = null
+        grantOwner = null
         issuedAt = 0L
         return token
     }
