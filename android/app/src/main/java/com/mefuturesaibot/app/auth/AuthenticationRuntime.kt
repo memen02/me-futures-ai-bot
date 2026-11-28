@@ -6,6 +6,7 @@ import okhttp3.HttpUrl
 // Blocking operations must run off the main thread.
 internal class AuthenticationRuntime(origin: HttpUrl) {
     val sessions = SecureSessionManager()
+    val accessGate = LocalAccessGate(sessions)
     private val transport = HttpsAuthenticationApi(origin)
     private val verified = VerifiedDeviceAuthentication(transport, KeystoreDeviceSigner)
     private val owner = AuthenticationRepository(
@@ -19,12 +20,15 @@ internal class AuthenticationRuntime(origin: HttpUrl) {
     @Synchronized fun register(username: String, password: CharArray, repeated: CharArray): RegistrationResult =
         user.register(username, password, repeated)
 
-    @Synchronized fun logout() = owner.logout()
+    @Synchronized fun logout() {
+        accessGate.lock()
+        owner.logout()
+    }
 
     fun deviceCode(): String = DeviceLoginProof.digest(KeystoreDeviceSigner.publicDer())
 
     fun ownerPanel(activity: android.app.Activity, onError: (String) -> Unit): OwnerPanelHost {
-        check(sessions.ownerToken() != null) { "OWNER session required" }
+        check(accessGate.allowsOwnerScreen()) { "OWNER session required" }
         return OwnerPanelHost(activity, sessions, transport, onError)
     }
 }
