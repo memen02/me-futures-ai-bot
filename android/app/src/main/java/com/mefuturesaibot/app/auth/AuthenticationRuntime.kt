@@ -35,11 +35,17 @@ internal class AuthenticationRuntime(origin: HttpUrl) {
     // Local logout is immediate; callers revoke the returned token off the UI thread.
     fun clearLocalSession(): String? {
         accessGate.lock()
-        return sessions.clear()
+        var token: String? = null
+        sessions.withSessionLock {
+            token = sessions.clear()
+            token?.let(sessions::rememberPendingRevocation)
+        }
+        return token
     }
 
     fun revokeSession(token: String) {
-        runCatching { transport.revoke(token) }
+        sessions.rememberPendingRevocation(token)
+        runCatching { transport.revoke(token) }.onSuccess { sessions.confirmRevocation(token) }
     }
 
     fun deviceCode(): String = DeviceLoginProof.digest(KeystoreDeviceSigner.publicDer())

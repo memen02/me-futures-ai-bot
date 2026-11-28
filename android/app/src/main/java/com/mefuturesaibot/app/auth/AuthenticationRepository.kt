@@ -32,13 +32,17 @@ internal class AuthenticationRepository(private val api: AuthenticationApi,
             if (!allowed()) return false
             val grant = api.login(normalized,password) ?: return false
             if (grant.identity.username != normalized || !sessions.installIfUnchanged(grant, revision, owner, allowed)) {
-                try { api.revoke(grant.accessToken) } catch (_: Exception) { /* rejected locally */ }
+                try { api.revoke(grant.accessToken) } catch (_: Exception) { sessions.rememberPendingRevocation(grant.accessToken) }
                 return false
             }
             return true
         } finally { password.fill('\u0000') }
     }
     @Synchronized fun logout() {
-        sessions.clear()?.let { api.revoke(it) }
+        sessions.clear()?.let { token ->
+            sessions.rememberPendingRevocation(token)
+            api.revoke(token)
+            sessions.confirmRevocation(token)
+        }
     }
 }
