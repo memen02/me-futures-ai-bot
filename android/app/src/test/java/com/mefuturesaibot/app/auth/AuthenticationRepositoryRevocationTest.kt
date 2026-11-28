@@ -35,4 +35,17 @@ class AuthenticationRepositoryRevocationTest {
         assertEquals(1, api.logins)
         assertEquals(3, api.revokes)
     }
+    @Test fun failedLogoutRemainsPending() {
+        val sessions = SecureSessionManager { 1000L }
+        val api = FakeApi()
+        val repository = AuthenticationRepository(api, sessions)
+        assertTrue(sessions.install(AuthGrant(identity, token, 60)))
+        try {
+            repository.logout()
+            fail("Expected offline error")
+        } catch (_: IllegalStateException) {}
+        assertNull(sessions.identity())
+        assertFalse(repository.login("tester", charArrayOf('x')))
+        assertEquals(0, api.logins)
+    }
 }
