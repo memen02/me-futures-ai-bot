@@ -27,9 +27,8 @@ class ScreeningService : Service() {
 
     private val liveTick = object : Runnable {
         override fun run() {
-            val bounds = researchRepository.clockBounds()
-            
             val active = BotPreferences.shouldRun(this@ScreeningService) && BotForegroundService.isRunning
+            val bounds = if (active) researchRepository.clockBounds() else null
             val nextResearchStatus = if (!active) "OFFLINE" else researchDepth.entries.joinToString("\n") { (symbol,feed) ->
                 val book = bounds?.let(feed::liquidity)
                 if (book == null) "$symbol · WAIT · depth tidak valid"
@@ -60,11 +59,10 @@ class ScreeningService : Service() {
                     ticker.time >= (row.ticker?.time ?: 0L)
                 ) {
                     liveCount++
-                    row.copy(ticker = ticker)
+                    if (row.ticker == ticker) row else row.copy(ticker = ticker)
                 } else {
-                    row.copy(ticker = row.ticker?.takeIf {
-                        restFresh && it.fresh(marketTime)
-                    })
+                    val fallback = row.ticker?.takeIf { restFresh && it.fresh(marketTime) }
+                    if (row.ticker == fallback) row else row.copy(ticker = fallback)
                 }
             }
 
