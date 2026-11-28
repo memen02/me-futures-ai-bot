@@ -75,4 +75,18 @@ class AuthenticationRepositoryRevocationTest {
         assertEquals(0, api.logins)
         assertTrue(password.all { it == '\u0000' })
     }
+    @Test fun rejectedRoleGrantRemainsPendingWhenOffline() {
+        val sessions = SecureSessionManager { 1000L }
+        val api = object : AuthenticationApi {
+            override fun register(username: String, password: CharArray) = RegistrationResult.REJECTED
+            override fun login(username: String, password: CharArray) = AuthGrant(identity, token, 60)
+            override fun revoke(accessToken: String) { throw IllegalStateException("offline") }
+        }
+        val role = RoleAuthenticationApi(api, api, UserRole.SUPER_ADMIN, sessions)
+        try {
+            role.login("tester", charArrayOf('x'))
+            fail("Expected revocation failure")
+        } catch (_: IllegalStateException) {}
+        assertTrue(sessions.flushPendingRevocation { assertEquals(token, it) })
+    }
 }
