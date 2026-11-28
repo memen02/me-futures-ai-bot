@@ -2,9 +2,22 @@
 
 Nama aplikasi Android adalah **ME Project**. Nomor build tersedia di tab Akun, bagian Perangkat.
 
-**Fase saat ini:** scanner pasar publik dan simulasi transaksi otomatis pada perangkat Android.
-Pengujian Stop, notifikasi, jaringan, dan reboot pada HP untuk revisi ini masih tertunda.
-Lihat [skenario uji perangkat](TEST_PLAN.md#uji-pemantauan-di-hp).
+## Status pengembangan per 28 November 2026
+
+Basis pemeriksaan adalah `chatgpt/realtime-scanner` pada `7a5bfaa8`, turunan langsung checkpoint Fase 1 `5d2bd62f`. Tabel lama di bawah mencatat perjalanan implementasi. Bukti build terbaru tersedia pada workflow branch pengembangan.
+
+|Area|Sudah ada dalam kode|Pekerjaan terbuka|
+|---|---|---|
+|Pasar dan riset AI|Scanner kontrak, ticker live, monitor Paper dan pilot riset BTCUSDT/ETHUSDT dengan candle 1m/5m, depth dan status WAIT.|Validasi end-to-end pada data nyata dan pengukuran RAM, CPU serta baterai di HP 4 GB.|
+|Siklus Stop/Start|Dalam perubahan ini, tick scanner membuka sesi riset hanya saat bot aktif. Stop menutup WebSocket riset, permintaan snapshot yang sedang berjalan, cache dan worker. Start memakai sesi baru. Scanner harga dan monitor posisi tetap berjalan dengan siklusnya sendiri.|Uji layar terkunci, perpindahan jaringan, reboot dan 24–72 jam di perangkat. Waktu penerapan Stop bergantung pada tick service berikutnya dan penjadwalan Android.|
+|Antrean order book riset|Sebelum diproses di Android, tiap koneksi depth riset menampung maksimal delapan pesan dengan total 262.144 karakter. Saat penuh, likuiditas sesi langsung dianggap invalid dan koneksi dibangun kembali untuk sinkronisasi snapshot.|Ukur frekuensi overflow dan waktu pemulihan pada jaringan perangkat nyata.|
+|Akun, lisensi dan perangkat|Monitoring akun, pemisahan venue dan fondasi skema lisensi/pengikatan perangkat ada di repo.|Deployment backend, verifikasi UI/layanan dan pengelolaan lisensi end-to-end.|
+|Order dan risiko|RiskPlan, jurnal intent, pemulihan dan pelindung SL/TP tersedia pada jalur yang ada. Sinyal pilot digunakan untuk riset.|Validasi Binance Demo, rekonsiliasi saat putus jaringan dan tinjauan seluruh jalur entry sebelum persetujuan Mainnet.|
+|Backtest dan model|Komponen replay, evaluasi temporal dan pembelajaran tersedia untuk riset.|Dataset terverifikasi, kelengkapan funding, uji out-of-sample dan Paper minimal 30 hari. Bukti profitabilitas masih terbuka.|
+
+Untuk menguji perubahan siklus riset, buka Pasar dengan bot mati dan periksa pembaruan harga. Nyalakan bot, tunggu bukti BTC/ETH, matikan bot hingga status riset OFFLINE, lalu nyalakan lagi. Pada awal sesi baru status harus WAIT sampai data sinkron kembali. Pantau juga posisi Paper yang sudah terbuka sepanjang langkah ini.
+
+[Rincian gerbang rilis](FINAL-ROADMAP-AUDIT.md) · [Audit UI/performa](BATCH-11-UI-PERFORMANCE-AUDIT.md)
 
 ## PERUBAHAN ARSITEKTUR BESAR (2026-11-07)
 

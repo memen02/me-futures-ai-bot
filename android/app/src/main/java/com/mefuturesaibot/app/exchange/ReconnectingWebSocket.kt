@@ -53,7 +53,40 @@ class ReconnectingWebSocket(
     private val onStatusChange: (ConnectionStatus) -> Unit = {},
     private val onMessage: (String) -> Unit = {},
     private val scheduler: Scheduler = AndroidHandlerScheduler(),
+    private val messageBudget: MessageBudget? = null,
 ) {
+    /** Limits retained message text before the scheduler is able to process it. */
+    data class MessageBudget(val count: Int, val totalChars: Int) {
+        init { require(count > 0 && totalChars > 0) }
+    }
+
+    private class Inbox(private val budget: MessageBudget) {
+        private var count = 0
+        private var chars = 0
+        @Volatile var invalid = false
+            private set
+
+        @Synchronized fun offer(size: Int): Boolean {
+            if (invalid) return false
+            if (count >= budget.count || size > budget.totalChars - chars) {
+                invalid = true
+                return false
+            }
+            count++
+            chars += size
+            return true
+        }
+
+        @Synchronized fun consumed(size: Int) {
+            count--
+            chars -= size
+        }
+        fun invalidate() { invalid = true }
+    }
+
+    @Volatile private var currentInbox: Inbox? = null
+    fun hasMessageGap() = currentInbox?.invalid == true
+
     enum class ConnectionStatus { CONNECTING, CONNECTED, DISCONNECTED, RECONNECTING }
 
     private var webSocket: WebSocket? = null
@@ -68,6 +101,8 @@ class ReconnectingWebSocket(
         val currentSession = ++session
         onStatusChange(if (attempt == 0) ConnectionStatus.CONNECTING else ConnectionStatus.RECONNECTING)
 
+        val inbox = messageBudget?.let(::Inbox)
+        currentInbox = inbox
         val request = Request.Builder().url(url).build()
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
@@ -78,7 +113,24 @@ class ReconnectingWebSocket(
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                withActiveSocket(webSocket) { onMessage(text) }
+                if (inbox == null) {
+                    withActiveSocket(webSocket) { onMessage(text) }
+                    return
+                }
+                if (inbox.invalid) return
+                if (!inbox.offer(text.length)) {
+                    // Dropping a depth delta breaks continuity. Reconnect for a fresh snapshot.
+                    disconnected(webSocket)
+                    webSocket.cancel()
+                    return
+                }
+                withActiveSocket(webSocket) {
+                    try {
+                        if (!inbox.invalid) onMessage(text)
+                    } finally {
+                        inbox.consumed(text.length)
+                    }
+                }
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
@@ -94,6 +146,7 @@ class ReconnectingWebSocket(
             }
 
             private fun disconnected(socket: WebSocket) {
+                inbox?.invalidate()
                 withActiveSocket(socket) {
                     this@ReconnectingWebSocket.webSocket = null
                     onStatusChange(ConnectionStatus.DISCONNECTED)
@@ -114,6 +167,7 @@ class ReconnectingWebSocket(
     }
 
     fun close() {
+        currentInbox?.invalidate()
         session++
         attempt = 0
         val closing = webSocket

@@ -7,15 +7,22 @@ import android.os.SystemClock
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
-internal class ResearchDepthFeed(private val symbol: String = "BTCUSDT") {
-    init { require(symbol in setOf("BTCUSDT","ETHUSDT")) }
-    private val book=ResearchDepthBook(symbol)
-    private val client=ReconnectingWebSocket.sharedHttpClient.newBuilder()
+internal class ResearchDepthFeed(
+    private val symbol: String = "BTCUSDT",
+    socketFactory: okhttp3.WebSocket.Factory = ReconnectingWebSocket.sharedHttpClient,
+    private val guard: AiRateLimitGuard = ResearchApiBudget.guard,
+    private val client: okhttp3.Call.Factory = ReconnectingWebSocket.sharedHttpClient.newBuilder()
         .callTimeout(5,TimeUnit.SECONDS).retryOnConnectionFailure(false)
         .followRedirects(false).followSslRedirects(false).build()
+) {
+    init { require(symbol in setOf("BTCUSDT","ETHUSDT")) }
+    private val book=ResearchDepthBook(symbol)
+    private var snapshotCall: okhttp3.Call? = null
     @Volatile private var closed=false
     @Volatile private var generation=0L
     private val socket=ReconnectingWebSocket(
+        client=socketFactory,
+        messageBudget=ReconnectingWebSocket.MessageBudget(count=8, totalChars=262144),
         url="wss://fstream.binance.com/public/ws/${symbol.lowercase(java.util.Locale.ROOT)}@depth@500ms",
         onStatusChange={ synchronized(this) { generation++; book.clear() } },
         onMessage={ raw -> synchronized(this) {
@@ -37,28 +44,45 @@ internal class ResearchDepthFeed(private val symbol: String = "BTCUSDT") {
             p.toBigDecimal() to q.toBigDecimal()
         }
     }
-    fun start()=socket.connect()
+    fun start() { if (!closed) socket.connect() }
     fun refreshSnapshot() {
-        val token=synchronized(this) { if (closed||!book.needsSnapshot()) return; generation to book.epoch() }
-        val guard=ResearchApiBudget.guard
+        val token=synchronized(this) { if (closed || socket.hasMessageGap() || !book.needsSnapshot()) return; generation to book.epoch() }
         if (!guard.acquire(SystemClock.elapsedRealtime(),20)) return
         try {
-            client.newCall(Request.Builder().url("https://fapi.binance.com/fapi/v1/depth?symbol=$symbol&limit=500").build()).execute().use { response ->
-                guard.onHttpResponse(response.code,response.header("Retry-After")?.toLongOrNull(),SystemClock.elapsedRealtime())
-                if (!response.isSuccessful) return
-                val source=response.body.source()
-                if (source.request(262145L)) return
-                val o=JSONObject(source.readUtf8())
-                val bids=levels(o.getJSONArray("bids")); val asks=levels(o.getJSONArray("asks"))
-                synchronized(this) { if (!closed && generation==token.first && book.epoch()==token.second) book.anchor(o.getLong("lastUpdateId"),bids,asks) }
+            val call = synchronized(this) {
+                if (closed || generation != token.first || book.epoch() != token.second || snapshotCall != null) return
+                client.newCall(Request.Builder().url("https://fapi.binance.com/fapi/v1/depth?symbol=$symbol&limit=500").build())
+                    .also { snapshotCall = it }
+            }
+            try {
+                call.execute().use { response ->
+                    guard.onHttpResponse(response.code,response.header("Retry-After")?.toLongOrNull(),SystemClock.elapsedRealtime())
+                    if (!response.isSuccessful) return
+                    val source=response.body.source()
+                    if (source.request(262145L)) return
+                    val o=JSONObject(source.readUtf8())
+                    val bids=levels(o.getJSONArray("bids")); val asks=levels(o.getJSONArray("asks"))
+                    synchronized(this) { if (!closed && !socket.hasMessageGap() && generation==token.first && book.epoch()==token.second) book.anchor(o.getLong("lastUpdateId"),bids,asks) }
+                }
+            } finally {
+                synchronized(this) { if (snapshotCall === call) snapshotCall = null }
             }
         } catch (_: Exception) { synchronized(this) { if (generation==token.first && book.epoch()==token.second) book.clear() } }
         finally { guard.release() }
     }
     @Synchronized fun liquidity(bounds: AiExchangeClock.Bounds): com.mefuturesaibot.app.ai.decision.LiquiditySnapshot? {
+        if (closed || socket.hasMessageGap()) return null
         val value=book.liquidity() ?: return null
         return value.takeIf { !closed && it.observedAtMs<=bounds.earliest && bounds.latest-it.observedAtMs in 0..1999 }
     }
     fun observed()=book.liquidity()!=null
-    fun close() { synchronized(this) { closed=true; generation++; book.clear() }; socket.close() }
+    fun close() {
+        synchronized(this) {
+            closed = true
+            generation++
+            snapshotCall?.cancel()
+            book.clear()
+        }
+        socket.close()
+    }
 }
