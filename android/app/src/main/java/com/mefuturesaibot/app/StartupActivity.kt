@@ -167,7 +167,12 @@ class StartupActivity : SecureActivity() {
         navigation = nav
         val view = AuthenticationView(this, runtime) {
             if (canUseProtectedUi()) nav.open(
-                onOwner = { openDashboard() },
+                onOwner = {
+                    if (canUseProtectedUi() && ApplicationAuthentication.allowsOwnerScreen()) {
+                        startActivity(Intent(this, com.mefuturesaibot.app.auth.OwnerPanelActivity::class.java))
+                        finish()
+                    }
+                },
                 onUser = { openDashboard() },
                 onDenied = { android.widget.Toast.makeText(this, "Verifikasi perangkat diperlukan", android.widget.Toast.LENGTH_SHORT).show() }
             )
