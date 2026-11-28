@@ -16,7 +16,7 @@ internal data class ResearchEntryInputs(val symbol: String, val bid: Double, val
 internal object UnifiedEntryPlanIntegration {
     fun calculate(source: UnifiedTimeframeSnapshot, assessment: UnifiedMasterAssessment,
         input: ResearchEntryInputs, policy: RiskPolicy, earliest: Long, latest: Long): UnifiedTradePlan? {
-        if (input.symbol != source.symbol || !source.fresh(earliest,latest) ||
+        if (assessment.source !== source || input.symbol != source.symbol || !source.fresh(earliest,latest) ||
             input.quoteAtMs > earliest || input.exchangeCap < 1 ||
             listOf(input.stopCosts,input.targetCosts).any { !it.isFinite() || it < 0 }) return null
         val decision = IndependentConfirmationIntegration.revalidate(assessment,earliest,latest)
