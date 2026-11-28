@@ -1,6 +1,12 @@
 package com.mefuturesaibot.app.scanner
 
 internal object ResearchSignalDisplay {
+    fun freshText(active:Boolean, status:String, updated:Long, now:Long): String {
+        if (!active || status == "OFFLINE") return "Master AI · OFFLINE"
+        if (updated <= 0 || now < updated || now - updated >= 2000L) return "Master AI · WAIT · pembaruan kedaluwarsa"
+        return text(active,status)
+    }
+
     fun text(active:Boolean, status:String): String {
         if (!active || status == "OFFLINE") return "Master AI · OFFLINE"
         if (status.isBlank() || status.length > 512) return "Master AI · WAIT"
