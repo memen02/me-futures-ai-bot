@@ -117,11 +117,12 @@ class ScreeningService : Service() {
                 if (enabled()) {
                     val frames = setOf(com.mefuturesaibot.app.ai.Timeframe.M1, com.mefuturesaibot.app.ai.Timeframe.M5)
                     for (frame in frames) researchRepository.refresh("BTCUSDT",frame)
+                    researchDepth.refreshSnapshot()
                     val capture = researchRepository.researchCapture("BTCUSDT")
                     if (capture != null) researchWorker.submit(capture.first,
-                        com.mefuturesaibot.app.ai.Timeframe.M1,frames,capture.second,null)
-                    researchStatus = if (researchDepth.observed()) "WAIT · depth belum tervalidasi" else "WAIT · depth belum tersedia"
-                } else researchStatus = "OFFLINE"
+                        com.mefuturesaibot.app.ai.Timeframe.M1,frames,capture.second,researchRepository.clockBounds()?.let(researchDepth::liquidity))
+                    // Status is read independently on the main tick, with current liquidity.
+                } else { researchStatus = "OFFLINE" }
             } catch (_: Exception) { researchStatus = "WAIT · data riset tidak tersedia" }
         }, 5L, 5L, java.util.concurrent.TimeUnit.SECONDS)
         scanner.start()
