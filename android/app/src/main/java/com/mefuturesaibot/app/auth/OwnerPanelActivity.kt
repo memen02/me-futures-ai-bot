@@ -11,6 +11,7 @@ import com.mefuturesaibot.app.security.SecureActivity
 
 internal class OwnerPanelActivity : SecureActivity() {
     override val requiresBackendAccount: Boolean = true
+    override val requiresOwnerAccount: Boolean = true
     private var host: OwnerPanelHost? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
