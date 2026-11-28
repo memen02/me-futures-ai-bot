@@ -22,6 +22,7 @@ internal class ResearchDepthFeed(
     @Volatile private var generation=0L
     private val socket=ReconnectingWebSocket(
         client=socketFactory,
+        messageBudget=ReconnectingWebSocket.MessageBudget(count=8, totalChars=262144),
         url="wss://fstream.binance.com/public/ws/${symbol.lowercase(java.util.Locale.ROOT)}@depth@500ms",
         onStatusChange={ synchronized(this) { generation++; book.clear() } },
         onMessage={ raw -> synchronized(this) {
@@ -45,7 +46,7 @@ internal class ResearchDepthFeed(
     }
     fun start() { if (!closed) socket.connect() }
     fun refreshSnapshot() {
-        val token=synchronized(this) { if (closed||!book.needsSnapshot()) return; generation to book.epoch() }
+        val token=synchronized(this) { if (closed || socket.hasMessageGap() || !book.needsSnapshot()) return; generation to book.epoch() }
         if (!guard.acquire(SystemClock.elapsedRealtime(),20)) return
         try {
             val call = synchronized(this) {
@@ -61,7 +62,7 @@ internal class ResearchDepthFeed(
                     if (source.request(262145L)) return
                     val o=JSONObject(source.readUtf8())
                     val bids=levels(o.getJSONArray("bids")); val asks=levels(o.getJSONArray("asks"))
-                    synchronized(this) { if (!closed && generation==token.first && book.epoch()==token.second) book.anchor(o.getLong("lastUpdateId"),bids,asks) }
+                    synchronized(this) { if (!closed && !socket.hasMessageGap() && generation==token.first && book.epoch()==token.second) book.anchor(o.getLong("lastUpdateId"),bids,asks) }
                 }
             } finally {
                 synchronized(this) { if (snapshotCall === call) snapshotCall = null }
@@ -70,6 +71,7 @@ internal class ResearchDepthFeed(
         finally { guard.release() }
     }
     @Synchronized fun liquidity(bounds: AiExchangeClock.Bounds): com.mefuturesaibot.app.ai.decision.LiquiditySnapshot? {
+        if (closed || socket.hasMessageGap()) return null
         val value=book.liquidity() ?: return null
         return value.takeIf { !closed && it.observedAtMs<=bounds.earliest && bounds.latest-it.observedAtMs in 0..1999 }
     }

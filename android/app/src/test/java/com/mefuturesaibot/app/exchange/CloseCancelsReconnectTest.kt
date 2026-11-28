@@ -62,6 +62,44 @@ class CloseCancelsReconnectTest {
     )
 
     @Test
+    fun depthOverflowInvalidatesQueuedDeltasAndReconnectsWithAFreshBudget() {
+        val bounded = ReconnectingWebSocket(
+            url = "wss://example.test/depth",
+            client = object : WebSocket.Factory {
+                override fun newWebSocket(request: Request, listener: WebSocketListener): WebSocket =
+                    TestSocket(request, listener).also(sockets::add)
+            },
+            scheduler = scheduler,
+            onMessage = { messages.add(it) },
+            messageBudget = ReconnectingWebSocket.MessageBudget(count = 2, totalChars = 6)
+        )
+        bounded.connect()
+        val first = sockets.single()
+        first.listener.onMessage(first, "abc")
+        first.listener.onMessage(first, "def")
+        first.listener.onMessage(first, "g")
+        repeat(100) { first.listener.onMessage(first, "late") }
+        assertTrue(bounded.hasMessageGap())
+        assertTrue(first.closed)
+        assertEquals(3, scheduler.ready.size)
+        scheduler.deliverCallbacks()
+        assertTrue(messages.isEmpty())
+        scheduler.delayed.single().invoke()
+        val second = sockets.last()
+        assertTrue(!bounded.hasMessageGap())
+        second.listener.onMessage(second, "123456")
+        scheduler.deliverCallbacks()
+        second.listener.onMessage(second, "789")
+        scheduler.deliverCallbacks()
+        assertEquals(listOf("123456", "789"), messages)
+        second.listener.onMessage(second, "toolarge")
+        assertTrue(bounded.hasMessageGap())
+        bounded.close()
+        scheduler.deliverCallbacks()
+        assertTrue(scheduler.delayed.isEmpty())
+    }
+
+    @Test
     fun stopIgnoresQueuedAndLateCallbacks() {
         connection.connect()
         val socket = sockets.single()
