@@ -21,9 +21,13 @@ internal class AuthenticationRepository(private val api: AuthenticationApi,
             if (!allowed()) return false
             val normalized = AccountIdentity.normalizeUsername(username) ?: return false
             if (password.size !in 1..128) return false
+            if (!sessions.flushPendingRevocation(api::revoke)) return false
             val (previous, revision) = sessions.beginLogin(expected) ?: return false
             previous?.let { token ->
-                try { api.revoke(token) } catch (_: Exception) { return false }
+                try { api.revoke(token) } catch (_: Exception) {
+                    sessions.rememberPendingRevocation(token)
+                    return false
+                }
             }
             if (!allowed()) return false
             val grant = api.login(normalized,password) ?: return false

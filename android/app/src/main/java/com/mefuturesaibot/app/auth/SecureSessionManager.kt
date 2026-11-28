@@ -8,6 +8,19 @@ internal class SecureSessionManager(private val clock: () -> Long = { SystemCloc
     private var grant: AuthGrant? = null
     private var issuedAt = 0L
     private var generation = 0L
+    private var pendingRevocation: String? = null
+    @Synchronized fun rememberPendingRevocation(token: String) {
+        pendingRevocation = token
+    }
+    // Network call outside the session monitor; runtime serializes login attempts.
+    fun flushPendingRevocation(revoke: (String) -> Unit): Boolean {
+        val token = synchronized(this) { pendingRevocation } ?: return true
+        try { revoke(token) } catch (_: Exception) { return false }
+        synchronized(this) {
+            if (pendingRevocation == token) pendingRevocation = null
+            return pendingRevocation == null
+        }
+    }
     private var grantOwner: Any? = null
     @Synchronized fun clearOwnedGrant(owner: Any): String? =
         if (grantOwner === owner) clear() else null
