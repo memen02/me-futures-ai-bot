@@ -42,6 +42,13 @@ class HttpAdapterTest(unittest.TestCase):
         self.assertEqual(dispatch(self.service,"/v1/auth/logout",b'{"extra":true}',"Bearer "+"a"*64)[0],400)
         self.assertEqual(self.service.calls,[])
 
+    def test_logout_transport_failure_is_not_acknowledged(self):
+        class OfflineService(StubService):
+            def logout(self,token):
+                raise OSError("database unavailable")
+        with self.assertRaises(OSError):
+            dispatch(OfflineService(),"/v1/auth/logout",b"{}","Bearer "+"a"*64)
+
     def test_logout_requires_valid_bearer(self):
         self.assertEqual(dispatch(self.service,"/v1/auth/logout",b"{}","Bearer bad")[0],400)
         self.assertEqual(self.service.calls,[])
