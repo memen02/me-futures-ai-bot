@@ -15,7 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], qualifiers = "w320dp-h640dp")
+@Config(application = com.mefuturesaibot.app.auth.ApprovedDeviceApplication::class, sdk = [28], qualifiers = "w320dp-h640dp")
 class DeskNavigationTest {
     @Test fun fiveTabsAreExclusiveAndViewingThemDoesNotStartTrading() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()

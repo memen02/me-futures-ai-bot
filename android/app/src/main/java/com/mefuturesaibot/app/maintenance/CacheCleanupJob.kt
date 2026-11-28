@@ -15,7 +15,10 @@ import java.text.DateFormat
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
-class MeProjectApplication : Application() {
+open class MeProjectApplication : Application() {
+    internal val onlineDeviceAccess by lazy { com.mefuturesaibot.app.auth.DeviceAccess() }
+    internal open val devicePermission: com.mefuturesaibot.app.auth.DevicePermission get() = onlineDeviceAccess
+
     override fun onCreate() {
         super.onCreate()
         CacheCleanupJob.schedule(this)

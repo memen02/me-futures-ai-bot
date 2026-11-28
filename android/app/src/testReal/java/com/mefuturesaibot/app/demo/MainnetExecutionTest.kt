@@ -17,7 +17,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(application = com.mefuturesaibot.app.auth.ApprovedDeviceApplication::class, sdk = [35])
 class MainnetExecutionTest {
     private val context: Context = RuntimeEnvironment.getApplication()
     private val prefs = FuturesVenue.REAL.prefs(context)

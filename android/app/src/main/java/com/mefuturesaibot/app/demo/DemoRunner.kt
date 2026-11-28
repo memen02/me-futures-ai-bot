@@ -1,5 +1,7 @@
 package com.mefuturesaibot.app.demo
 
+import com.mefuturesaibot.app.auth.hasDeviceAccess
+
 import android.content.Context
 import com.mefuturesaibot.app.account.CredentialVault
 import com.mefuturesaibot.app.exchange.CandleHistory
@@ -69,6 +71,7 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
         }
         if (pending?.has("accountId") == true && pending.getString("accountId") != api.accountId)
             return "WAIT · key berbeda dari akun pemilik intent"
+        if (pending == null && !context.hasDeviceAccess()) return "WAIT · memerlukan izin pemilik"
         api.sync()
         if (pending != null) return reconcile(api, pending)
         val minute = api.now() / 60_000
@@ -128,7 +131,7 @@ internal class DemoRunner(private val context: Context, private val venue: Futur
             .put("qty",qty).put("budget",minOf(available * RiskPlan.RISK,remaining)).put("fee",fee)
         intent.put("accountId",api.accountId)
         synchronized(entryLock) {
-            if (closing || FuturesVenue.selected(context) != venue || !prefs.getBoolean("enabled",false) ||
+            if (!context.hasDeviceAccess() || closing || FuturesVenue.selected(context) != venue || !prefs.getBoolean("enabled",false) ||
                 live && (prefs.getString("consentKey",null) != api.accountId || prefs.getString("capital",null)?.toDoubleOrNull() != cap)) return "$mode nonaktif"
             check(prefs.edit().putString("intent",intent.toString()).putLong("entryMinute",minute).commit())
         }

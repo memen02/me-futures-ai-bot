@@ -1,5 +1,7 @@
 package com.mefuturesaibot.app
 
+import com.mefuturesaibot.app.auth.hasDeviceAccess
+
 import android.app.*
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -25,7 +27,7 @@ class ScreeningService : Service() {
 
     private val liveTick = object : Runnable {
         override fun run() {
-            val active = BotPreferences.shouldRun(this@ScreeningService) && BotForegroundService.isRunning
+            val active = hasDeviceAccess() && BotPreferences.shouldRun(this@ScreeningService) && BotForegroundService.isRunning
             researchDisplay = ResearchDisplaySnapshot(research.status(active), SystemClock.elapsedRealtime())
             val base = marketBase
             val elapsed = SystemClock.elapsedRealtime()
@@ -94,7 +96,7 @@ class ScreeningService : Service() {
         if (Build.VERSION.SDK_INT >= 34) startForeground(2, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         else startForeground(2, notification)
         val store = DeskStore(this)
-        val enabled = { BotPreferences.shouldRun(this) && BotForegroundService.isRunning }
+        val enabled = { hasDeviceAccess() && BotPreferences.shouldRun(this) && BotForegroundService.isRunning }
         monitor = PaperPositionMonitor(store,enabled).also { it.start() }
         liveFeed = LiveMarketFeed()
         liveFeed.start()

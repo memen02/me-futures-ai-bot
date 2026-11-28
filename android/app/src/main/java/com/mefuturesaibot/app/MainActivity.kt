@@ -30,6 +30,7 @@ class MainActivity : SecureActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!requireDeviceAccess()) return
         setContentView(R.layout.activity_trading_desk)
         setupSecuritySettings()
         findViewById<Button>(R.id.scan_stop).setOnClickListener { onStopClicked() }
@@ -42,11 +43,12 @@ class MainActivity : SecureActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean("userRequestedStop", userRequestedStop)
-        outState.putString(DeskTab.STATE_KEY, desk.tab.name)
+        if (::desk.isInitialized) outState.putString(DeskTab.STATE_KEY, desk.tab.name)
     }
 
     override fun onStart() {
         super.onStart()
+        if (isFinishing) return
         try {
             startForegroundService(Intent(this, ScreeningService::class.java))
         } catch (_: RuntimeException) {
@@ -68,7 +70,7 @@ class MainActivity : SecureActivity() {
     override fun onStop() {
         visible = false
         pollHandler.removeCallbacks(pollRunnable)
-        desk.releaseDisplayData()
+        if (::desk.isInitialized) desk.releaseDisplayData()
         super.onStop()
     }
 
@@ -119,9 +121,9 @@ class MainActivity : SecureActivity() {
         findViewById<android.widget.TextView>(
             R.id.user_access_status
         ).text = if (enabled) {
-            "App Lock aktif · Lisensi online belum tersedia"
+            "App Lock aktif · Izin perangkat aktif"
         } else {
-            "App Lock nonaktif · Lisensi online belum tersedia"
+            "App Lock nonaktif · Izin perangkat aktif"
         }
     }
 

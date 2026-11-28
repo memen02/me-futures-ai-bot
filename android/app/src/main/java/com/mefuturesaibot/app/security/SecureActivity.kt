@@ -1,5 +1,7 @@
 package com.mefuturesaibot.app.security
 
+import com.mefuturesaibot.app.auth.hasDeviceAccess
+
 import android.app.Activity
 import com.mefuturesaibot.app.BuildConfig
 import android.content.Intent
@@ -74,9 +76,30 @@ open class SecureActivity : Activity() {
         private var startedActivities = 0
     }
 
+    private val licenseTimer = android.os.Handler(android.os.Looper.getMainLooper())
+    private val licenseCheck = object : Runnable {
+        override fun run() {
+            if (requireDeviceAccess()) licenseTimer.postDelayed(this, 1000)
+        }
+    }
+
+    protected fun requireDeviceAccess(): Boolean {
+        if (hasDeviceAccess()) return true
+        if (!isFinishing) {
+            onProtectedUiRevoked()
+            dismissProtectedDialogs()
+            startActivity(Intent(this, com.mefuturesaibot.app.auth.DeviceAccessActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+            finish()
+        }
+        return false
+    }
+
     override fun onStart() {
         super.onStart()
 
+        licenseCheck.run()
+        if (isFinishing) return
         if (!countedAsStarted) {
             countedAsStarted = true
             startedActivities++
@@ -89,7 +112,7 @@ open class SecureActivity : Activity() {
     private var generation = 0
 
     internal fun canUseProtectedUi(): Boolean =
-        resumed &&
+        hasDeviceAccess() && resumed &&
             !isFinishing &&
             !isDestroyed &&
             !AppLock.requiresUnlock(this)
@@ -150,6 +173,7 @@ open class SecureActivity : Activity() {
     }
 
     override fun onStop() {
+        licenseTimer.removeCallbacks(licenseCheck)
         if (countedAsStarted) {
             countedAsStarted = false
             startedActivities =

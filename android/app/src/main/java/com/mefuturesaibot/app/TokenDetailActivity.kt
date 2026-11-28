@@ -51,6 +51,7 @@ class TokenDetailActivity : SecureActivity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
+        if (!requireDeviceAccess()) return
         val symbol = intent.getStringExtra("symbol").orEmpty()
         val quote = intent.getStringExtra("quote").orEmpty()
         val base = intent.getStringExtra("base").orEmpty()
@@ -111,6 +112,7 @@ class TokenDetailActivity : SecureActivity() {
 
     override fun onStart() {
         super.onStart()
+        if (isFinishing) return
         if (!::feed.isInitialized) return
         active = true
         feed.setVisible(true)

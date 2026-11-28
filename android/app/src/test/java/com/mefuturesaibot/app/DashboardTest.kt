@@ -16,7 +16,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], qualifiers = "w320dp-h640dp")
+@Config(application = com.mefuturesaibot.app.auth.ApprovedDeviceApplication::class, sdk = [28], qualifiers = "w320dp-h640dp")
 class DashboardTest {
     @Test fun tokenOwnsChartAndFavoriteWhileAccountOwnsPaperStats() {
         val home = Robolectric.buildActivity(MainActivity::class.java).create()

@@ -28,7 +28,7 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity
-            android:name=".StartupActivity"
+            android:name=".auth.DeviceAccessActivity"
             android:theme="@style/StartupTheme"
             android:exported="true">
             <intent-filter>
@@ -37,6 +37,7 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".StartupActivity" android:theme="@style/StartupTheme" android:exported="false" />
         <activity android:name=".TokenDetailActivity" android:theme="@style/DashboardTheme" android:exported="false" />
         <activity android:name=".MainActivity" android:theme="@style/DashboardTheme" android:exported="false" />
 

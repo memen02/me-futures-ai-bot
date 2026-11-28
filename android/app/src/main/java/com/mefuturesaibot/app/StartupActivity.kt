@@ -89,6 +89,7 @@ class StartupActivity : SecureActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!requireDeviceAccess()) return
         setContentView(R.layout.activity_startup)
         summary = findViewById(R.id.startup_summary)
         progress = findViewById(R.id.startup_progress)
@@ -129,6 +130,7 @@ class StartupActivity : SecureActivity() {
 
     override fun onStart() {
         super.onStart()
+        if (isFinishing) return
 
         try {
             startForegroundService(

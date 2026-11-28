@@ -14,7 +14,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(application = com.mefuturesaibot.app.auth.ApprovedDeviceApplication::class, sdk = [35])
 class ModeSelectionTest {
     private val context: Context = RuntimeEnvironment.getApplication()
     private val demo = FuturesVenue.DEMO.prefs(context)
