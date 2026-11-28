@@ -84,6 +84,17 @@ class AuthTest(unittest.TestCase):
         with transaction(self.path) as db:
             self.assertIsNone(actor(db,new))
 
+    def test_owner_expiry_boundary(self):
+        from unittest.mock import patch
+        bootstrap_owner(self.path,"owner",self.password)
+        with patch("auth_sessions.time.time", return_value=1000):
+            token = login(self.path,"owner",self.password)["accessToken"]
+        with transaction(self.path) as db:
+            with patch("auth_sessions.time.time", return_value=1899):
+                self.assertIsNotNone(actor(db,token))
+            with patch("auth_sessions.time.time", return_value=1900):
+                self.assertIsNone(actor(db,token))
+
     def test_rate_limit(self):
         for _ in range(5):
             self.assertTrue(permit(self.path,"login_user","tester"))
