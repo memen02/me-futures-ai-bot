@@ -1,4 +1,6 @@
 import tempfile
+import time
+from auth_entitlements import grant, revoke_license
 import unittest
 from pathlib import Path
 from auth_db import initialize, transaction
@@ -31,7 +33,10 @@ class AuthTest(unittest.TestCase):
         with transaction(self.path) as db:
             target = db.execute("SELECT id FROM accounts WHERE username='tester'").fetchone()["id"]
         self.assertEqual(review(self.path,admin["accessToken"],target,"PENDING","APPROVED"),"APPLIED")
+        self.assertIsNone(login(self.path,"tester",self.password))
+        self.assertEqual(grant(self.path,admin["accessToken"],target,"FAMILY"),"APPLIED")
         user = login(self.path,"tester",self.password)
+        self.assertIsNotNone(user)
         self.assertEqual(review(self.path,user["accessToken"],target,"APPROVED","SUSPENDED"),"DENIED")
         self.assertEqual(review(self.path,admin["accessToken"],target,"APPROVED","SUSPENDED"),"APPLIED")
         with transaction(self.path) as db:
@@ -39,6 +44,30 @@ class AuthTest(unittest.TestCase):
         revoke(self.path,admin["accessToken"])
         with transaction(self.path) as db:
             self.assertIsNone(actor(db,admin["accessToken"]))
+
+    def test_license_expiry_and_revocation(self):
+        bootstrap_owner(self.path,"owner",self.password)
+        register(self.path,"tester",self.password)
+        admin = login(self.path,"owner",self.password)["accessToken"]
+        with transaction(self.path) as db:
+            target = db.execute("SELECT id FROM accounts WHERE username='tester'").fetchone()["id"]
+        self.assertEqual(review(self.path,admin,target,"PENDING","APPROVED"),"APPLIED")
+        self.assertIsNone(login(self.path,"tester",self.password))
+        self.assertEqual(grant(self.path,admin,target,"MONTHLY",int(time.time())-1),"DENIED")
+        self.assertEqual(grant(self.path,admin,target,"MONTHLY",int(time.time())+3600),"APPLIED")
+        token = login(self.path,"tester",self.password)["accessToken"]
+        self.assertEqual(grant(self.path,token,target,"FAMILY"),"DENIED")
+        with transaction(self.path) as db:
+            self.assertIsNotNone(actor(db,token))
+            db.execute("UPDATE entitlements SET expires=? WHERE account_id=?",(int(time.time())-1,target))
+            self.assertIsNone(actor(db,token))
+        self.assertIsNone(login(self.path,"tester",self.password))
+        self.assertEqual(grant(self.path,admin,target,"FAMILY"),"APPLIED")
+        token = login(self.path,"tester",self.password)["accessToken"]
+        self.assertEqual(revoke_license(self.path,admin,target),"APPLIED")
+        with transaction(self.path) as db:
+            self.assertIsNone(actor(db,token))
+        self.assertIsNone(login(self.path,"tester",self.password))
 
     def test_rate_limit(self):
         for _ in range(5):
