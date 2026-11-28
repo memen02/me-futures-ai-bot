@@ -21,6 +21,10 @@ class HttpAdapterTest(unittest.TestCase):
             self.assertEqual(dispatch(self.service,"/v1/auth/login",body)[0],status)
         self.assertEqual(self.service.calls,[])
 
+    def test_invalid_route_type(self):
+        self.assertEqual(dispatch(self.service,None,b"{}")[0],400)
+        self.assertEqual(self.service.calls,[])
+
     def test_nonstandard_json_constants_rejected(self):
         for value in (b"NaN", b"Infinity", b"-Infinity"):
             body = b'{"username":"tester","password":' + value + b'}'

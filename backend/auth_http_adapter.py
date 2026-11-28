@@ -26,6 +26,8 @@ def reject_constant(value):
     raise ValueError("invalid JSON constant")
 
 def dispatch(service, route, body, authorization=None):
+    if not isinstance(route,str):
+        return 400, {"error":"INVALID_REQUEST"}
     if not isinstance(body,bytes) or len(body)>MAX_BODY:
         return 413, {"error":"INVALID_REQUEST"}
     try:
