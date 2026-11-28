@@ -36,6 +36,7 @@ internal class OwnerPanelActivity : SecureActivity() {
                 text = "Logout"
                 setOnClickListener {
                     if (!canUseProtectedUi() || !ApplicationAuthentication.allowsOwnerScreen()) return@setOnClickListener
+                    closeHost()
                     ApplicationAuthentication.lockLocalAccess()
                     // Clear locally immediately; remote revocation runs off the UI thread.
                     val token = runtime.sessions.clear()
@@ -59,10 +60,17 @@ internal class OwnerPanelActivity : SecureActivity() {
         if (isFinishing || isDestroyed) return
         val runtime = ApplicationAuthentication.current() ?: return
         if (host == null) {
-            host = runtime.ownerPanel(this) { message ->
-                if (canUseProtectedUi()) Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            if (!::panelContainer.isInitialized) { finish(); return }
+            val newHost = try {
+                runtime.ownerPanel(this) { message ->
+                    if (canUseProtectedUi()) Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: IllegalStateException) {
+                finish()
+                return
             }
-            panelContainer.addView(host!!.view, LinearLayout.LayoutParams(-1, -1))
+            host = newHost
+            panelContainer.addView(newHost.view, LinearLayout.LayoutParams(-1, -1))
         }
         host?.refresh()
     }
