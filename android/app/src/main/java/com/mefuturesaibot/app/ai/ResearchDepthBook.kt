@@ -13,8 +13,12 @@ internal class ResearchDepthBook {
     private val pending = ArrayDeque<DepthDelta>()
     private var anchored = false
     private var time = 0L
+    private var floor: BigDecimal? = null
+    private var ceiling: BigDecimal? = null
+    private var revision = 0L
+    @Synchronized fun epoch() = revision
     @Synchronized fun clear() {
-        guard.invalidate(); bids.clear(); asks.clear(); pending.clear(); anchored=false; time=0
+        revision++; floor=null; ceiling=null; guard.invalidate(); bids.clear(); asks.clear(); pending.clear(); anchored=false; time=0
     }
     private fun valid(levels: List<Pair<BigDecimal,BigDecimal>>) = levels.size <= 1000 &&
         levels.all { (p,q) -> p.signum()>0 && q.signum()>=0 && p.precision()<=32 && q.precision()<=32 &&
@@ -42,6 +46,8 @@ internal class ResearchDepthBook {
         val buffered=pending.toList()
         clear(); guard.reset(id); anchored=true
         apply(bids,buy); apply(asks,sell)
+        if (bids.isEmpty() || asks.isEmpty() || bids.firstKey()>=asks.firstKey()) { clear(); return }
+        floor=bids.lastKey(); ceiling=asks.lastKey()
         for (d in buffered) {
             if (d.last<id) continue
             delta(d)
@@ -50,6 +56,10 @@ internal class ResearchDepthBook {
     }
     @Synchronized fun liquidity(): com.mefuturesaibot.app.ai.decision.LiquiditySnapshot? {
         if (!guard.synchronized()) return null
+        val low=floor ?: return null
+        val high=ceiling ?: return null
+        val mid=bids.firstKey().add(asks.firstKey()).divide(BigDecimal("2"))
+        if (mid.multiply(BigDecimal("0.999"))<low || mid.multiply(BigDecimal("1.001"))>high) return null
         return ResearchLiquidityBand.calculate("BTCUSDT",time,bids.entries.map { it.key.toDouble() to it.value.toDouble() },
             asks.entries.map { it.key.toDouble() to it.value.toDouble() },true)
     }
