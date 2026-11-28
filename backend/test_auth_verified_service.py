@@ -65,3 +65,23 @@ class VerifiedServiceTest(unittest.TestCase):
             with transaction(path) as db:
                 self.assertIsNone(db.execute("SELECT nonce FROM device_challenges WHERE account_id=?",(target,)).fetchone())
             self.assertIsNone(service.device_challenge("tester",password,"a"*64))
+
+    def test_owner_session_rotation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp)/"auth.db")
+            initialize(path)
+            service = AuthService(path)
+            password = "test-password-123"
+            bootstrap_owner(path,"owner",password)
+            first = service.login("owner",password)["accessToken"]
+            second = service.login("owner",password)["accessToken"]
+            self.assertIsNone(service.authorize(first))
+            self.assertEqual(service.authorize(second)["role"],"SUPER_ADMIN")
+            self.assertIsNone(service.login("owner","wrong"))
+            self.assertIsNotNone(service.authorize(second))
+            service.register("tester",password)
+            with transaction(path) as db:
+                target = db.execute("SELECT id FROM accounts WHERE username='tester'").fetchone()[0]
+            self.assertEqual(service.review(second,target,"PENDING","APPROVED"),"APPLIED")
+            self.assertEqual(service.grant_license(second,target,"FAMILY"),"APPLIED")
+            self.assertIsNone(service.login("tester",password))
