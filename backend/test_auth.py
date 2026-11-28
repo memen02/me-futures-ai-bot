@@ -165,17 +165,31 @@ class AuthTest(unittest.TestCase):
         self.assertEqual(result["role"],"SUPER_ADMIN")
         self.assertIsNone(verified_login(self.path,"owner",self.password,digest,nonce,der,signature))
 
+    def recovery_proof(self):
+        import hashlib
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from auth_owner_recovery import issue_recovery_challenge
+        key = ec.generate_private_key(ec.SECP256R1())
+        der = key.public_key().public_bytes(serialization.Encoding.DER,serialization.PublicFormat.SubjectPublicKeyInfo)
+        digest = hashlib.sha256(der).hexdigest()
+        challenge = issue_recovery_challenge(self.path,"owner",digest)
+        nonce = challenge["nonce"]
+        message = ("ME-PROJECT-DEVICE-LOGIN-V1:"+challenge["accountId"]+":"+digest+":"+nonce).encode("ascii")
+        return digest, {"nonce":nonce,"public_der":der,"signature":key.sign(message,ec.ECDSA(hashes.SHA256()))}
+
     def test_offline_owner_recovery_revokes_old_session_and_consumes_secret(self):
         from auth_owner_recovery import provision, recover
         bootstrap_owner(self.path,"owner",self.password)
         old = login(self.path,"owner",self.password)["accessToken"]
         secret = provision(self.path,"owner")
         self.assertFalse(recover(self.path,"owner","wrong",secret,"a"*64))
-        self.assertTrue(recover(self.path,"owner",self.password,secret,"a"*64))
+        digest, proof = self.recovery_proof()
+        self.assertTrue(recover(self.path,"owner",self.password,secret,digest,**proof))
         self.assertFalse(recover(self.path,"owner",self.password,secret,"b"*64))
         with transaction(self.path) as db:
             self.assertIsNone(actor(db,old))
-            self.assertEqual(db.execute("SELECT public_key_digest FROM device_bindings").fetchone()[0],"a"*64)
+            self.assertEqual(db.execute("SELECT public_key_digest FROM device_bindings").fetchone()[0],digest)
             self.assertIsNone(db.execute("SELECT 1 FROM owner_recovery").fetchone())
         self.assertIsNone(login(self.path,"owner",self.password))
 
@@ -197,7 +211,8 @@ class AuthTest(unittest.TestCase):
         new = provision(self.path,"owner")
         self.assertNotEqual(old,new)
         self.assertFalse(recover(self.path,"owner",self.password,old,"a"*64))
-        self.assertTrue(recover(self.path,"owner",self.password,new,"a"*64))
+        digest, proof = self.recovery_proof()
+        self.assertTrue(recover(self.path,"owner",self.password,new,digest,**proof))
 
     def test_owner_recovery_challenge_requires_matching_proof(self):
         import hashlib
