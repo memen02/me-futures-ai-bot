@@ -53,3 +53,6 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 - 8bdd417: require backend account in non-dev builds even when AUTH_ORIGIN is blank; dev-only bypass retained. Release must have deployed trusted HTTPS backend and server-side approval, license, device binding and revocation enforcement. Verify configured and unconfigured build variants and direct activity entry. CI and device tests pending.
 
 - Replace cancellation revision arithmetic with explicit grant ownership by login attempt; stale queued runtime login rejected before locking access gate. Verify existing positional callers and regression tests; biometric handoff and revocation remain open.
+
+- Require active protected UI before biometric navigation unlocks account access; cancel navigation prompt on Startup stop. Device lifecycle compatibility and regression tests pending.
+- Future iOS target: reuse backend approval/licensing/device contracts, separate native client and platform-specific biometric adapter. No iOS implementation in current Android batch.

@@ -3,7 +3,7 @@ package com.mefuturesaibot.app.auth
 import android.app.Activity
 
 internal class AuthenticatedNavigation(
-    activity: Activity,
+    private val activity: Activity,
     private val sessions: SecureSessionManager,
     private val accessGate: LocalAccessGate
 ) : AutoCloseable {
@@ -19,7 +19,7 @@ internal class AuthenticatedNavigation(
         }
         unlock.authenticate { success ->
             val current = sessions.identity()
-            if (!success || sessions.sessionGeneration() != generation || current != before || !AccountApprovalPolicy.showTrading(current)) {
+            if (!success || (activity as? com.mefuturesaibot.app.security.SecureActivity)?.canUseProtectedUi() != true || sessions.sessionGeneration() != generation || current != before || !AccountApprovalPolicy.showTrading(current)) {
                 onDenied()
             } else if (!accessGate.unlock(generation)) {
                 onDenied()

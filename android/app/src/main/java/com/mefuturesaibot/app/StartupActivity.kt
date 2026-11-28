@@ -201,6 +201,7 @@ class StartupActivity : SecureActivity() {
     }
 
     override fun onStop() {
+        navigation?.close()
         stopChecks()
         super.onStop()
     }
