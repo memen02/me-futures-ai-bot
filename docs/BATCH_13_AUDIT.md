@@ -117,3 +117,7 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 ## Recovery rate limit follow-up
 - Runs 46176742541 and 46176742484 passed. Offline recovery now uses persistent global five-attempt/300-second limit; tests cover denial without mutation and credential rotation. New CI pending.
 - Offline operator must still verify new key possession. Remote recovery challenge, Android UI and secure provisioning remain open. Global limit is deliberately conservative for the single Owner; remote deployment requires denial-of-service review.
+
+## Recovery challenge foundation
+- Prior runs 46176907895 and 46176907902 passed. Added isolated 60-second challenge, signature validation, invalidation on rotation and successful recovery, and regression test. New CI pending.
+- Offline compatibility without challenge remains; never expose remotely. Mandatory proof, separate signature domain, Android integration and deployment remain open.
