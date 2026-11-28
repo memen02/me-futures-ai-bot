@@ -75,6 +75,20 @@ internal class HttpsAuthenticationApi(origin: HttpUrl) : AuthenticationApi, Veri
             else AuthGrant(identity, token, value.getLong("lifetimeSeconds"))
         } catch (_: Exception) { null }
 
+    fun listUsers(accessToken: String, after: String? = null): JSONObject {
+        require(after == null || after.matches(Regex("[0-9a-f]{32}")))
+        return post("admin/list-users", JSONObject()
+            .put("after", after ?: JSONObject.NULL).put("limit", 20), accessToken)
+    }
+
+    fun reviewUser(accessToken: String, target: String,
+        expected: AccountStatus, desired: AccountStatus): Boolean {
+        require(target.matches(Regex("[0-9a-f]{32}")))
+        return post("admin/review", JSONObject().put("target", target)
+            .put("expected", expected.name).put("desired", desired.name),
+            accessToken).getString("result") == "APPLIED"
+    }
+
     override fun revoke(accessToken: String) {
         if (post("logout",JSONObject(),accessToken).getString("result") != "APPLIED")
             throw java.io.IOException("Session revocation not confirmed")
