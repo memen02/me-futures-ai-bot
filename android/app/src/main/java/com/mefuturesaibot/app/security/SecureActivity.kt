@@ -380,6 +380,8 @@ open class SecureActivity : Activity() {
 
     protected open fun onProtectedUiRevoked() {}
 
+    protected open fun onProtectedUiUnlocked() {}
+
     private fun hideLock() {
         val cover = shield ?: return
         (cover.parent as? FrameLayout)?.removeView(cover)
@@ -414,7 +416,10 @@ open class SecureActivity : Activity() {
                     authenticating = false
                     cancellation = null
                     AppLock.markAuthenticated()
-                    if (resumed) hideLock()
+                    if (resumed) {
+                        hideLock()
+                        if (canUseProtectedUi()) onProtectedUiUnlocked()
+                    }
                 }
             },
             onFailure = { message ->

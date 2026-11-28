@@ -152,6 +152,14 @@ class StartupActivity : SecureActivity() {
 
     override fun onResume() {
         super.onResume()
+        resumeAccountEntry()
+    }
+
+    override fun onProtectedUiUnlocked() {
+        resumeAccountEntry()
+    }
+
+    private fun resumeAccountEntry() {
         if (!ApplicationAuthentication.allowsDashboard() && canUseProtectedUi()) showAccountLogin()
     }
 
