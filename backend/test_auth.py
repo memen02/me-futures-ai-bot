@@ -7,6 +7,7 @@ from auth_db import initialize, transaction
 from auth_accounts import register, hash_password, verify_password
 from auth_sessions import login, review, actor, revoke
 from auth_security import bootstrap_owner, permit
+from auth_test_helpers import user_session
 
 class AuthTest(unittest.TestCase):
     def setUp(self):
@@ -35,7 +36,7 @@ class AuthTest(unittest.TestCase):
         self.assertEqual(review(self.path,admin["accessToken"],target,"PENDING","APPROVED"),"APPLIED")
         self.assertIsNone(login(self.path,"tester",self.password))
         self.assertEqual(grant(self.path,admin["accessToken"],target,"FAMILY"),"APPLIED")
-        user = login(self.path,"tester",self.password)
+        user = user_session(self.path,admin["accessToken"],"tester",self.password)
         self.assertIsNotNone(user)
         self.assertEqual(review(self.path,user["accessToken"],target,"APPROVED","SUSPENDED"),"DENIED")
         self.assertEqual(review(self.path,admin["accessToken"],target,"APPROVED","SUSPENDED"),"APPLIED")
@@ -55,7 +56,7 @@ class AuthTest(unittest.TestCase):
         self.assertIsNone(login(self.path,"tester",self.password))
         self.assertEqual(grant(self.path,admin,target,"MONTHLY",int(time.time())-1),"DENIED")
         self.assertEqual(grant(self.path,admin,target,"MONTHLY",int(time.time())+3600),"APPLIED")
-        token = login(self.path,"tester",self.password)["accessToken"]
+        token = user_session(self.path,admin,"tester",self.password)["accessToken"]
         self.assertEqual(grant(self.path,token,target,"FAMILY"),"DENIED")
         with transaction(self.path) as db:
             self.assertIsNotNone(actor(db,token))
@@ -63,7 +64,7 @@ class AuthTest(unittest.TestCase):
             self.assertIsNone(actor(db,token))
         self.assertIsNone(login(self.path,"tester",self.password))
         self.assertEqual(grant(self.path,admin,target,"FAMILY"),"APPLIED")
-        token = login(self.path,"tester",self.password)["accessToken"]
+        token = user_session(self.path,admin,"tester",self.password)["accessToken"]
         self.assertEqual(revoke_license(self.path,admin,target),"APPLIED")
         with transaction(self.path) as db:
             self.assertIsNone(actor(db,token))
@@ -85,10 +86,10 @@ class AuthTest(unittest.TestCase):
         now = int(time.time())
         self.assertEqual(grant(self.path,admin,target,"MONTHLY",now+32*86400),"DENIED")
         self.assertEqual(grant(self.path,admin,target,"MONTHLY",now+3600),"APPLIED")
-        token = login(self.path,"tester",self.password)["accessToken"]
+        token = user_session(self.path,admin,"tester",self.password)["accessToken"]
         self.assertEqual(grant(self.path,admin,target,"MONTHLY",now+1800),"CONFLICT")
         self.assertEqual(grant(self.path,admin,target,"MONTHLY",now+7200),"APPLIED")
         with transaction(self.path) as db:
             self.assertIsNone(actor(db,token))
             self.assertEqual(db.execute("SELECT expires FROM entitlements WHERE account_id=?",(target,)).fetchone()[0],now+7200)
-        self.assertIsNotNone(login(self.path,"tester",self.password))
+        self.assertIsNotNone(user_session(self.path,admin,"tester",self.password))
