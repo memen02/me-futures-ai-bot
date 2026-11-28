@@ -30,7 +30,11 @@ internal class AuthenticationRepository(private val api: AuthenticationApi,
             if (!allowed()) return false
             val grant = api.login(normalized,password) ?: return false
             if (grant.identity.username != normalized || !sessions.installIfUnchanged(grant, revision, owner, allowed)) {
-                try { api.revoke(grant.accessToken) } catch (_: Exception) { sessions.rememberPendingRevocation(grant.accessToken) }
+                sessions.rememberPendingRevocation(grant.accessToken)
+                try {
+                    api.revoke(grant.accessToken)
+                    sessions.confirmRevocation(grant.accessToken)
+                } catch (_: Exception) { /* retained for retry */ }
                 return false
             }
             return true
