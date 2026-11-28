@@ -74,3 +74,21 @@ class AuthTest(unittest.TestCase):
             self.assertTrue(permit(self.path,"login_user","tester"))
         self.assertFalse(permit(self.path,"login_user","tester"))
         self.assertTrue(permit(self.path,"login_user","other"))
+
+    def test_monthly_renewal(self):
+        bootstrap_owner(self.path,"owner",self.password)
+        register(self.path,"tester",self.password)
+        admin = login(self.path,"owner",self.password)["accessToken"]
+        with transaction(self.path) as db:
+            target = db.execute("SELECT id FROM accounts WHERE username='tester'").fetchone()["id"]
+        self.assertEqual(review(self.path,admin,target,"PENDING","APPROVED"),"APPLIED")
+        now = int(time.time())
+        self.assertEqual(grant(self.path,admin,target,"MONTHLY",now+32*86400),"DENIED")
+        self.assertEqual(grant(self.path,admin,target,"MONTHLY",now+3600),"APPLIED")
+        token = login(self.path,"tester",self.password)["accessToken"]
+        self.assertEqual(grant(self.path,admin,target,"MONTHLY",now+1800),"CONFLICT")
+        self.assertEqual(grant(self.path,admin,target,"MONTHLY",now+7200),"APPLIED")
+        with transaction(self.path) as db:
+            self.assertIsNone(actor(db,token))
+            self.assertEqual(db.execute("SELECT expires FROM entitlements WHERE account_id=?",(target,)).fetchone()[0],now+7200)
+        self.assertIsNotNone(login(self.path,"tester",self.password))
