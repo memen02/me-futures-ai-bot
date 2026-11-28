@@ -97,3 +97,7 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 ## Account storage follow-up
 - Runs 46175063428 and 46175063451 passed. Reject malformed stored password hashes before scrypt; cover invalid entitlement expiry and owner entitlement isolation. Remove unused import.
 - New CI pending; no schema or production credential migration. Owner device proof and Android restart revocation remain open.
+
+## Atomic revocation follow-up
+- Session replacement and repository logout now retain token under the session lock before network I/O. Rejected grants retained before revoke; added clearAndRemember regression test.
+- Run 46175248721 passed. New Android CI pending. Role adapter rejection and process-death persistence remain open; no plaintext token persistence introduced.
