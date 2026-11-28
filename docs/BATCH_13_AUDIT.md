@@ -93,3 +93,7 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 ## HTTP adapter follow-up
 - Reject nonstandard JSON constants and invalid route types; regression coverage for malformed logout payload and storage failure propagation.
 - Runs 46174912685 and 46174912720 passed. New tests pending CI. Hosting layer must map unexpected storage failures to non-success responses without leaking details.
+
+## Account storage follow-up
+- Runs 46175063428 and 46175063451 passed. Reject malformed stored password hashes before scrypt; cover invalid entitlement expiry and owner entitlement isolation. Remove unused import.
+- New CI pending; no schema or production credential migration. Owner device proof and Android restart revocation remain open.
