@@ -1,6 +1,6 @@
 """Service facade for a future authenticated HTTPS adapter; not a listener."""
 from auth_accounts import normalize, register
-from auth_sessions import login, review, revoke, actor
+from auth_sessions import owner_login, review, revoke, actor
 from auth_db import transaction
 from auth_entitlements import grant, revoke_license
 from auth_security import permit
@@ -33,9 +33,7 @@ class AuthService:
                 if not isinstance(proof,dict) or set(proof) != {"key_digest","nonce","public_der","signature"}:
                     return None
                 return verified_login(self.path,username,password,**proof)
-            with transaction(self.path) as db:
-                owner = db.execute("SELECT 1 FROM accounts WHERE username=? AND role='SUPER_ADMIN'",(username,)).fetchone()
-            return login(self.path,username,password) if owner else None
+            return owner_login(self.path,username,password)
         except (ValueError,TypeError):
             return None
 
