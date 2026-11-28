@@ -175,7 +175,7 @@ class AuthTest(unittest.TestCase):
         digest = hashlib.sha256(der).hexdigest()
         challenge = issue_recovery_challenge(self.path,"owner",digest)
         nonce = challenge["nonce"]
-        message = ("ME-PROJECT-DEVICE-LOGIN-V1:"+challenge["accountId"]+":"+digest+":"+nonce).encode("ascii")
+        message = ("ME-PROJECT-OWNER-RECOVERY-V1:"+challenge["accountId"]+":"+digest+":"+nonce).encode("ascii")
         return digest, {"nonce":nonce,"public_der":der,"signature":key.sign(message,ec.ECDSA(hashes.SHA256()))}
 
     def test_offline_owner_recovery_revokes_old_session_and_consumes_secret(self):
@@ -226,7 +226,7 @@ class AuthTest(unittest.TestCase):
         digest = hashlib.sha256(der).hexdigest()
         challenge = issue_recovery_challenge(self.path,"owner",digest)
         nonce = challenge["nonce"]
-        message = ("ME-PROJECT-DEVICE-LOGIN-V1:"+challenge["accountId"]+":"+digest+":"+nonce).encode("ascii")
+        message = ("ME-PROJECT-OWNER-RECOVERY-V1:"+challenge["accountId"]+":"+digest+":"+nonce).encode("ascii")
         signature = key.sign(message,ec.ECDSA(hashes.SHA256()))
         self.assertFalse(recover(self.path,"owner",self.password,secret,digest))
         self.assertFalse(recover(self.path,"owner",self.password,secret,digest,nonce=nonce,public_der=der,signature=b"bad"))
