@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from auth_db import initialize, transaction
 from auth_security import bootstrap_owner
 from auth_service import AuthService
+from auth_sessions import login as legacy_login
 
 class VerifiedServiceTest(unittest.TestCase):
     def test_verified_login(self):
@@ -28,6 +29,7 @@ class VerifiedServiceTest(unittest.TestCase):
             self.assertIsNone(service.device_challenge("tester",password,digest))
             self.assertEqual(service.grant_license(admin,target,"FAMILY"),"APPLIED")
             self.assertIsNone(service.login("tester",password))
+            self.assertIsNone(legacy_login(path,"tester",password))
             challenge = service.device_challenge("tester",password,digest)
             nonce = challenge["nonce"]
             message = ("ME-PROJECT-DEVICE-LOGIN-V1:"+target+":"+digest+":"+nonce).encode("ascii")
@@ -85,3 +87,4 @@ class VerifiedServiceTest(unittest.TestCase):
             self.assertEqual(service.review(second,target,"PENDING","APPROVED"),"APPLIED")
             self.assertEqual(service.grant_license(second,target,"FAMILY"),"APPLIED")
             self.assertIsNone(service.login("tester",password))
+            self.assertIsNone(legacy_login(path,"tester",password))
