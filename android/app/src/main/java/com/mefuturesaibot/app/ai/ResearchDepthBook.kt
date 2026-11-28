@@ -12,6 +12,7 @@ internal class ResearchDepthBook(private val symbol: String = "BTCUSDT") {
     private val bids = TreeMap<BigDecimal,BigDecimal>(reverseOrder())
     private val asks = TreeMap<BigDecimal,BigDecimal>()
     private val pending = ArrayDeque<DepthDelta>()
+    private var pendingLevels = 0
     private var anchored = false
     private var time = 0L
     private var floor: BigDecimal? = null
@@ -19,7 +20,7 @@ internal class ResearchDepthBook(private val symbol: String = "BTCUSDT") {
     private var revision = 0L
     @Synchronized fun epoch() = revision
     @Synchronized fun clear() {
-        revision++; floor=null; ceiling=null; guard.invalidate(); bids.clear(); asks.clear(); pending.clear(); anchored=false; time=0
+        revision++; floor=null; ceiling=null; guard.invalidate(); bids.clear(); asks.clear(); pending.clear(); pendingLevels=0; anchored=false; time=0
     }
     private fun valid(levels: List<Pair<BigDecimal,BigDecimal>>) = levels.size <= 1000 &&
         levels.all { (p,q) -> p.signum()>0 && q.signum()>=0 && p.precision()<=32 && q.precision()<=32 &&
@@ -30,8 +31,9 @@ internal class ResearchDepthBook(private val symbol: String = "BTCUSDT") {
     @Synchronized fun delta(d: DepthDelta) {
         if (!valid(d.bids)||!valid(d.asks)||d.time<=0) { clear(); return }
         if (!anchored) {
-            if (pending.size>=64) clear()
-            pending.addLast(d); return
+            val levels = d.bids.size + d.asks.size
+            if (pending.size>=64 || pendingLevels + levels > 8192) clear()
+            pending.addLast(d); pendingLevels += levels; return
         }
         if (!guard.accept(d.first,d.last,d.previous)) {
             if (!guard.synchronized()) clear()
