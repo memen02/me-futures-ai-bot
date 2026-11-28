@@ -34,6 +34,8 @@ def dispatch(service, route, body, authorization=None):
                 raise ValueError("invalid logout")
             service.logout(authorization[7:])
             return 200, {"result":"APPLIED"}
+        if route.startswith("/v1/auth/admin/"):
+            return dispatch_admin(service,route,data,authorization)
         if route not in ("/v1/auth/register","/v1/auth/login","/v1/auth/device-challenge"):
             return 404, {"error":"NOT_FOUND"}
         expected = {"username","password"}
@@ -67,3 +69,42 @@ def dispatch(service, route, body, authorization=None):
         return (200,result) if result is not None else (401,{"error":"DENIED"})
     except (ValueError,TypeError,UnicodeError,binascii.Error,RecursionError):
         return 400, {"error":"INVALID_REQUEST"}
+
+
+def dispatch_admin(service, route, data, authorization):
+    if not isinstance(authorization,str) or not re.fullmatch(r"Bearer [0-9a-f]{64}",authorization):
+        return 401, {"error":"DENIED"}
+    token = authorization[7:]
+    action = route.removeprefix("/v1/auth/admin/")
+    fields = {
+        "review":{"target","expected","desired"},
+        "grant-license":{"target","kind","expires"},
+        "revoke-license":{"target"},
+        "bind-device":{"target","key_digest","expected"},
+    }
+    if action not in fields:
+        return 404, {"error":"NOT_FOUND"}
+    if set(data)!=fields[action]:
+        raise ValueError("invalid fields")
+    target = data["target"]
+    if not isinstance(target,str) or not re.fullmatch(r"[0-9a-f]{32}",target):
+        raise ValueError("invalid target")
+    if action == "review":
+        if not all(isinstance(data[k],str) for k in ("expected","desired")):
+            raise ValueError("invalid status")
+        result = service.review(token,target,data["expected"],data["desired"])
+    elif action == "grant-license":
+        if not isinstance(data["kind"],str) or (data["expires"] is not None and type(data["expires"]) is not int):
+            raise ValueError("invalid license")
+        result = service.grant_license(token,target,data["kind"],data["expires"])
+    elif action == "revoke-license":
+        result = service.revoke_license(token,target)
+    else:
+        for value in (data["key_digest"],data["expected"]):
+            if value is not None and (not isinstance(value,str) or not re.fullmatch(r"[0-9a-f]{64}",value)):
+                raise ValueError("invalid digest")
+        if data["key_digest"] is None:
+            raise ValueError("missing digest")
+        result = service.bind_device(token,target,data["key_digest"],data["expected"])
+    status = {"APPLIED":200,"DENIED":403,"CONFLICT":409,"UNAVAILABLE":503}.get(result,503)
+    return status, {"result":result}
