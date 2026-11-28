@@ -7,16 +7,21 @@ import android.os.SystemClock
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
-internal class ResearchDepthFeed(private val symbol: String = "BTCUSDT") {
-    init { require(symbol in setOf("BTCUSDT","ETHUSDT")) }
-    private val book=ResearchDepthBook(symbol)
-    private val client=ReconnectingWebSocket.sharedHttpClient.newBuilder()
+internal class ResearchDepthFeed(
+    private val symbol: String = "BTCUSDT",
+    socketFactory: okhttp3.WebSocket.Factory = ReconnectingWebSocket.sharedHttpClient,
+    private val guard: AiRateLimitGuard = ResearchApiBudget.guard,
+    private val client: okhttp3.Call.Factory = ReconnectingWebSocket.sharedHttpClient.newBuilder()
         .callTimeout(5,TimeUnit.SECONDS).retryOnConnectionFailure(false)
         .followRedirects(false).followSslRedirects(false).build()
+) {
+    init { require(symbol in setOf("BTCUSDT","ETHUSDT")) }
+    private val book=ResearchDepthBook(symbol)
     private var snapshotCall: okhttp3.Call? = null
     @Volatile private var closed=false
     @Volatile private var generation=0L
     private val socket=ReconnectingWebSocket(
+        client=socketFactory,
         url="wss://fstream.binance.com/public/ws/${symbol.lowercase(java.util.Locale.ROOT)}@depth@500ms",
         onStatusChange={ synchronized(this) { generation++; book.clear() } },
         onMessage={ raw -> synchronized(this) {
@@ -38,10 +43,9 @@ internal class ResearchDepthFeed(private val symbol: String = "BTCUSDT") {
             p.toBigDecimal() to q.toBigDecimal()
         }
     }
-    fun start()=socket.connect()
+    fun start() { if (!closed) socket.connect() }
     fun refreshSnapshot() {
         val token=synchronized(this) { if (closed||!book.needsSnapshot()) return; generation to book.epoch() }
-        val guard=ResearchApiBudget.guard
         if (!guard.acquire(SystemClock.elapsedRealtime(),20)) return
         try {
             val call = synchronized(this) {
