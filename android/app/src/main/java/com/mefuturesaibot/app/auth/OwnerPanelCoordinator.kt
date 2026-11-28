@@ -12,6 +12,7 @@ internal class OwnerPanelCoordinator(
     private val worker = OwnerRequestWorker()
 
     fun refresh(after: String? = null) {
+        if (!canAct()) return
         if (sessions.ownerToken() == null) {
             view.removeAllViews()
             onError("Sesi OWNER berakhir")
@@ -20,6 +21,7 @@ internal class OwnerPanelCoordinator(
         if (!worker.submit({
             OwnerDirectoryPage.parse(controller.listUsers(after))
         }) { result ->
+            if (!canAct()) return@submit
             if (sessions.ownerToken() == null) {
                 view.removeAllViews()
                 onError("Sesi OWNER berakhir")
@@ -38,6 +40,7 @@ internal class OwnerPanelCoordinator(
         if (!worker.submit({
             controller.review(row.accountId, row.status, desired)
         }) { result ->
+            if (!canAct()) return@submit
             if (result.getOrNull() != true)
                 onError("Perubahan belum terkonfirmasi")
             refresh()
@@ -59,6 +62,7 @@ internal class OwnerPanelCoordinator(
     private fun mutate(action: () -> Boolean) {
         if (!canAct()) return
         if (!worker.submit(action) { result ->
+            if (!canAct()) return@submit
             if (result.getOrNull() != true)
                 onError("Perubahan belum terkonfirmasi; periksa status terbaru")
             refresh()
