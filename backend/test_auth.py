@@ -199,6 +199,25 @@ class AuthTest(unittest.TestCase):
         self.assertFalse(recover(self.path,"owner",self.password,old,"a"*64))
         self.assertTrue(recover(self.path,"owner",self.password,new,"a"*64))
 
+    def test_owner_recovery_challenge_requires_matching_proof(self):
+        import hashlib
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from auth_owner_recovery import provision, recover, issue_recovery_challenge
+        bootstrap_owner(self.path,"owner",self.password)
+        secret = provision(self.path,"owner")
+        key = ec.generate_private_key(ec.SECP256R1())
+        der = key.public_key().public_bytes(serialization.Encoding.DER,serialization.PublicFormat.SubjectPublicKeyInfo)
+        digest = hashlib.sha256(der).hexdigest()
+        challenge = issue_recovery_challenge(self.path,"owner",digest)
+        nonce = challenge["nonce"]
+        message = ("ME-PROJECT-DEVICE-LOGIN-V1:"+challenge["accountId"]+":"+digest+":"+nonce).encode("ascii")
+        signature = key.sign(message,ec.ECDSA(hashes.SHA256()))
+        self.assertFalse(recover(self.path,"owner",self.password,secret,digest))
+        self.assertFalse(recover(self.path,"owner",self.password,secret,digest,nonce=nonce,public_der=der,signature=b"bad"))
+        self.assertTrue(recover(self.path,"owner",self.password,secret,digest,nonce=nonce,public_der=der,signature=signature))
+        self.assertFalse(recover(self.path,"owner",self.password,secret,digest,nonce=nonce,public_der=der,signature=signature))
+
     def test_rate_limit(self):
         for _ in range(5):
             self.assertTrue(permit(self.path,"login_user","tester"))
