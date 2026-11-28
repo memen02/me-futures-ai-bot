@@ -52,6 +52,9 @@ def owner_login(path, username, password):
         row = db.execute("SELECT * FROM accounts WHERE username=? AND role='SUPER_ADMIN' AND status='APPROVED'",(username,)).fetchone()
         if row is None or not verify_password(password,row["password_hash"]):
             return None
+        # Enrolled owners must use device proof; never fall back to password-only.
+        if db.execute("SELECT 1 FROM device_bindings WHERE account_id=?", (row["id"],)).fetchone():
+            return None
         now = int(time.time())
         token = secrets.token_hex(32)
         db.execute("DELETE FROM sessions WHERE expires<=? OR account_id=?",(now,row["id"]))
