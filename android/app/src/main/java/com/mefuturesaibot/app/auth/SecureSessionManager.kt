@@ -9,6 +9,11 @@ internal class SecureSessionManager(private val clock: () -> Long = { SystemCloc
     private var issuedAt = 0L
     private var generation = 0L
     @Synchronized fun sessionGeneration(): Long? = if (active() != null) generation else null
+    @Synchronized fun revision(): Long = generation
+    @Synchronized fun installIfUnchanged(value: AuthGrant, expected: Long): Boolean {
+        if (generation != expected) return false
+        return install(value)
+    }
     @Synchronized fun install(value: AuthGrant): Boolean {
         clear()
         if (!AccountApprovalPolicy.showTrading(value.identity) ||
