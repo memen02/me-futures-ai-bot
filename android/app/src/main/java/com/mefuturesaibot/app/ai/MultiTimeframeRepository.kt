@@ -47,6 +47,7 @@ internal class MultiTimeframeRepository(
     private var closed = false
 
     private var activeCall: Call? = null
+    private val flowCache = LinkedHashMap<Pair<String,Timeframe>, com.mefuturesaibot.app.ai.decision.OrderFlowSnapshot>()
 
     private val base =
         "https://fapi.binance.com/fapi/v1/"
@@ -258,6 +259,17 @@ internal class MultiTimeframeRepository(
                 if (closed) return Status.CLOSED
 
                 if (cache.put(history)) {
+                    val key = symbol to timeframe
+                    flowCache.remove(key)
+                    val rows = org.json.JSONArray(body)
+                    val last = history.lastOpen
+                    for (i in 0 until rows.length()) {
+                        val row = rows.getJSONArray(i)
+                        if (row.getLong(0) == last) {
+                            com.mefuturesaibot.app.ai.decision.OrderFlowKlineAdapter.parse(symbol,timeframe,row,cutoff)?.let { flowCache[key] = it }
+                        }
+                    }
+                    while (flowCache.size > 120) flowCache.remove(flowCache.keys.first())
                     Status.UPDATED
                 } else {
                     Status.WAIT_DATA
@@ -330,12 +342,29 @@ internal class MultiTimeframeRepository(
         }
     }
 
+    fun clockBounds(): AiExchangeClock.Bounds? = synchronized(lifecycle) {
+        if (closed) null else clock.bounds(elapsed())
+    }
+
+    fun researchCapture(symbol: String): Pair<UnifiedTimeframeSnapshot, Map<Timeframe,com.mefuturesaibot.app.ai.decision.OrderFlowSnapshot>>? = synchronized(lifecycle) {
+        if (closed) return@synchronized null
+        val bounds = clock.bounds(elapsed()) ?: return@synchronized null
+        val source = UnifiedTimeframeSnapshot.capture(symbol,cache.snapshot(symbol,bounds.latest),
+            bounds.earliest,bounds.latest) ?: return@synchronized null
+        val flows = source.frames.mapNotNull { (frame,history) ->
+            val flow = flowCache[symbol to frame] ?: return@mapNotNull null
+            if (flow.closedAtMs != frame.nextOpen(requireNotNull(history.lastOpen))-1L) null else frame to flow
+        }.toMap()
+        source to flows
+    }
+
     override fun close() {
         synchronized(lifecycle) {
             closed = true
             activeCall?.cancel()
             activeCall = null
             cache.clear()
+            flowCache.clear()
             clock.clear()
         }
     }
