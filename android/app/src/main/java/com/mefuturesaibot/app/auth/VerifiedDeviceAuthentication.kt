@@ -30,7 +30,11 @@ internal class VerifiedDeviceAuthentication(
         if (signature.size !in 1..80) return null
         val grant = transport.login(username, password, digest, challenge.nonce, der, signature)
             ?: return null
-        if (grant.identity.username != username) {
+        if (grant.identity.username != username ||
+            grant.identity.accountId != challenge.accountId ||
+            grant.identity.role != UserRole.USER ||
+            grant.identity.status != AccountStatus.APPROVED ||
+            grant.lifetimeSeconds !in 1L..900L) {
             transport.revoke(grant.accessToken)
             return null
         }
