@@ -1,6 +1,8 @@
 """Service facade for a future authenticated HTTPS adapter; not a listener."""
 from auth_accounts import normalize, register
-from auth_sessions import login, review, revoke
+from auth_sessions import login, review, revoke, actor
+from auth_db import transaction
+from auth_entitlements import grant, revoke_license
 from auth_security import permit
 
 class AuthService:
@@ -38,3 +40,27 @@ class AuthService:
 
     def logout(self,token):
         revoke(self.path,token)
+
+    def authorize(self,token):
+        try:
+            with transaction(self.path) as db:
+                row = actor(db,token)
+                return dict(row) if row is not None else None
+        except (ValueError,TypeError):
+            return None
+
+    def grant_license(self,token,target,kind,expires=None):
+        if not permit(self.path,"admin_global","all",limit=60):
+            return "UNAVAILABLE"
+        try:
+            return grant(self.path,token,target,kind,expires)
+        except (ValueError,TypeError):
+            return "DENIED"
+
+    def revoke_license(self,token,target):
+        if not permit(self.path,"admin_global","all",limit=60):
+            return "UNAVAILABLE"
+        try:
+            return revoke_license(self.path,token,target)
+        except (ValueError,TypeError):
+            return "DENIED"
