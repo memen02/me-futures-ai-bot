@@ -20,11 +20,13 @@ internal class VerifiedDeviceAuthentication(
         transport.register(username, password)
 
     override fun login(username: String, password: CharArray): AuthGrant? {
-        val der = signer.publicDer()
-        val digest = DeviceLoginProof.digest(der)
+        val der = try { signer.publicDer() } catch (_: Exception) { return null }
+        val digest = try { DeviceLoginProof.digest(der) } catch (_: IllegalArgumentException) { return null }
         val challenge = transport.challenge(username, password, digest) ?: return null
-        DeviceLoginProof.message(challenge.accountId, digest, challenge.nonce)
-        val signature = signer.sign(challenge.accountId, digest, challenge.nonce)
+        val signature = try {
+            DeviceLoginProof.message(challenge.accountId, digest, challenge.nonce)
+            signer.sign(challenge.accountId, digest, challenge.nonce)
+        } catch (_: Exception) { return null }
         if (signature.size !in 1..80) return null
         val grant = transport.login(username, password, digest, challenge.nonce, der, signature)
             ?: return null
