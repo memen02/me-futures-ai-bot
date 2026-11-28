@@ -36,6 +36,11 @@ class VerifiedServiceTest(unittest.TestCase):
             self.assertIsNotNone(session)
             token = session["accessToken"]
             self.assertIsNotNone(service.authorize(token))
+            self.assertEqual(service.bind_device(token,target,"c"*64,expected=digest),"DENIED")
+            self.assertEqual(service.grant_license(token,target,"FAMILY"),"DENIED")
+            self.assertEqual(service.revoke_license(token,target),"DENIED")
+            self.assertIsNone(service.authorize("invalid"))
+            service.logout("invalid")
             self.assertIsNone(service.login("tester",password,proof))
             self.assertEqual(service.bind_device(admin,target,"b"*64,expected=digest),"APPLIED")
             self.assertIsNone(service.authorize(token))
