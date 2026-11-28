@@ -10,7 +10,8 @@ internal class SecureSessionManager(private val clock: () -> Long = { SystemCloc
     private var generation = 0L
     @Synchronized fun sessionGeneration(): Long? = if (active() != null) generation else null
     @Synchronized fun revision(): Long = generation
-    @Synchronized fun beginLogin(): Pair<String?, Long> {
+    @Synchronized fun beginLogin(expected: Long): Pair<String?, Long>? {
+        if (generation != expected) return null
         val previous = clear()
         return previous to generation
     }

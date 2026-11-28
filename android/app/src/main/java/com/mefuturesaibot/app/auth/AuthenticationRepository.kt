@@ -15,10 +15,10 @@ internal class AuthenticationRepository(private val api: AuthenticationApi,
             repeated.fill('\u0000')
         }
     }
-    @Synchronized fun login(username: String, password: CharArray): Boolean {
+    @Synchronized fun login(username: String, password: CharArray, expected: Long = sessions.revision()): Boolean {
         try {
             // Fail closed if the previous server session cannot be revoked.
-            val (previous, revision) = sessions.beginLogin()
+            val (previous, revision) = sessions.beginLogin(expected) ?: return false
             previous?.let { token ->
                 try { api.revoke(token) } catch (_: Exception) { return false }
             }
