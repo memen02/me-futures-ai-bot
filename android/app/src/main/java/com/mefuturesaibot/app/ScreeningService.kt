@@ -14,6 +14,8 @@ import com.mefuturesaibot.app.scanner.*
 class ScreeningService : Service() {
     private lateinit var researchRepository: com.mefuturesaibot.app.ai.MultiTimeframeRepository
     private lateinit var researchWorker: com.mefuturesaibot.app.ai.UnifiedAnalysisWorker
+    private val researchDepth = com.mefuturesaibot.app.ai.ResearchDepthFeed()
+    private val researchScheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
     private lateinit var monitor: PaperPositionMonitor
     private lateinit var scanner: MarketScanner
     private lateinit var liveFeed: LiveMarketFeed
@@ -92,7 +94,7 @@ class ScreeningService : Service() {
         if (Build.VERSION.SDK_INT >= 34) startForeground(2, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         else startForeground(2, notification)
         // Lifecycle ownership only until the shared rate budget and depth feed are ready.
-        researchRepository = com.mefuturesaibot.app.ai.MultiTimeframeRepository()
+        researchRepository = com.mefuturesaibot.app.ai.MultiTimeframeRepository(guard = com.mefuturesaibot.app.ai.ResearchApiBudget.guard)
         researchWorker = com.mefuturesaibot.app.ai.UnifiedAnalysisWorker { researchRepository.clockBounds() }
         val store = DeskStore(this)
         val enabled = { BotPreferences.shouldRun(this) && BotForegroundService.isRunning }
@@ -108,12 +110,28 @@ class ScreeningService : Service() {
             }
         }
 
+        researchDepth.start()
+        // Pilot only: BTC, two frames, no order authorization. Missing depth means WAIT.
+        researchScheduler.scheduleWithFixedDelay({
+            try {
+                if (enabled()) {
+                    val frames = setOf(com.mefuturesaibot.app.ai.Timeframe.M1, com.mefuturesaibot.app.ai.Timeframe.M5)
+                    for (frame in frames) researchRepository.refresh("BTCUSDT",frame)
+                    val capture = researchRepository.researchCapture("BTCUSDT")
+                    if (capture != null) researchWorker.submit(capture.first,
+                        com.mefuturesaibot.app.ai.Timeframe.M1,frames,capture.second,null)
+                    researchStatus = if (researchDepth.observed()) "WAIT · depth belum tervalidasi" else "WAIT · depth belum tersedia"
+                } else researchStatus = "OFFLINE"
+            } catch (_: Exception) { researchStatus = "WAIT · data riset tidak tersedia" }
+        }, 5L, 5L, java.util.concurrent.TimeUnit.SECONDS)
         scanner.start()
         liveHandler.post(liveTick)
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onDestroy() {
+        researchScheduler.shutdownNow()
+        researchDepth.close()
         researchWorker.close()
         researchRepository.close()
         liveHandler.removeCallbacksAndMessages(null)
@@ -128,6 +146,9 @@ class ScreeningService : Service() {
         super.onDestroy()
     }
     companion object {
+        @Volatile internal var researchStatus = "OFFLINE"
+            private set
+
         @Volatile internal var latest = Scan()
             private set
 
