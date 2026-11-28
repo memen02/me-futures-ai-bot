@@ -38,7 +38,7 @@ internal class ResearchDepthFeed {
     }
     fun start()=socket.connect()
     fun refreshSnapshot() {
-        val token=synchronized(this) { if (closed||!book.needsSnapshot()) return; generation }
+        val token=synchronized(this) { if (closed||!book.needsSnapshot()) return; generation to book.epoch() }
         val guard=ResearchApiBudget.guard
         if (!guard.acquire(SystemClock.elapsedRealtime(),20)) return
         try {
@@ -49,12 +49,12 @@ internal class ResearchDepthFeed {
                 if (source.request(262145L)) return
                 val o=JSONObject(source.readUtf8())
                 val bids=levels(o.getJSONArray("bids")); val asks=levels(o.getJSONArray("asks"))
-                synchronized(this) { if (!closed && generation==token) book.anchor(o.getLong("lastUpdateId"),bids,asks) }
+                synchronized(this) { if (!closed && generation==token.first && book.epoch()==token.second) book.anchor(o.getLong("lastUpdateId"),bids,asks) }
             }
-        } catch (_: Exception) { synchronized(this) { if (generation==token) book.clear() } }
+        } catch (_: Exception) { synchronized(this) { if (generation==token.first && book.epoch()==token.second) book.clear() } }
         finally { guard.release() }
     }
-    fun liquidity(bounds: AiExchangeClock.Bounds): com.mefuturesaibot.app.ai.decision.LiquiditySnapshot? {
+    @Synchronized fun liquidity(bounds: AiExchangeClock.Bounds): com.mefuturesaibot.app.ai.decision.LiquiditySnapshot? {
         val value=book.liquidity() ?: return null
         return value.takeIf { !closed && it.observedAtMs<=bounds.earliest && bounds.latest-it.observedAtMs in 0..1999 }
     }
