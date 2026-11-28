@@ -48,12 +48,12 @@ def issue_authenticated(path, username, password, key_digest):
         return None
     with transaction(path) as db:
         row = db.execute("""SELECT a.* FROM accounts a JOIN device_bindings b ON b.account_id=a.id
-            WHERE a.username=? AND a.role='USER' AND a.status='APPROVED' AND b.public_key_digest=?""",
+            WHERE a.username=? AND a.role IN ('USER','SUPER_ADMIN') AND a.status='APPROVED' AND b.public_key_digest=?""",
             (username,key_digest)).fetchone()
         if row is None or not verify_password(password,row["password_hash"]):
             return None
         now = int(time.time())
-        if not licensed(db,row["id"],now):
+        if row["role"] == "USER" and not licensed(db,row["id"],now):
             return None
         db.execute("DELETE FROM device_challenges WHERE expires<=?",(now,))
         nonce = secrets.token_hex(32)
