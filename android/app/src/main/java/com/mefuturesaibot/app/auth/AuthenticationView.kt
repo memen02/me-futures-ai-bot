@@ -14,6 +14,7 @@ internal class AuthenticationView(
     private val onAuthenticated: () -> Unit
 ) : LinearLayout(activity), AutoCloseable {
     private val worker = OwnerRequestWorker()
+    private var closed = false
     private val username = EditText(activity).apply {
         hint = "Username"
         isSingleLine = true
@@ -21,6 +22,8 @@ internal class AuthenticationView(
     }
     private fun passwordField(label: String) = EditText(activity).apply {
         hint = label
+        isSaveEnabled = false
+        isSingleLine = true
         inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
         filters = arrayOf(InputFilter.LengthFilter(128))
     }
@@ -65,6 +68,7 @@ internal class AuthenticationView(
         val p = take(password)
         repeated.text.clear()
         if (!worker.submit({ runtime.login(role,name,p) }) { result ->
+            if (closed || activity.isFinishing || activity.isDestroyed) return@submit
             if (result.getOrNull() == true) onAuthenticated()
             else status.text = "Login gagal atau akun belum disetujui"
         }) {
@@ -87,6 +91,7 @@ internal class AuthenticationView(
     }
 
     override fun close() {
+        closed = true
         worker.close()
         password.text.clear()
         repeated.text.clear()
