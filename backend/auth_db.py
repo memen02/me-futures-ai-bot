@@ -35,3 +35,14 @@ def initialize(path):
             target TEXT NOT NULL REFERENCES accounts(id), action TEXT NOT NULL,
             created INTEGER NOT NULL
         )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS entitlements(
+            account_id TEXT PRIMARY KEY REFERENCES accounts(id),
+            kind TEXT NOT NULL CHECK(kind IN ('FAMILY','MONTHLY')),
+            expires INTEGER,
+            CHECK((kind='FAMILY' AND expires IS NULL) OR
+                  (kind='MONTHLY' AND expires IS NOT NULL))
+        )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS device_bindings(
+            account_id TEXT PRIMARY KEY REFERENCES accounts(id),
+            public_key_digest TEXT NOT NULL UNIQUE
+        )""")
