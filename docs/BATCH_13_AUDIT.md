@@ -63,3 +63,7 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 - Owner clarification: replace the proposed two-device exception with migration of the same Owner account from Android to iOS (or reverse). Retain one active approved device; require secure recovery/transfer and revoke old device after verified migration. Shared backend data remains intact. This supersedes the two-device proposal; implementation deferred.
 
 - Owner panel host now starts only after protected UI is unlocked, using existing unlock lifecycle hook. No directory refresh while App Lock blocks entry. Regression and device tests pending.
+
+- Distribution target: trading client and Owner panel available on Android and iOS; shared backend, server-enforced roles and device migration. Separate Owner app packaging is a future design option, not implemented.
+
+- Validate login input before clearing existing session or sending revocation. Invalid local credentials must not destroy an existing session. Runtime access gate still locks on attempted login; test pending. Failed server revocation persistence remains open.
