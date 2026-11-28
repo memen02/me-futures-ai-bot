@@ -101,3 +101,7 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 ## Atomic revocation follow-up
 - Session replacement and repository logout now retain token under the session lock before network I/O. Rejected grants retained before revoke; added clearAndRemember regression test.
 - Run 46175248721 passed. New Android CI pending. Role adapter rejection and process-death persistence remain open; no plaintext token persistence introduced.
+
+## Role rejection follow-up
+- Runtime role adapters retain rejected tokens before revoke. Conditional installation fails while pending revocations exist. Added two regression tests.
+- Android process restart still loses memory-only pending tokens; owner device proof and deployed HTTPS remain open. CI pending.
