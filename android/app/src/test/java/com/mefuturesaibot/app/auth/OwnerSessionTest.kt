@@ -9,6 +9,22 @@ class OwnerSessionTest {
         value: String = token) = AuthGrant(
         AccountIdentity("b".repeat(32), "tester", role, status), value, 60L)
 
+    @Test fun failedRevocationsRemainPendingUntilConfirmed() {
+        val sessions = SecureSessionManager { 1000L }
+        val second = "b".repeat(64)
+        sessions.rememberPendingRevocation(token)
+        sessions.rememberPendingRevocation(second)
+        val revoked = mutableListOf<String>()
+        assertFalse(sessions.flushPendingRevocation {
+            if (it == second) throw IllegalStateException("offline")
+            revoked.add(it)
+        })
+        assertEquals(listOf(token), revoked)
+        assertTrue(sessions.flushPendingRevocation { revoked.add(it) })
+        assertEquals(listOf(token, second), revoked)
+        assertTrue(sessions.flushPendingRevocation { fail("Unexpected revocation") })
+    }
+
     @Test fun ownerTokenRequiresActiveApprovedOwner() {
         val sessions = SecureSessionManager { 1000L }
         assertTrue(sessions.install(grant(UserRole.SUPER_ADMIN)))
