@@ -27,6 +27,10 @@ internal class AuthenticationRuntime(origin: HttpUrl) {
         owner.logout()
     }
 
+    fun revokeSession(token: String) {
+        runCatching { transport.revoke(token) }
+    }
+
     fun deviceCode(): String = DeviceLoginProof.digest(KeystoreDeviceSigner.publicDer())
 
     fun ownerPanel(activity: android.app.Activity, onError: (String) -> Unit): OwnerPanelHost {
