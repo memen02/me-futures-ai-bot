@@ -35,7 +35,7 @@ internal class SecureSessionManager(private val clock: () -> Long = { SystemCloc
         return previous to generation
     }
     @Synchronized fun installIfUnchanged(value: AuthGrant, expected: Long, owner: Any? = null, allowed: () -> Boolean = { true }): Boolean {
-        if (generation != expected || !allowed()) return false
+        if (generation != expected || pendingRevocations.isNotEmpty() || !allowed()) return false
         if (!install(value)) return false
         grantOwner = owner
         return true
