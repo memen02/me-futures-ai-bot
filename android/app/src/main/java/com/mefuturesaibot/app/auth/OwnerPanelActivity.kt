@@ -37,9 +37,7 @@ internal class OwnerPanelActivity : SecureActivity() {
                 setOnClickListener {
                     if (!canUseProtectedUi() || !ApplicationAuthentication.allowsOwnerScreen()) return@setOnClickListener
                     closeHost()
-                    ApplicationAuthentication.lockLocalAccess()
-                    // Clear locally immediately; remote revocation runs off the UI thread.
-                    val token = runtime.sessions.clear()
+                    val token = runtime.clearLocalSession()
                     if (token != null) Thread { runtime.revokeSession(token) }.start()
                     startActivity(Intent(this@OwnerPanelActivity, StartupActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))

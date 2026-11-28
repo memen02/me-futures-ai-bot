@@ -27,6 +27,12 @@ internal class AuthenticationRuntime(origin: HttpUrl) {
         owner.logout()
     }
 
+    // Local logout is immediate; callers revoke the returned token off the UI thread.
+    fun clearLocalSession(): String? {
+        accessGate.lock()
+        return sessions.clear()
+    }
+
     fun revokeSession(token: String) {
         runCatching { transport.revoke(token) }
     }
