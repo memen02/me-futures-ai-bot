@@ -89,6 +89,30 @@ internal class HttpsAuthenticationApi(origin: HttpUrl) : AuthenticationApi, Veri
             accessToken).getString("result") == "APPLIED"
     }
 
+    fun grantLicense(accessToken: String, target: String, kind: String, expires: Long?): Boolean {
+        require(target.matches(Regex("[0-9a-f]{32}")))
+        require((kind == "FAMILY" && expires == null) ||
+            (kind == "MONTHLY" && expires != null && expires > 0))
+        return post("admin/grant-license", JSONObject().put("target", target)
+            .put("kind", kind).put("expires", expires ?: JSONObject.NULL),
+            accessToken).getString("result") == "APPLIED"
+    }
+
+    fun revokeLicense(accessToken: String, target: String): Boolean {
+        require(target.matches(Regex("[0-9a-f]{32}")))
+        return post("admin/revoke-license", JSONObject().put("target", target),
+            accessToken).getString("result") == "APPLIED"
+    }
+
+    fun bindDevice(accessToken: String, target: String, digest: String, expected: String?): Boolean {
+        require(target.matches(Regex("[0-9a-f]{32}")))
+        val pattern = Regex("[0-9a-f]{64}")
+        require(digest.matches(pattern) && (expected == null || expected.matches(pattern)))
+        return post("admin/bind-device", JSONObject().put("target", target)
+            .put("key_digest", digest).put("expected", expected ?: JSONObject.NULL),
+            accessToken).getString("result") == "APPLIED"
+    }
+
     override fun revoke(accessToken: String) {
         if (post("logout",JSONObject(),accessToken).getString("result") != "APPLIED")
             throw java.io.IOException("Session revocation not confirmed")
