@@ -1,4 +1,4 @@
-"""Entitlement foundation. Not yet wired into login or HTTP authorization."""
+"""Owner-managed entitlements; enforced by backend login and session checks."""
 import re
 import time
 from auth_db import transaction
@@ -38,6 +38,7 @@ def grant(path, token, target, kind, expires=None):
         db.execute("""INSERT INTO entitlements VALUES(?,?,?)
             ON CONFLICT(account_id) DO UPDATE SET kind=excluded.kind, expires=excluded.expires""",
             (target,kind,expires))
+        db.execute("DELETE FROM device_challenges WHERE account_id=?", (target,))
         db.execute("DELETE FROM sessions WHERE account_id=?", (target,))
         db.execute("INSERT INTO admin_audit(actor,target,action,created) VALUES(?,?,?,?)",
                    (admin["id"],target,"LICENSE_"+kind,now))
@@ -50,6 +51,7 @@ def revoke_license(path, token, target):
             return "DENIED"
         if db.execute("DELETE FROM entitlements WHERE account_id=?", (target,)).rowcount != 1:
             return "CONFLICT"
+        db.execute("DELETE FROM device_challenges WHERE account_id=?", (target,))
         db.execute("DELETE FROM sessions WHERE account_id=?", (target,))
         db.execute("INSERT INTO admin_audit(actor,target,action,created) VALUES(?,?,?,?)",
                    (admin["id"],target,"LICENSE_REVOKED",int(time.time())))
