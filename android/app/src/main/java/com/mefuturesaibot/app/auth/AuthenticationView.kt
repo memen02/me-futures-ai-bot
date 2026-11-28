@@ -7,6 +7,7 @@ import android.content.Context
 import android.text.InputType
 import android.text.InputFilter
 import android.widget.*
+import com.mefuturesaibot.app.security.SecureActivity
 
 internal class AuthenticationView(
     private val activity: Activity,
@@ -86,7 +87,9 @@ internal class AuthenticationView(
     private fun button(label: String, action: () -> Unit) {
         addView(Button(activity).apply {
             text = label
-            setOnClickListener { action() }
+            setOnClickListener {
+                if (!closed && (activity as? SecureActivity)?.canUseProtectedUi() == true) action()
+            }
         })
     }
 
