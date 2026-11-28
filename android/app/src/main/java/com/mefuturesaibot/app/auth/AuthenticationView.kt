@@ -99,7 +99,10 @@ internal class AuthenticationView(
         runtime.sessions.withSessionLock {
             val attempt = pendingLogin
             pendingLogin = null
-            if (attempt != null) token = runtime.sessions.clearOwnedGrant(attempt)
+            if (attempt != null) {
+                token = runtime.sessions.clearOwnedGrant(attempt)
+                token?.let(runtime.sessions::rememberPendingRevocation)
+            }
         }
         token?.let { value -> Thread { runtime.revokeSession(value) }.start() }
     }
