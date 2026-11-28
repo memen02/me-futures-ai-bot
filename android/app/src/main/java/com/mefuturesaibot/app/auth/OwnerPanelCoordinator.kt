@@ -42,6 +42,26 @@ internal class OwnerPanelCoordinator(
         }) onError("Permintaan sedang diproses")
     }
 
+    fun grantLicense(row: OwnerDirectoryRow, kind: String, expires: Long?) {
+        mutate { controller.grantLicense(row.accountId, kind, expires) }
+    }
+
+    fun revokeLicense(row: OwnerDirectoryRow) {
+        mutate { controller.revokeLicense(row.accountId) }
+    }
+
+    fun replaceDevice(row: OwnerDirectoryRow, digest: String) {
+        mutate { controller.bindDevice(row.accountId, digest, row.deviceDigest) }
+    }
+
+    private fun mutate(action: () -> Boolean) {
+        if (!worker.submit(action) { result ->
+            if (result.getOrNull() != true)
+                onError("Perubahan belum terkonfirmasi; periksa status terbaru")
+            refresh()
+        }) onError("Permintaan sedang diproses")
+    }
+
     override fun close() {
         worker.close()
         view.removeAllViews()
