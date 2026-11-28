@@ -70,6 +70,20 @@ class AuthTest(unittest.TestCase):
             self.assertIsNone(actor(db,token))
         self.assertIsNone(login(self.path,"tester",self.password))
 
+    def test_owner_relogin_invalidates_old_token_and_old_logout_preserves_new(self):
+        bootstrap_owner(self.path,"owner",self.password)
+        old = login(self.path,"owner",self.password)["accessToken"]
+        new = login(self.path,"owner",self.password)["accessToken"]
+        self.assertNotEqual(old,new)
+        revoke(self.path,old)
+        with transaction(self.path) as db:
+            self.assertIsNone(actor(db,old))
+            self.assertIsNotNone(actor(db,new))
+        revoke(self.path,new)
+        revoke(self.path,new)
+        with transaction(self.path) as db:
+            self.assertIsNone(actor(db,new))
+
     def test_rate_limit(self):
         for _ in range(5):
             self.assertTrue(permit(self.path,"login_user","tester"))
