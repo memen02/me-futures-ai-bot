@@ -15,6 +15,7 @@ internal class OwnerRequestWorker : AutoCloseable {
         if (closed.get() || !busy.compareAndSet(false, true)) return false
         try {
             executor.execute {
+                if (closed.get()) return@execute
                 val result = runCatching { action() }
                 main.post {
                     busy.set(false)
