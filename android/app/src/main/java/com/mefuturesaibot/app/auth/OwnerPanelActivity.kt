@@ -51,11 +51,19 @@ internal class OwnerPanelActivity : SecureActivity() {
 
     override fun onResume() {
         super.onResume()
+        resumeOwnerHost()
+    }
+
+    override fun onProtectedUiUnlocked() {
+        resumeOwnerHost()
+    }
+
+    private fun resumeOwnerHost() {
         if (!ApplicationAuthentication.allowsOwnerScreen()) {
             finish()
             return
         }
-        if (isFinishing || isDestroyed) return
+        if (!canUseProtectedUi()) return
         val runtime = ApplicationAuthentication.current() ?: return
         if (host == null) {
             if (!::panelContainer.isInitialized) { finish(); return }

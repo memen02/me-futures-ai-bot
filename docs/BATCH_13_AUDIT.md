@@ -61,3 +61,5 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 - One authoritative Owner account and shared backend for Android and iOS administration. Proposed Owner-only exception: two individually approved devices (Android and iOS), independently authenticated and revocable; ordinary USER remains limited to one device. Confirm device-limit policy before implementing. No client-side role bypass or shared device keys. iOS implementation deferred until Android validation.
 
 - Owner clarification: replace the proposed two-device exception with migration of the same Owner account from Android to iOS (or reverse). Retain one active approved device; require secure recovery/transfer and revoke old device after verified migration. Shared backend data remains intact. This supersedes the two-device proposal; implementation deferred.
+
+- Owner panel host now starts only after protected UI is unlocked, using existing unlock lifecycle hook. No directory refresh while App Lock blocks entry. Regression and device tests pending.
