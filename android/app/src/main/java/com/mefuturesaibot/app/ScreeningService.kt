@@ -16,6 +16,7 @@ class ScreeningService : Service() {
     private lateinit var researchWorkers: Map<String,com.mefuturesaibot.app.ai.UnifiedAnalysisWorker>
     private val researchDepth = listOf("BTCUSDT","ETHUSDT").associateWith { com.mefuturesaibot.app.ai.ResearchDepthFeed(it) }
     private val researchScheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
+    private var researchCursor = 0
     private lateinit var monitor: PaperPositionMonitor
     private lateinit var scanner: MarketScanner
     private lateinit var liveFeed: LiveMarketFeed
@@ -134,17 +135,25 @@ class ScreeningService : Service() {
             try {
                 if (enabled()) {
                     val frames = setOf(com.mefuturesaibot.app.ai.Timeframe.M1, com.mefuturesaibot.app.ai.Timeframe.M5)
+                    val symbols = researchDepth.keys.toList()
+                    val index = researchCursor
+                    researchCursor = (researchCursor + 1) % (symbols.size * 3)
+                    val symbol = symbols[index % symbols.size]
+                    val feed = researchDepth.getValue(symbol)
+                    when (index / symbols.size) {
+                        0 -> researchRepository.refresh(symbol,com.mefuturesaibot.app.ai.Timeframe.M1)
+                        1 -> researchRepository.refresh(symbol,com.mefuturesaibot.app.ai.Timeframe.M5)
+                        else -> feed.refreshSnapshot()
+                    }
                     for ((symbol,feed) in researchDepth) {
-                    for (frame in frames) researchRepository.refresh(symbol,frame)
-                    feed.refreshSnapshot()
                     val capture = researchRepository.researchCapture(symbol)
                     if (capture != null) researchWorkers.getValue(symbol).submit(capture.first,
                         com.mefuturesaibot.app.ai.Timeframe.M1,frames,capture.second,researchRepository.clockBounds()?.let(feed::liquidity))
                     }
                     // Status is read independently on the main tick, with current liquidity.
-                } else { researchStatus = "OFFLINE" }
-            } catch (_: Exception) { researchStatus = "WAIT · data riset tidak tersedia" }
-        }, 5L, 5L, java.util.concurrent.TimeUnit.SECONDS)
+                }
+            } catch (_: Exception) { /* Main tick revalidates freshness independently. */ }
+        }, 2L, 2L, java.util.concurrent.TimeUnit.SECONDS)
         scanner.start()
         liveHandler.post(liveTick)
     }
@@ -154,7 +163,7 @@ class ScreeningService : Service() {
         researchScheduler.shutdownNow()
         researchDepth.values.forEach { it.close() }
         if (::researchWorkers.isInitialized) researchWorkers.values.forEach { it.close() }
-        researchRepository.close()
+        if (::researchRepository.isInitialized) researchRepository.close()
         liveHandler.removeCallbacksAndMessages(null)
         liveFeed.close()
         researchStatus = "OFFLINE"
