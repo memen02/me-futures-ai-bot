@@ -15,6 +15,7 @@ import com.mefuturesaibot.app.scanner.Scan
 import com.mefuturesaibot.app.scanner.TradingDesk
 
 class MainActivity : SecureActivity() {
+    override val requiresBackendAccount: Boolean = true
     private lateinit var desk: TradingDesk
     private val pollHandler = Handler(Looper.getMainLooper())
     private var userRequestedStop = false
