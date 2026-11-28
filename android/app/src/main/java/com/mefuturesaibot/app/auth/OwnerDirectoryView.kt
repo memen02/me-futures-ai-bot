@@ -14,7 +14,9 @@ internal class OwnerDirectoryView(context: Context) : LinearLayout(context) {
 
     fun render(page: OwnerDirectoryPage,
         review: (OwnerDirectoryRow, AccountStatus) -> Unit,
-        next: (String) -> Unit) {
+        next: (String) -> Unit,
+        manageLicense: (OwnerDirectoryRow) -> Unit,
+        manageDevice: (OwnerDirectoryRow) -> Unit) {
         removeAllViews()
         label("OWNER • Pengelolaan pengguna", Color.rgb(240, 185, 11))
         if (page.users.isEmpty()) label("Tidak ada pengguna")
@@ -22,6 +24,16 @@ internal class OwnerDirectoryView(context: Context) : LinearLayout(context) {
             label(row.username + " • " + row.status.name)
             label("Lisensi: " + (row.licenseKind ?: "Belum aktif") +
                 " | Perangkat: " + if (row.deviceDigest == null) "Belum terdaftar" else "Terdaftar")
+            if (row.status == AccountStatus.APPROVED) {
+                addView(Button(context).apply {
+                    text = "Kelola lisensi"
+                    setOnClickListener { manageLicense(row) }
+                })
+                addView(Button(context).apply {
+                    text = "Kelola perangkat"
+                    setOnClickListener { manageDevice(row) }
+                })
+            }
             for (desired in AccountStatus.values()) {
                 if (!AccountApprovalPolicy.reviewTransition(row.status, desired)) continue
                 val caption = when (desired) {
