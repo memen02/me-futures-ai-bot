@@ -8,7 +8,7 @@ import org.json.JSONObject
 
 // Integration adapter only. No production origin or UI activation yet.
 // Server HTTP adapter must implement this exact contract before use.
-internal class HttpsAuthenticationApi(origin: HttpUrl) : AuthenticationApi {
+internal class HttpsAuthenticationApi(origin: HttpUrl) : AuthenticationApi, VerifiedDeviceTransport {
     private val security = AuthenticationTransportSecurity(origin)
     private val client = security.client()
 
@@ -44,6 +44,35 @@ internal class HttpsAuthenticationApi(origin: HttpUrl) : AuthenticationApi {
             val token = value.getString("accessToken")
             if (!identity.valid() || identity.username != username || !token.matches(Regex("[a-f0-9]{64}"))) null
             else AuthGrant(identity,token,value.getLong("lifetimeSeconds"))
+        } catch (_: Exception) { null }
+
+    override fun challenge(username: String, password: CharArray, keyDigest: String): DeviceChallenge? =
+        try {
+            val value = post("device-challenge", JSONObject()
+                .put("username", username).put("password", String(password))
+                .put("key_digest", keyDigest))
+            val challenge = DeviceChallenge(value.getString("accountId"), value.getString("nonce"))
+            DeviceLoginProof.message(challenge.accountId, keyDigest, challenge.nonce)
+            challenge
+        } catch (_: Exception) { null }
+
+    override fun login(username: String, password: CharArray, keyDigest: String,
+        nonce: String, publicDer: ByteArray, signature: ByteArray): AuthGrant? =
+        try {
+            require(DeviceLoginProof.digest(publicDer) == keyDigest)
+            require(signature.size in 1..80)
+            val encoder = java.util.Base64.getEncoder()
+            val value = post("login", JSONObject().put("username", username)
+                .put("password", String(password)).put("proof", JSONObject()
+                    .put("key_digest", keyDigest).put("nonce", nonce)
+                    .put("public_der", encoder.encodeToString(publicDer))
+                    .put("signature", encoder.encodeToString(signature))))
+            val identity = AccountIdentity(value.getString("accountId"), value.getString("username"),
+                UserRole.valueOf(value.getString("role")), AccountStatus.valueOf(value.getString("status")))
+            val token = value.getString("accessToken")
+            if (!identity.valid() || identity.username != username || identity.role != UserRole.USER ||
+                identity.status != AccountStatus.APPROVED || !token.matches(Regex("[a-f0-9]{64}"))) null
+            else AuthGrant(identity, token, value.getLong("lifetimeSeconds"))
         } catch (_: Exception) { null }
 
     override fun revoke(accessToken: String) {
