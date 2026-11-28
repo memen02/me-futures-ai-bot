@@ -53,6 +53,7 @@ def review(path,token,target,expected,desired):
                              (desired,target,expected)).rowcount
         if changed!=1:
             return "CONFLICT"
+        db.execute("DELETE FROM device_challenges WHERE account_id=?",(target,))
         db.execute("DELETE FROM sessions WHERE account_id=?",(target,))
         db.execute("INSERT INTO admin_audit(actor,target,action,created) VALUES(?,?,?,?)",
                    (admin["id"],target,expected+"->"+desired,int(time.time())))
