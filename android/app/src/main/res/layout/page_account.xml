@@ -1,7 +1,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:focusableInTouchMode="true">
 
-        <TextView style="@style/DeskTitle" android:text="Settings" />
+        <TextView style="@style/DeskTitle" android:text="Akun" />
 
         <LinearLayout style="@style/DashPanel">
             <TextView
@@ -11,13 +11,13 @@
 
             <TextView
                 style="@style/DashLabel"
-                android:text="Private Edition"
+                android:text="Akses perangkat"
                 android:layout_marginTop="4dp" />
 
             <TextView
                 android:id="@+id/user_access_status"
                 style="@style/DashLabel"
-                android:text="Mode pengembangan · autentikasi belum aktif"
+                android:text="Memeriksa izin pemilik"
                 android:layout_marginTop="8dp" />
         </LinearLayout>
 
@@ -27,22 +27,9 @@
                 android:text="Pengguna" />
 
             <Button
-                android:id="@+id/settings_profile"
-                style="@style/AccountSecondary"
-                android:text="Profil pengguna"
-                android:enabled="false" />
-
-            <Button
                 android:id="@+id/settings_license"
                 style="@style/AccountSecondary"
-                android:text="Lisensi pengguna"
-                android:enabled="false" />
-
-            <Button
-                android:id="@+id/settings_devices"
-                style="@style/AccountSecondary"
-                android:text="Perangkat terdaftar"
-                android:enabled="false" />
+                android:text="Salin kode perangkat ini" />
         </LinearLayout>
 
         <LinearLayout style="@style/DashPanel">
@@ -63,21 +50,7 @@
                 android:enabled="false" />
         </LinearLayout>
 
-        <LinearLayout style="@style/DashPanel">
-            <TextView
-                style="@style/DashHeading"
-                android:text="Administrasi" />
 
-            <Button
-                android:id="@+id/settings_admin"
-                style="@style/AccountSecondary"
-                android:text="Admin Panel"
-                android:enabled="false" />
-
-            <TextView
-                style="@style/DashLabel"
-                android:text="Memerlukan verifikasi akun pemilik melalui server." />
-        </LinearLayout>
 
         <TextView
             style="@style/DeskTitle"

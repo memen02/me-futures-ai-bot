@@ -94,6 +94,15 @@ class MainActivity : SecureActivity() {
         val biometric = findViewById<Button>(R.id.settings_biometric)
         val autoLock = findViewById<Button>(R.id.settings_autolock)
 
+        findViewById<Button>(R.id.settings_license).setOnClickListener {
+            if (!canUseProtectedUi()) return@setOnClickListener
+            val access = (application as com.mefuturesaibot.app.maintenance.MeProjectApplication).onlineDeviceAccess
+            access.code?.let { code ->
+                getSystemService(android.content.ClipboardManager::class.java)
+                    .setPrimaryClip(android.content.ClipData.newPlainText("Kode perangkat ME Project", code))
+                android.widget.Toast.makeText(this, "Kode disalin", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
         biometric.isEnabled = true
         autoLock.isEnabled = true
 
