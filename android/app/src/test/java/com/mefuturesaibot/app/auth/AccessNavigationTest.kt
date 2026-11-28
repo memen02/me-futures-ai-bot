@@ -21,6 +21,17 @@ class LockedDeviceApplication : MeProjectApplication() {
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = LockedDeviceApplication::class)
 class AccessNavigationTest {
+    @Test fun unapprovedDemoEntryDoesNotContactExchange() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val venue = com.mefuturesaibot.app.demo.FuturesVenue.DEMO
+        venue.prefs(context).edit().putBoolean("enabled", true).commit()
+        val http = okhttp3.OkHttpClient.Builder().addInterceptor { error("Unexpected exchange request") }.build()
+        val api = com.mefuturesaibot.app.demo.DemoExchange(
+            com.mefuturesaibot.app.account.BinanceCredentials("fixture", "test"), http, venue)
+        assertTrue(com.mefuturesaibot.app.demo.DemoRunner(context, venue).cycle(api).contains("izin pemilik"))
+        assertFalse(venue.prefs(context).contains("intent"))
+    }
+
     @Test fun directDashboardAndRestoredStartupReturnToDeviceGate() {
         val home = Robolectric.buildActivity(MainActivity::class.java).create(Bundle())
         assertTrue(home.get().isFinishing)

@@ -96,8 +96,9 @@ class ScreeningService : Service() {
         if (Build.VERSION.SDK_INT >= 34) startForeground(2, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         else startForeground(2, notification)
         val store = DeskStore(this)
-        val enabled = { hasDeviceAccess() && BotPreferences.shouldRun(this) && BotForegroundService.isRunning }
-        monitor = PaperPositionMonitor(store,enabled).also { it.start() }
+        val botRunning = { BotPreferences.shouldRun(this) && BotForegroundService.isRunning }
+        val enabled = { botRunning() && hasDeviceAccess() }
+        monitor = PaperPositionMonitor(store,botRunning).also { it.start() }
         liveFeed = LiveMarketFeed()
         liveFeed.start()
 
