@@ -28,6 +28,7 @@ def bind(path, token, target, new_digest, expected=None):
                 (target,new_digest))
         except sqlite3.IntegrityError:
             return "CONFLICT"
+        db.execute("DELETE FROM device_challenges WHERE account_id=?", (target,))
         db.execute("DELETE FROM sessions WHERE account_id=?", (target,))
         db.execute("INSERT INTO admin_audit(actor,target,action,created) VALUES(?,?,?,?)",
                    (admin["id"],target,"DEVICE_REPLACED" if current else "DEVICE_BOUND",int(time.time())))
