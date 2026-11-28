@@ -242,7 +242,7 @@ internal class TradingDesk(
         } else if (!marketStatus.startsWith("LIVE ")) {
             view<TextView>(R.id.scan_state).append(" · REST")
         }
-        view<TextView>(R.id.bot_state).text = status + last + "\nAI Riset: " + research
+        view<TextView>(R.id.bot_state).text = status + last + "\n" + ResearchSignalDisplay.text(active, research)
         view<Button>(R.id.scan_start).visibility = if (active) View.GONE else View.VISIBLE
         view<Button>(R.id.scan_stop).visibility = if (active) View.VISIBLE else View.GONE
         if (tab == DeskTab.HOME) renderTerminal(elapsed)
@@ -260,7 +260,7 @@ internal class TradingDesk(
             running && execution.getBoolean("enabled",false) -> "Trading aktif"
             else -> "Trading nonaktif"
         }
-        view<TextView>(R.id.desk_bot).text = state
+        view<TextView>(R.id.desk_bot).text = state + "\n" + ResearchSignalDisplay.text(running, com.mefuturesaibot.app.ScreeningService.researchStatus)
         paperSummary = "Paper · ${money(store.read().second.balance)} USDT   ·   USDⓈ-M Perpetual"
         view<TextView>(R.id.home_summary).text = paperSummary
         val rising = rows.count { it.ticker!!.change > 0 }
