@@ -5,6 +5,8 @@ import android.view.View
 import android.widget.TextView
 import com.mefuturesaibot.app.MainActivity
 import com.mefuturesaibot.app.R
+import com.mefuturesaibot.app.auth.*
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,6 +49,10 @@ class ModeSelectionTest {
     }
 
     @Test fun settingsUpdatesBannerCredentialsAndPersistsThroughRecreation() {
+        val runtime = ApplicationAuthentication.initialize("https://test.invalid/".toHttpUrl())
+        val identity = AccountIdentity("test_account_0001", "test_user", UserRole.USER, AccountStatus.APPROVED)
+        assertTrue(runtime.sessions.install(AuthGrant(identity, "a".repeat(64), 900)))
+        assertTrue(runtime.accessGate.unlock(requireNotNull(runtime.sessions.sessionGeneration())))
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         try {
             var a = controller.get()
@@ -65,6 +71,9 @@ class ModeSelectionTest {
             assertEquals("DEMO · Saldo virtual",a.findViewById<TextView>(R.id.active_venue).text.toString())
             assertFalse(a.findViewById<View>(R.id.mainnet_credentials).isShown)
             assertFalse(live.getBoolean("enabled",false))
-        } finally { controller.pause().stop().destroy() }
+        } finally {
+            try { controller.pause().stop().destroy() }
+            finally { runtime.clearLocalSession() }
+        }
     }
 }
