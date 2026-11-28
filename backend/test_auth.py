@@ -113,6 +113,14 @@ class AuthTest(unittest.TestCase):
         with transaction(self.path) as db:
             self.assertEqual(db.execute("SELECT status FROM accounts WHERE id=?",(target,)).fetchone()[0],"PENDING")
 
+    def test_service_recreation_respects_revocation(self):
+        from auth_service import AuthService
+        bootstrap_owner(self.path,"owner",self.password)
+        token = login(self.path,"owner",self.password)["accessToken"]
+        self.assertIsNotNone(AuthService(self.path).authorize(token))
+        AuthService(self.path).logout(token)
+        self.assertIsNone(AuthService(self.path).authorize(token))
+
     def test_rate_limit(self):
         for _ in range(5):
             self.assertTrue(permit(self.path,"login_user","tester"))
