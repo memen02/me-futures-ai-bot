@@ -5,7 +5,7 @@ import com.mefuturesaibot.app.ai.trend.*
 import java.util.Collections
 
 internal data class UnifiedMasterAssessment(val decision: MasterDecision,
-    val evidence: List<DecisionEvidence>, val evaluatedAtMs: Long)
+    val evidence: List<DecisionEvidence>, val evaluatedAtMs: Long, val source: UnifiedTimeframeSnapshot? = null)
 
 // Research signal only. Compute context from the captured source, not caller-supplied votes.
 internal object UnifiedMasterAiIntegration {
@@ -48,6 +48,6 @@ internal object UnifiedMasterAiIntegration {
         votes.add(DecisionEvidence(EvidenceGroup.LIQUIDITY,liquidity,
             if (liquidity == EvidenceDirection.MISSING || book == null) end else book.observedAtMs,bookExpiry))
         return UnifiedMasterAssessment(MasterDecisionEngine.evaluate(votes,latest,false),
-            Collections.unmodifiableList(votes),latest)
+            Collections.unmodifiableList(votes),latest,source)
     }
 }
