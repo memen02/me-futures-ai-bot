@@ -262,7 +262,7 @@ open class SecureActivity : Activity() {
         })
 
         val status = TextView(this).apply {
-            text = "Verifikasi identitas untuk melanjutkan"
+            text = "Lihat layar atau gunakan biometrik yang didukung perangkat"
             textSize = 14f
             gravity = Gravity.CENTER
             setTextColor(Color.LTGRAY)
@@ -310,7 +310,7 @@ open class SecureActivity : Activity() {
         if (!DeviceAuthentication.available(this)) {
             android.widget.Toast.makeText(
                 this,
-                "Daftarkan sidik jari pada pengaturan Android terlebih dahulu.",
+                "Aktifkan biometrik atau kunci layar pada pengaturan Android terlebih dahulu.",
                 android.widget.Toast.LENGTH_LONG
             ).show()
             return

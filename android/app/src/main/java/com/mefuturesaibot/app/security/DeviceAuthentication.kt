@@ -18,7 +18,8 @@ internal object DeviceAuthentication {
             Build.VERSION.SDK_INT >= 30 ->
                 context.getSystemService(BiometricManager::class.java)
                     ?.canAuthenticate(
-                        BiometricManager.Authenticators.BIOMETRIC_STRONG
+                        BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
                     ) == BiometricManager.BIOMETRIC_SUCCESS
 
             Build.VERSION.SDK_INT >= 28 ->
@@ -38,7 +39,7 @@ internal object DeviceAuthentication {
     ): CancellationSignal? {
 
         if (Build.VERSION.SDK_INT < 28 || !available(activity)) {
-            onFailure("Biometrik tidak tersedia. Periksa pengaturan sidik jari Android.")
+            onFailure("Biometrik tidak tersedia. Periksa pengaturan biometrik dan kunci layar Android.")
             return null
         }
 
@@ -54,8 +55,9 @@ internal object DeviceAuthentication {
         try {
             val builder = BiometricPrompt.Builder(activity)
                 .setTitle("ME Project")
-                .setSubtitle("Verifikasi biometrik")
-                .setNegativeButton(
+                .setSubtitle("Verifikasi wajah, sidik jari atau kunci layar")
+
+            if (Build.VERSION.SDK_INT < 30) builder.setNegativeButton(
                     "Batal",
                     activity.mainExecutor
                 ) { _, _ ->

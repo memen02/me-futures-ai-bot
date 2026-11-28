@@ -44,3 +44,6 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 - Cancel pending login on Startup pause/close, conditionally clear an installed grant using its expected revision. Review revision ownership assumptions, biometric navigation lifecycle, remote revocation and tests; not yet verified.
 
 - Distinguish individual UI login attempts by object identity, not revision alone, so a canceled callback cannot match a later attempt with the same revision. Remaining: explicit installed-grant ownership instead of revision arithmetic, biometric lifecycle, revocation, logout call sites and CI.
+
+## Face unlock integration
+- Existing automatic App Lock prompt supports Android strong face biometrics where exposed by the OS. Enable device credential fallback on API 30+ without weakening biometric class. No custom camera or face storage. Android 28–29 retain existing fingerprint path. Verify on actual devices, including face availability and cancellation; no guarantee of face-only selection.
