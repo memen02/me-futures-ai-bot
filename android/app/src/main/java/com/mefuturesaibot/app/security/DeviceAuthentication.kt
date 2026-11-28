@@ -66,7 +66,8 @@ internal object DeviceAuthentication {
 
             if (Build.VERSION.SDK_INT >= 30) {
                 builder.setAllowedAuthenticators(
-                    BiometricManager.Authenticators.BIOMETRIC_STRONG
+                    BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
                 )
             }
 
