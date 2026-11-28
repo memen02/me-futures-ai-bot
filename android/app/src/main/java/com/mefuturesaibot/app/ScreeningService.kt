@@ -12,6 +12,8 @@ import com.mefuturesaibot.app.scanner.*
 
 /** Owns public screening and the local paper ledger independently of the exchange executor. */
 class ScreeningService : Service() {
+    private lateinit var researchRepository: com.mefuturesaibot.app.ai.MultiTimeframeRepository
+    private lateinit var researchWorker: com.mefuturesaibot.app.ai.UnifiedAnalysisWorker
     private lateinit var monitor: PaperPositionMonitor
     private lateinit var scanner: MarketScanner
     private lateinit var liveFeed: LiveMarketFeed
@@ -89,6 +91,9 @@ class ScreeningService : Service() {
             .setContentIntent(open).setOngoing(true).build()
         if (Build.VERSION.SDK_INT >= 34) startForeground(2, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         else startForeground(2, notification)
+        // Lifecycle ownership only until the shared rate budget and depth feed are ready.
+        researchRepository = com.mefuturesaibot.app.ai.MultiTimeframeRepository()
+        researchWorker = com.mefuturesaibot.app.ai.UnifiedAnalysisWorker { researchRepository.clockBounds() }
         val store = DeskStore(this)
         val enabled = { BotPreferences.shouldRun(this) && BotForegroundService.isRunning }
         monitor = PaperPositionMonitor(store,enabled).also { it.start() }
@@ -109,6 +114,8 @@ class ScreeningService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onDestroy() {
+        researchWorker.close()
+        researchRepository.close()
         liveHandler.removeCallbacksAndMessages(null)
         liveFeed.close()
         marketStatus = "OFFLINE"
