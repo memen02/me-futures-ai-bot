@@ -214,13 +214,16 @@ internal class TradingDesk(
         onTabSelected?.invoke()
     }
 
+    private var displayedResearchStatus = ""
     fun update(scan: Scan, active: Boolean, force: Boolean = false) {
+        val research = com.mefuturesaibot.app.ScreeningService.researchStatus
         val elapsed = SystemClock.elapsedRealtime()
         val current = scan.fresh(elapsed)
         val marketStatus = com.mefuturesaibot.app.ScreeningService.marketStatus
-        if (!force && displayedMarketStatus == marketStatus && snapshot === scan && current == fresh && running == active &&
+        if (!force && displayedResearchStatus == research && displayedMarketStatus == marketStatus && snapshot === scan && current == fresh && running == active &&
             (tab != DeskTab.HOME || elapsed < nextTerminalRefresh)) return
         displayedMarketStatus = marketStatus
+        displayedResearchStatus = research
         snapshot = scan
         fresh = current
         running = active
@@ -239,7 +242,7 @@ internal class TradingDesk(
         } else if (!marketStatus.startsWith("LIVE ")) {
             view<TextView>(R.id.scan_state).append(" · REST")
         }
-        view<TextView>(R.id.bot_state).text = status + last
+        view<TextView>(R.id.bot_state).text = status + last + "\nAI Riset: " + research
         view<Button>(R.id.scan_start).visibility = if (active) View.GONE else View.VISIBLE
         view<Button>(R.id.scan_stop).visibility = if (active) View.VISIBLE else View.GONE
         if (tab == DeskTab.HOME) renderTerminal(elapsed)
