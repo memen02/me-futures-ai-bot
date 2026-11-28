@@ -190,6 +190,15 @@ class AuthTest(unittest.TestCase):
             self.assertIsNotNone(db.execute("SELECT 1 FROM owner_recovery").fetchone())
             self.assertIsNone(db.execute("SELECT 1 FROM device_bindings").fetchone())
 
+    def test_recovery_provision_rotates_secret(self):
+        from auth_owner_recovery import provision, recover
+        bootstrap_owner(self.path,"owner",self.password)
+        old = provision(self.path,"owner")
+        new = provision(self.path,"owner")
+        self.assertNotEqual(old,new)
+        self.assertFalse(recover(self.path,"owner",self.password,old,"a"*64))
+        self.assertTrue(recover(self.path,"owner",self.password,new,"a"*64))
+
     def test_rate_limit(self):
         for _ in range(5):
             self.assertTrue(permit(self.path,"login_user","tester"))
