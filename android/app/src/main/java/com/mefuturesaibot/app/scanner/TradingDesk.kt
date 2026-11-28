@@ -214,10 +214,15 @@ internal class TradingDesk(
         onTabSelected?.invoke()
     }
 
+    private fun researchText(active:Boolean, now:Long): String =
+        ResearchSignalDisplay.freshText(active && BotForegroundService.isRunning && BotPreferences.shouldRun(activity),
+            com.mefuturesaibot.app.ScreeningService.researchStatus,
+            com.mefuturesaibot.app.ScreeningService.researchUpdatedElapsed, now)
+
     private var displayedResearchStatus = ""
     fun update(scan: Scan, active: Boolean, force: Boolean = false) {
-        val research = com.mefuturesaibot.app.ScreeningService.researchStatus
         val elapsed = SystemClock.elapsedRealtime()
+        val research = researchText(active, elapsed)
         val current = scan.fresh(elapsed)
         val marketStatus = com.mefuturesaibot.app.ScreeningService.marketStatus
         if (!force && displayedResearchStatus == research && displayedMarketStatus == marketStatus && snapshot === scan && current == fresh && running == active &&
@@ -242,7 +247,7 @@ internal class TradingDesk(
         } else if (!marketStatus.startsWith("LIVE ")) {
             view<TextView>(R.id.scan_state).append(" · REST")
         }
-        view<TextView>(R.id.bot_state).text = status + last + "\n" + ResearchSignalDisplay.text(active, research)
+        view<TextView>(R.id.bot_state).text = status + last + "\n" + research
         view<Button>(R.id.scan_start).visibility = if (active) View.GONE else View.VISIBLE
         view<Button>(R.id.scan_stop).visibility = if (active) View.VISIBLE else View.GONE
         if (tab == DeskTab.HOME) renderTerminal(elapsed)
@@ -260,7 +265,7 @@ internal class TradingDesk(
             running && execution.getBoolean("enabled",false) -> "Trading aktif"
             else -> "Trading nonaktif"
         }
-        view<TextView>(R.id.desk_bot).text = state + "\n" + ResearchSignalDisplay.text(running, com.mefuturesaibot.app.ScreeningService.researchStatus)
+        view<TextView>(R.id.desk_bot).text = state + "\n" + researchText(running, elapsed)
         paperSummary = "Paper · ${money(store.read().second.balance)} USDT   ·   USDⓈ-M Perpetual"
         view<TextView>(R.id.home_summary).text = paperSummary
         val rising = rows.count { it.ticker!!.change > 0 }
@@ -380,7 +385,7 @@ internal class TradingDesk(
                 SignalSide.WAIT -> "Menunggu konfirmasi"
             }
             view<TextView>(R.id.bot_trend).text = "$symbol · $direction · ${signal.side}\n${signal.reason}\n\nMaster AI (riset, bukan order):\n" +
-                com.mefuturesaibot.app.ScreeningService.researchStatus
+                researchText(running, SystemClock.elapsedRealtime())
             return
         }
         val cells = visibleCells()
