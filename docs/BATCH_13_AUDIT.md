@@ -67,3 +67,6 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 - Distribution target: trading client and Owner panel available on Android and iOS; shared backend, server-enforced roles and device migration. Separate Owner app packaging is a future design option, not implemented.
 
 - Validate login input before clearing existing session or sending revocation. Invalid local credentials must not destroy an existing session. Runtime access gate still locks on attempted login; test pending. Failed server revocation persistence remains open.
+
+## CI regression repair
+- d0d627b: DeskNavigationTest uses approved USER fixture and clears local session after tests; production account gate unchanged. Five failed runs (46168623045, 46168895372, 46169001067, 46169319227, 46169447156) each had 2 Debug navigation failures and 932 passing DEV tests. Await fresh CI on repair commit; do not rerun old commits as validation.
