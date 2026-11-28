@@ -253,6 +253,23 @@ class AuthTest(unittest.TestCase):
         with transaction(self.path) as db:
             self.assertIsNotNone(db.execute("SELECT 1 FROM owner_recovery").fetchone())
 
+    def test_recovery_signature_domains_are_isolated(self):
+        import hashlib
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from auth_device_proof import verify_device_proof, verify_recovery_proof
+        key = ec.generate_private_key(ec.SECP256R1())
+        der = key.public_key().public_bytes(serialization.Encoding.DER,serialization.PublicFormat.SubjectPublicKeyInfo)
+        digest = hashlib.sha256(der).hexdigest()
+        account, nonce = "a"*32, "b"*64
+        suffix = account+":"+digest+":"+nonce
+        login_sig = key.sign(("ME-PROJECT-DEVICE-LOGIN-V1:"+suffix).encode("ascii"),ec.ECDSA(hashes.SHA256()))
+        recovery_sig = key.sign(("ME-PROJECT-OWNER-RECOVERY-V1:"+suffix).encode("ascii"),ec.ECDSA(hashes.SHA256()))
+        self.assertTrue(verify_device_proof(account,digest,nonce,der,login_sig))
+        self.assertFalse(verify_recovery_proof(account,digest,nonce,der,login_sig))
+        self.assertTrue(verify_recovery_proof(account,digest,nonce,der,recovery_sig))
+        self.assertFalse(verify_device_proof(account,digest,nonce,der,recovery_sig))
+
     def test_rate_limit(self):
         for _ in range(5):
             self.assertTrue(permit(self.path,"login_user","tester"))
