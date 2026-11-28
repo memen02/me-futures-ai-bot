@@ -6,7 +6,8 @@ import java.util.TreeMap
 internal data class DepthDelta(val first: Long,val last: Long,val previous: Long,val time: Long,
     val bids: List<Pair<BigDecimal,BigDecimal>>,val asks: List<Pair<BigDecimal,BigDecimal>>)
 
-internal class ResearchDepthBook {
+internal class ResearchDepthBook(private val symbol: String = "BTCUSDT") {
+    init { require(UnifiedMarketDataProvider.validSymbol(symbol)) }
     private val guard = UnifiedDepthSequenceGuard()
     private val bids = TreeMap<BigDecimal,BigDecimal>(reverseOrder())
     private val asks = TreeMap<BigDecimal,BigDecimal>()
@@ -60,7 +61,7 @@ internal class ResearchDepthBook {
         val high=ceiling ?: return null
         val mid=bids.firstKey().add(asks.firstKey()).divide(BigDecimal("2"))
         if (mid.multiply(BigDecimal("0.999"))<low || mid.multiply(BigDecimal("1.001"))>high) return null
-        return ResearchLiquidityBand.calculate("BTCUSDT",time,bids.entries.map { it.key.toDouble() to it.value.toDouble() },
+        return ResearchLiquidityBand.calculate(symbol,time,bids.entries.map { it.key.toDouble() to it.value.toDouble() },
             asks.entries.map { it.key.toDouble() to it.value.toDouble() },true)
     }
 }
