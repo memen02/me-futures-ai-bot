@@ -1,5 +1,4 @@
 """Owner-managed entitlements; enforced by backend login and session checks."""
-import re
 import time
 from auth_db import transaction
 from auth_sessions import actor
