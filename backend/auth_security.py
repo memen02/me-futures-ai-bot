@@ -16,7 +16,7 @@ def bootstrap_owner(path, username, password):
                    (secrets.token_hex(16),username,encoded))
 
 def permit(path, scope, subject, limit=5, window=300):
-    if scope not in ("login_global","login_user","register_global","admin_global"):
+    if scope not in ("login_global","login_user","register_global","admin_global","owner_recovery"):
         raise ValueError("invalid scope")
     if not isinstance(subject,str) or len(subject)>128 or not 1<=limit<=1000 or not 60<=window<=3600:
         raise ValueError("invalid limit input")
