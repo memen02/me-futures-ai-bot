@@ -1,10 +1,16 @@
-"""Verify P-256 device possession using cryptography; no login integration yet."""
+"""Verify P-256 device possession with separate login and recovery domains."""
 import hashlib
 import hmac
 import re
 from auth_devices import valid_digest
 
 def verify_device_proof(account_id, key_digest, nonce, public_der, signature):
+    return _verify(account_id,key_digest,nonce,public_der,signature,"ME-PROJECT-DEVICE-LOGIN-V1:")
+
+def verify_recovery_proof(account_id, key_digest, nonce, public_der, signature):
+    return _verify(account_id,key_digest,nonce,public_der,signature,"ME-PROJECT-OWNER-RECOVERY-V1:")
+
+def _verify(account_id, key_digest, nonce, public_der, signature, domain):
     if not isinstance(account_id,str) or re.fullmatch(r"[0-9a-f]{32}",account_id) is None:
         return False
     if not valid_digest(key_digest) or not valid_digest(nonce):
@@ -27,7 +33,7 @@ def verify_device_proof(account_id, key_digest, nonce, public_der, signature):
             return False
         if key.public_bytes(serialization.Encoding.DER,serialization.PublicFormat.SubjectPublicKeyInfo) != public_der:
             return False
-        message = ("ME-PROJECT-DEVICE-LOGIN-V1:"+account_id+":"+key_digest+":"+nonce).encode("ascii")
+        message = (domain+account_id+":"+key_digest+":"+nonce).encode("ascii")
         key.verify(signature,message,ec.ECDSA(hashes.SHA256()))
         return True
     except (ValueError,TypeError,InvalidSignature,UnsupportedAlgorithm):
