@@ -76,6 +76,16 @@ def dispatch_admin(service, route, data, authorization):
         return 401, {"error":"DENIED"}
     token = authorization[7:]
     action = route.removeprefix("/v1/auth/admin/")
+    if action == "list-users":
+        if set(data) != {"after","limit"}:
+            raise ValueError("invalid fields")
+        after, limit = data["after"], data["limit"]
+        if type(limit) is not int or not 1<=limit<=20:
+            raise ValueError("invalid limit")
+        if after is not None and (not isinstance(after,str) or not re.fullmatch(r"[0-9a-f]{32}",after)):
+            raise ValueError("invalid cursor")
+        result = service.list_users(token,after,limit)
+        return (200,result) if result is not None else (403,{"error":"DENIED"})
     fields = {
         "review":{"target","expected","desired"},
         "grant-license":{"target","kind","expires"},
