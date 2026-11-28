@@ -137,6 +137,11 @@ class AuthTest(unittest.TestCase):
         with transaction(self.path) as db:
             self.assertIsNone(db.execute("SELECT 1 FROM entitlements WHERE account_id=?",(target,)).fetchone())
 
+    def test_owner_cannot_receive_user_license(self):
+        bootstrap_owner(self.path,"owner",self.password)
+        admin = login(self.path,"owner",self.password)
+        self.assertEqual(grant(self.path,admin["accessToken"],admin["accountId"],"FAMILY"),"DENIED")
+
     def test_rate_limit(self):
         for _ in range(5):
             self.assertTrue(permit(self.path,"login_user","tester"))
