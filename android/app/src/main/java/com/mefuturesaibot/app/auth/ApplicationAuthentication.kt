@@ -21,7 +21,7 @@ internal object ApplicationAuthentication {
         return created
     }
 
-    // Empty configuration is intentional for existing development builds.
+    // Only the dedicated dev variant may operate without an authentication origin.
     fun initializeConfigured(): AuthenticationRuntime? {
         val origin = BuildConfig.AUTH_ORIGIN
         if (origin.isBlank()) return null
@@ -30,7 +30,7 @@ internal object ApplicationAuthentication {
 
     @Synchronized fun current(): AuthenticationRuntime? = runtime
 
-    fun requiresAccount(): Boolean = BuildConfig.AUTH_ORIGIN.isNotBlank()
+    fun requiresAccount(): Boolean = BuildConfig.BUILD_TYPE != "dev" || BuildConfig.AUTH_ORIGIN.isNotBlank()
 
     fun allowsDashboard(): Boolean =
         AccountEntryPolicy.allowsDashboard(requiresAccount(), allowsTradingScreen())
