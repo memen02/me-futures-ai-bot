@@ -52,3 +52,8 @@ def initialize(path):
             key_digest TEXT NOT NULL,
             expires INTEGER NOT NULL
         )""")
+
+        db.execute("""CREATE TABLE IF NOT EXISTS owner_recovery(
+            account_id TEXT PRIMARY KEY REFERENCES accounts(id),
+            digest TEXT NOT NULL UNIQUE
+        )""")
