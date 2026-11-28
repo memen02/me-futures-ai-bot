@@ -47,3 +47,7 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 
 ## Face unlock integration
 - Existing automatic App Lock prompt supports Android strong face biometrics where exposed by the OS. Enable device credential fallback on API 30+ without weakening biometric class. No custom camera or face storage. Android 28–29 retain existing fingerprint path. Verify on actual devices, including face availability and cancellation; no guarantee of face-only selection.
+
+## Owner approval release gate
+- d81b43e: align App Lock prompt authenticator mask with availability check.
+- 8bdd417: require backend account in non-dev builds even when AUTH_ORIGIN is blank; dev-only bypass retained. Release must have deployed trusted HTTPS backend and server-side approval, license, device binding and revocation enforcement. Verify configured and unconfigured build variants and direct activity entry. CI and device tests pending.
