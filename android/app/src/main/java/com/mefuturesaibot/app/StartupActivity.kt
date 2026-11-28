@@ -1,6 +1,7 @@
 package com.mefuturesaibot.app
 
 import android.animation.ValueAnimator
+import com.mefuturesaibot.app.auth.ApplicationAuthentication
 import com.mefuturesaibot.app.security.SecureActivity
 import android.content.Intent
 import android.graphics.Typeface
@@ -195,6 +196,11 @@ class StartupActivity : SecureActivity() {
 
     private fun openDashboard() {
         if (!canUseProtectedUi()) return
+        if (!ApplicationAuthentication.allowsDashboard()) {
+            stopChecks()
+            summary.text = "Akses akun diperlukan"
+            return
+        }
         if (isFinishing) return
         stopChecks()
         startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
