@@ -76,3 +76,7 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 - ba24689: validate login input before locking local gate; run 46172676165 SUCCESS.
 - 659751c: regression test invalid/stale login preserves approved session and wipes password; run 46172796248 SUCCESS.
 - Remaining: failed remote revocation handling across role changes and process restart; backend expiry/device enforcement; Owner panel lifecycle audit and device tests. Do not treat local logout as confirmed server revocation.
+
+## Step 6 — lifecycle follow-up
+- Track cancelled login grants before releasing session lock; guard owner refresh and UI callbacks; skip closed worker requests; recheck cancellation after revocation I/O.
+- Static review only; CI and regression coverage pending. In-flight requests cannot be undone by UI closure. Pending revocations remain memory-only; server expiry and deployment verification remain required.
