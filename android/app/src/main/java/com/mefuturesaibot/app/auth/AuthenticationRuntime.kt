@@ -15,7 +15,8 @@ internal class AuthenticationRuntime(origin: HttpUrl) {
         RoleAuthenticationApi(transport, verified, UserRole.USER), sessions)
 
     @Synchronized fun login(role: UserRole, username: String, password: CharArray, expected: Long = sessions.revision(), attempt: Any? = null, allowed: () -> Boolean = { true }): Boolean {
-        if (!allowed() || sessions.revision() != expected) {
+        if (!allowed() || sessions.revision() != expected ||
+            AccountIdentity.normalizeUsername(username) == null || password.size !in 1..128) {
             password.fill('\u0000')
             return false
         }
