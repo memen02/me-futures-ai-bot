@@ -95,6 +95,13 @@ class AuthTest(unittest.TestCase):
             with patch("auth_sessions.time.time", return_value=1900):
                 self.assertIsNone(actor(db,token))
 
+    def test_failed_owner_login_preserves_session(self):
+        bootstrap_owner(self.path,"owner",self.password)
+        token = login(self.path,"owner",self.password)["accessToken"]
+        self.assertIsNone(login(self.path,"owner","wrong-password"))
+        with transaction(self.path) as db:
+            self.assertIsNotNone(actor(db,token))
+
     def test_rate_limit(self):
         for _ in range(5):
             self.assertTrue(permit(self.path,"login_user","tester"))
