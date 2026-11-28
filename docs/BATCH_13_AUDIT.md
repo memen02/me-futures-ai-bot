@@ -56,3 +56,6 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 
 - Require active protected UI before biometric navigation unlocks account access; cancel navigation prompt on Startup stop. Device lifecycle compatibility and regression tests pending.
 - Future iOS target: reuse backend approval/licensing/device contracts, separate native client and platform-specific biometric adapter. No iOS implementation in current Android batch.
+
+## Future cross-platform Owner access
+- One authoritative Owner account and shared backend for Android and iOS administration. Proposed Owner-only exception: two individually approved devices (Android and iOS), independently authenticated and revocable; ordinary USER remains limited to one device. Confirm device-limit policy before implementing. No client-side role bypass or shared device keys. iOS implementation deferred until Android validation.
