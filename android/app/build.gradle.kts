@@ -15,6 +15,12 @@ android {
 
     defaultConfig {
         buildConfigField("boolean", "MAINNET_ORDERS", "false")
+        // Deployment-controlled opt-in; empty origin keeps integration disabled.
+        val authOrigin = providers.environmentVariable("ME_AUTH_ORIGIN").orNull.orEmpty()
+        require(authOrigin.isEmpty() || authOrigin.matches(Regex("https://[A-Za-z0-9.-]+(:[0-9]{1,5})?/"))) {
+            "ME_AUTH_ORIGIN must be a root HTTPS origin"
+        }
+        buildConfigField("String", "AUTH_ORIGIN", "\"" + authOrigin + "\"")
         applicationId = "com.mefuturesaibot.app"
         minSdk = 26
         targetSdk = 36
