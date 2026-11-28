@@ -4,7 +4,8 @@ package com.mefuturesaibot.app.auth
 internal class RoleAuthenticationApi(
     private val owner: AuthenticationApi,
     private val user: AuthenticationApi,
-    private val role: UserRole
+    private val role: UserRole,
+    private val sessions: SecureSessionManager? = null
 ) : AuthenticationApi {
     override fun register(username: String, password: CharArray): RegistrationResult =
         user.register(username, password)
@@ -15,7 +16,9 @@ internal class RoleAuthenticationApi(
         if (grant.identity.role != role || grant.identity.status != AccountStatus.APPROVED ||
             grant.identity.username != username || !grant.identity.valid() ||
             grant.lifetimeSeconds !in 1L..900L) {
+            sessions?.rememberPendingRevocation(grant.accessToken)
             api.revoke(grant.accessToken)
+            sessions?.confirmRevocation(grant.accessToken)
             return null
         }
         return grant
