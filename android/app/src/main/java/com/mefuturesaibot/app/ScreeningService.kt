@@ -8,15 +8,13 @@ import android.os.IBinder
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import com.mefuturesaibot.app.ai.MarketResearchPilot
+import com.mefuturesaibot.app.ai.ResearchPilotLifecycle
 import com.mefuturesaibot.app.scanner.*
 
 /** Owns public screening and the local paper ledger independently of the exchange executor. */
 class ScreeningService : Service() {
-    private lateinit var researchRepository: com.mefuturesaibot.app.ai.MultiTimeframeRepository
-    private lateinit var researchWorkers: Map<String,com.mefuturesaibot.app.ai.UnifiedAnalysisWorker>
-    private val researchDepth = listOf("BTCUSDT","ETHUSDT").associateWith { com.mefuturesaibot.app.ai.ResearchDepthFeed(it) }
-    private val researchScheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
-    private var researchCursor = 0
+    private val research = ResearchPilotLifecycle { MarketResearchPilot() }
     private lateinit var monitor: PaperPositionMonitor
     private lateinit var scanner: MarketScanner
     private lateinit var liveFeed: LiveMarketFeed
@@ -28,23 +26,7 @@ class ScreeningService : Service() {
     private val liveTick = object : Runnable {
         override fun run() {
             val active = BotPreferences.shouldRun(this@ScreeningService) && BotForegroundService.isRunning
-            val bounds = if (active) researchRepository.clockBounds() else null
-            val nextResearchStatus = if (!active) "OFFLINE" else researchDepth.entries.joinToString("\n") { (symbol,feed) ->
-                val book = bounds?.let(feed::liquidity)
-                if (book == null) "$symbol · WAIT · depth tidak valid"
-                else {
-                    val decision = researchWorkers.getValue(symbol).read(symbol)
-                    val expected = when (decision.direction) {
-                        com.mefuturesaibot.app.ai.decision.MasterDirection.LONG -> com.mefuturesaibot.app.ai.decision.EvidenceDirection.LONG
-                        com.mefuturesaibot.app.ai.decision.MasterDirection.SHORT -> com.mefuturesaibot.app.ai.decision.EvidenceDirection.SHORT
-                        else -> null
-                    }
-                    if (expected != null && book.direction(symbol,bounds!!.latest) != expected)
-                        "$symbol · WAIT · likuiditas berubah"
-                    else "$symbol · ${decision.direction} · ${decision.reason} · ${decision.confirmations}"
-                }
-            }
-            researchDisplay = ResearchDisplaySnapshot(nextResearchStatus, SystemClock.elapsedRealtime())
+            researchDisplay = ResearchDisplaySnapshot(research.status(active), SystemClock.elapsedRealtime())
             val base = marketBase
             val elapsed = SystemClock.elapsedRealtime()
             val marketTime = base.time + elapsed - base.received
@@ -111,9 +93,6 @@ class ScreeningService : Service() {
             .setContentIntent(open).setOngoing(true).build()
         if (Build.VERSION.SDK_INT >= 34) startForeground(2, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         else startForeground(2, notification)
-        // Lifecycle ownership only until the shared rate budget and depth feed are ready.
-        researchRepository = com.mefuturesaibot.app.ai.MultiTimeframeRepository(guard = com.mefuturesaibot.app.ai.ResearchApiBudget.guard)
-        researchWorkers = researchDepth.keys.associateWith { com.mefuturesaibot.app.ai.UnifiedAnalysisWorker { researchRepository.clockBounds() } }
         val store = DeskStore(this)
         val enabled = { BotPreferences.shouldRun(this) && BotForegroundService.isRunning }
         monitor = PaperPositionMonitor(store,enabled).also { it.start() }
@@ -128,41 +107,13 @@ class ScreeningService : Service() {
             }
         }
 
-        researchDepth.values.forEach { it.start() }
-        // Pilot only: BTC, two frames, no order authorization. Missing depth means WAIT.
-        researchScheduler.scheduleWithFixedDelay({
-            try {
-                if (enabled()) {
-                    val frames = setOf(com.mefuturesaibot.app.ai.Timeframe.M1, com.mefuturesaibot.app.ai.Timeframe.M5)
-                    val symbols = researchDepth.keys.toList()
-                    val index = researchCursor
-                    researchCursor = (researchCursor + 1) % (symbols.size * 3)
-                    val symbol = symbols[index % symbols.size]
-                    val feed = researchDepth.getValue(symbol)
-                    when (index / symbols.size) {
-                        0 -> researchRepository.refresh(symbol,com.mefuturesaibot.app.ai.Timeframe.M1)
-                        1 -> researchRepository.refresh(symbol,com.mefuturesaibot.app.ai.Timeframe.M5)
-                        else -> feed.refreshSnapshot()
-                    }
-                    for ((symbol,feed) in researchDepth) {
-                    val capture = researchRepository.researchCapture(symbol)
-                    if (capture != null) researchWorkers.getValue(symbol).submit(capture.first,
-                        com.mefuturesaibot.app.ai.Timeframe.M1,frames,capture.second,researchRepository.clockBounds()?.let(feed::liquidity))
-                    }
-                    // Status is read independently on the main tick, with current liquidity.
-                }
-            } catch (_: Exception) { /* Main tick revalidates freshness independently. */ }
-        }, 2L, 2L, java.util.concurrent.TimeUnit.SECONDS)
         scanner.start()
         liveHandler.post(liveTick)
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onDestroy() {
-        researchScheduler.shutdownNow()
-        researchDepth.values.forEach { it.close() }
-        if (::researchWorkers.isInitialized) researchWorkers.values.forEach { it.close() }
-        if (::researchRepository.isInitialized) researchRepository.close()
+        research.close()
         liveHandler.removeCallbacksAndMessages(null)
         liveFeed.close()
         researchDisplay = ResearchDisplaySnapshot("OFFLINE",0L)
