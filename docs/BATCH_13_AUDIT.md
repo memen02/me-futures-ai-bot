@@ -124,3 +124,6 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 
 ## Mandatory recovery proof
 - Removed unsigned offline recovery compatibility; all successful recovery now requires issued unexpired challenge and matching signature. Updated existing tests and added missing/expired challenge regressions. New CI pending. Separate signature domain, Android integration and deployment remain open.
+
+## Recovery signature domain separation
+- Runs 46177304016 and 46177303988 passed. Recovery uses ME-PROJECT-OWNER-RECOVERY-V1, login retains existing domain; shared verifier avoids duplicate crypto. Tests cover both directions. New CI pending. Android recovery signer and transport not yet integrated.
