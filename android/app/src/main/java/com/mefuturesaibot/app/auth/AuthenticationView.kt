@@ -70,7 +70,10 @@ internal class AuthenticationView(
         repeated.text.clear()
         if (!worker.submit({ runtime.login(role,name,p) }) { result ->
             if (closed || activity.isFinishing || activity.isDestroyed) return@submit
-            if (result.getOrNull() == true) onAuthenticated()
+            if (result.getOrNull() == true) {
+                if ((activity as? SecureActivity)?.canUseProtectedUi() == true) onAuthenticated()
+                else status.text = "Login selesai; verifikasi ulang diperlukan"
+            }
             else status.text = "Login gagal atau akun belum disetujui"
         }) {
             p.fill('\u0000')
