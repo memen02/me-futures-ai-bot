@@ -16,7 +16,7 @@ internal object ResearchSignalDisplay {
         if (parsed.any { it.size < 3 || it[0] !in setOf("BTCUSDT","ETHUSDT") ||
                 it[1] !in setOf("LONG","SHORT","WAIT") } ||
             parsed.map { it[0] }.distinct().size != parsed.size ||
-            parsed.any { it[1] != "WAIT" && (it[2] != "AGREEMENT" || it.getOrNull(3)?.toIntOrNull() !in 5..6) }) return "Master AI · WAIT"
+            parsed.any { it[1] != "WAIT" && (it[2] != "AGREEMENT" || (it.getOrNull(3)?.toIntOrNull() ?: -1) !in 5..6) }) return "Master AI · WAIT"
         return "Master AI · Riset (bukan order)\n" + parsed.joinToString("\n") {
             val direction = when(it[1]) { "LONG" -> "↑ LONG"; "SHORT" -> "↓ SHORT"; else -> "— WAIT" }
             val reason = when(it[2]) {
@@ -25,7 +25,9 @@ internal object ResearchSignalDisplay {
                 "CONFLICT" -> "Bukti bertentangan"
                 "INVALID_EVIDENCE" -> "Data tidak valid"
                 "VETO" -> "Diblokir pengaman"
-                else -> it[2]
+                "depth tidak valid" -> "Order book belum valid"
+                "likuiditas berubah" -> "Likuiditas berubah"
+                else -> "Alasan belum dikenali"
             }
             val count = it.getOrNull(3)?.toIntOrNull()?.takeIf { n -> n in 0..6 }
             "${it[0]} · $direction · $reason" + (count?.let { n -> " · $n konfirmasi" } ?: "")
