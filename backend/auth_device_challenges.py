@@ -40,3 +40,24 @@ def consume(db, account_id, key_digest, nonce, now):
         AND EXISTS (SELECT 1 FROM device_bindings b JOIN accounts a ON a.id=b.account_id
             WHERE b.account_id=? AND b.public_key_digest=? AND a.status='APPROVED')""",
         (account_id,key_digest,nonce,now,account_id,key_digest)).rowcount == 1
+
+def issue_authenticated(path, username, password, key_digest):
+    from auth_accounts import verify_password
+    from auth_entitlements import licensed
+    if not valid_digest(key_digest):
+        return None
+    with transaction(path) as db:
+        row = db.execute("""SELECT a.* FROM accounts a JOIN device_bindings b ON b.account_id=a.id
+            WHERE a.username=? AND a.role='USER' AND a.status='APPROVED' AND b.public_key_digest=?""",
+            (username,key_digest)).fetchone()
+        if row is None or not verify_password(password,row["password_hash"]):
+            return None
+        now = int(time.time())
+        if not licensed(db,row["id"],now):
+            return None
+        db.execute("DELETE FROM device_challenges WHERE expires<=?",(now,))
+        nonce = secrets.token_hex(32)
+        db.execute("""INSERT INTO device_challenges VALUES(?,?,?,?)
+            ON CONFLICT(account_id) DO UPDATE SET nonce=excluded.nonce,
+            key_digest=excluded.key_digest,expires=excluded.expires""",(nonce,row["id"],key_digest,now+60))
+        return {"accountId":row["id"],"nonce":nonce}
