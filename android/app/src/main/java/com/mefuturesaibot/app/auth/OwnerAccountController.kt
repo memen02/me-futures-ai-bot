@@ -8,11 +8,18 @@ internal class OwnerAccountController(
     private val sessions: SecureSessionManager,
     private val api: HttpsAuthenticationApi
 ) {
+    // Bind this controller to the session that created the panel.
+    private val generation = sessions.sessionGeneration()
+
     private fun <T> authorized(action: (String) -> T): T {
+        if (generation == null || sessions.sessionGeneration() != generation)
+            throw SecurityException("OWNER session changed")
         val token = sessions.ownerToken()
             ?: throw SecurityException("OWNER session required")
+        if (sessions.sessionGeneration() != generation)
+            throw SecurityException("OWNER session changed")
         val result = action(token)
-        if (sessions.ownerToken() != token)
+        if (sessions.sessionGeneration() != generation || sessions.ownerToken() != token)
             throw SecurityException("OWNER session changed; refresh account state")
         return result
     }
