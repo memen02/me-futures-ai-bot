@@ -48,4 +48,21 @@ class AuthenticationRepositoryRevocationTest {
         assertFalse(repository.login("tester", charArrayOf('x')))
         assertEquals(0, api.logins)
     }
+    @Test fun cancellationDuringRevocationPreventsLogin() {
+        val sessions = SecureSessionManager { 1000L }
+        sessions.rememberPendingRevocation(token)
+        var allowed = true
+        val api = object : AuthenticationApi {
+            override fun register(username: String, password: CharArray) = RegistrationResult.REJECTED
+            override fun login(username: String, password: CharArray): AuthGrant? {
+                throw AssertionError("Cancelled login reached transport")
+            }
+            override fun revoke(accessToken: String) { allowed = false }
+        }
+        val password = charArrayOf('x')
+        val revision = sessions.revision()
+        assertFalse(AuthenticationRepository(api, sessions).login("tester", password, revision) { allowed })
+        assertEquals(revision, sessions.revision())
+        assertTrue(password.all { it == '\u0000' })
+    }
 }
