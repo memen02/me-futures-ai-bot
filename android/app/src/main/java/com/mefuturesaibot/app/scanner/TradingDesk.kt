@@ -391,8 +391,11 @@ internal class TradingDesk(
                 SignalSide.SELL -> "Tren turun"
                 SignalSide.WAIT -> "Menunggu konfirmasi"
             }
-            view<TextView>(R.id.bot_trend).text = "$symbol · $direction · ${signal.side}\n${signal.reason}\n\nMaster AI (riset, bukan order):\n" +
-                researchText(running, SystemClock.elapsedRealtime())
+            view<TextView>(R.id.bot_trend).apply {
+                val next = "SMA (model lama) · $symbol · $direction · ${signal.side}\n${signal.reason}\n\n" +
+                    researchText(running, SystemClock.elapsedRealtime())
+                if (text.toString() != next) text = next
+            }
             return
         }
         val cells = visibleCells()
