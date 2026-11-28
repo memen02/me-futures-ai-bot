@@ -31,7 +31,7 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 
 ## Next audit checkpoint
 - Verify all constructor call sites and compile/test the latest branch; no CI success claimed.
-- 3f56f6d: conditional session installation using existing generation rejects grants if session invalidation occurs after revision capture. Remaining: audit invalidation before revision capture, UI closure, and add regression tests.
+- 3f56f6d: conditional session installation using existing generation rejects grants if session invalidation occurs after revision capture. cf152b7: atomically clear and capture revision before remote revocation. Remaining: invalidation before worker starts, UI closure, and regression tests.
 - Verify backend revocation/session replacement and uncertain mutation reconciliation; no automatic mutation retries.
 - Review existing logout paths before further edits. Preserve immediate local logout and protective trading exits.
 - Add regression coverage for App Lock, owner actions, concurrent requests and session invalidation.
