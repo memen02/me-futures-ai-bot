@@ -53,4 +53,14 @@ class OwnerSessionTest {
         assertEquals(token, sessions.clear())
         assertNull(sessions.ownerToken())
     }
+    @Test fun clearAndRememberRetainsTokenUntilConfirmed() {
+        val sessions = SecureSessionManager { 1000L }
+        val identity = AccountIdentity("account_1234567890", "tester", UserRole.USER, AccountStatus.APPROVED)
+        val token = "a".repeat(64)
+        assertTrue(sessions.install(AuthGrant(identity, token, 60)))
+        assertEquals(token, sessions.clearAndRemember())
+        assertNull(sessions.identity())
+        assertFalse(sessions.flushPendingRevocation { throw IllegalStateException("offline") })
+        assertTrue(sessions.flushPendingRevocation { assertEquals(token, it) })
+    }
 }
