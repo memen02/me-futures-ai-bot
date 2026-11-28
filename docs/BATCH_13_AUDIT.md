@@ -113,3 +113,7 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 ## Owner recovery foundation
 - Runs 46176548576 and 46176548495 passed. Added hashed random recovery credential, trusted offline provisioning and atomic recovery (binding replacement, session/challenge revocation, credential consumption, audit).
 - Offline primitive only: caller must verify new key possession; no HTTP endpoint, self-service UI, rate-limited remote recovery or secure operator deployment yet. Do not provision production Owner until verified Android login and recovery workflow are ready. New CI pending.
+
+## Recovery rate limit follow-up
+- Runs 46176742541 and 46176742484 passed. Offline recovery now uses persistent global five-attempt/300-second limit; tests cover denial without mutation and credential rotation. New CI pending.
+- Offline operator must still verify new key possession. Remote recovery challenge, Android UI and secure provisioning remain open. Global limit is deliberately conservative for the single Owner; remote deployment requires denial-of-service review.
