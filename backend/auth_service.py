@@ -6,10 +6,7 @@ from auth_entitlements import grant, revoke_license
 from auth_security import permit
 from auth_verified_login import verified_login
 from auth_devices import bind
-from auth_device_challenges import issue
-from auth_accounts import verify_password
-from auth_entitlements import licensed
-import time
+from auth_device_challenges import issue_authenticated
 
 class AuthService:
     def __init__(self,path):
@@ -87,13 +84,7 @@ class AuthService:
             username = normalize(username)
             if not permit(self.path,"login_user",username):
                 return None
-            with transaction(self.path) as db:
-                row = db.execute("SELECT * FROM accounts WHERE username=? AND role='USER' AND status='APPROVED'",(username,)).fetchone()
-                if row is None or not verify_password(password,row["password_hash"]) or not licensed(db,row["id"],int(time.time())):
-                    return None
-                account_id = row["id"]
-            nonce = issue(self.path,account_id,key_digest)
-            return {"accountId":account_id,"nonce":nonce} if nonce else None
+            return issue_authenticated(self.path,username,password,key_digest)
         except (ValueError,TypeError):
             return None
 
