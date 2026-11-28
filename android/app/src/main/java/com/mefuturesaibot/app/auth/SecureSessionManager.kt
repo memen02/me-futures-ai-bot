@@ -31,7 +31,7 @@ internal class SecureSessionManager(private val clock: () -> Long = { SystemCloc
     @Synchronized fun revision(): Long = generation
     @Synchronized fun beginLogin(expected: Long): Pair<String?, Long>? {
         if (generation != expected) return null
-        val previous = clear()
+        val previous = clearAndRemember()
         return previous to generation
     }
     @Synchronized fun installIfUnchanged(value: AuthGrant, expected: Long, owner: Any? = null, allowed: () -> Boolean = { true }): Boolean {
@@ -69,6 +69,7 @@ internal class SecureSessionManager(private val clock: () -> Long = { SystemCloc
             !value.accessToken.matches(Regex("[0-9a-f]{64}"))) return null
         return value.accessToken
     }
+    @Synchronized fun clearAndRemember(): String? = clear()?.also(::rememberPendingRevocation)
     @Synchronized fun clear(): String? {
         generation++
         val token = grant?.accessToken

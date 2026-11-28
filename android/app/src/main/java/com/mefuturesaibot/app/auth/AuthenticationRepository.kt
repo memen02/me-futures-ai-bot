@@ -24,10 +24,8 @@ internal class AuthenticationRepository(private val api: AuthenticationApi,
             if (!sessions.flushPendingRevocation(api::revoke) || !allowed()) return false
             val (previous, revision) = sessions.beginLogin(expected) ?: return false
             previous?.let { token ->
-                try { api.revoke(token) } catch (_: Exception) {
-                    sessions.rememberPendingRevocation(token)
-                    return false
-                }
+                try { api.revoke(token) } catch (_: Exception) { return false }
+                sessions.confirmRevocation(token)
             }
             if (!allowed()) return false
             val grant = api.login(normalized,password) ?: return false
