@@ -7,21 +7,22 @@ import android.os.SystemClock
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
-internal class ResearchDepthFeed {
-    private val book=ResearchDepthBook()
+internal class ResearchDepthFeed(private val symbol: String = "BTCUSDT") {
+    init { require(symbol in setOf("BTCUSDT","ETHUSDT")) }
+    private val book=ResearchDepthBook(symbol)
     private val client=ReconnectingWebSocket.sharedHttpClient.newBuilder()
         .callTimeout(5,TimeUnit.SECONDS).retryOnConnectionFailure(false)
         .followRedirects(false).followSslRedirects(false).build()
     @Volatile private var closed=false
     @Volatile private var generation=0L
     private val socket=ReconnectingWebSocket(
-        url="wss://fstream.binance.com/public/ws/btcusdt@depth@500ms",
+        url="wss://fstream.binance.com/public/ws/${symbol.lowercase(java.util.Locale.ROOT)}@depth@500ms",
         onStatusChange={ synchronized(this) { generation++; book.clear() } },
         onMessage={ raw -> synchronized(this) {
             if (!closed) try {
                 require(raw.length<=131072)
                 val o=JSONObject(raw)
-                require(o.getString("s")=="BTCUSDT" && o.getString("e")=="depthUpdate")
+                require(o.getString("s")==symbol && o.getString("e")=="depthUpdate")
                 book.delta(DepthDelta(o.getLong("U"),o.getLong("u"),o.getLong("pu"),o.getLong("E"),
                     levels(o.getJSONArray("b")),levels(o.getJSONArray("a"))))
             } catch (_: Exception) { generation++; book.clear() }
@@ -42,7 +43,7 @@ internal class ResearchDepthFeed {
         val guard=ResearchApiBudget.guard
         if (!guard.acquire(SystemClock.elapsedRealtime(),20)) return
         try {
-            client.newCall(Request.Builder().url("https://fapi.binance.com/fapi/v1/depth?symbol=BTCUSDT&limit=500").build()).execute().use { response ->
+            client.newCall(Request.Builder().url("https://fapi.binance.com/fapi/v1/depth?symbol=$symbol&limit=500").build()).execute().use { response ->
                 guard.onHttpResponse(response.code,response.header("Retry-After")?.toLongOrNull(),SystemClock.elapsedRealtime())
                 if (!response.isSuccessful) return
                 val source=response.body.source()
