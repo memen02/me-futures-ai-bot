@@ -7,6 +7,8 @@ import android.os.SystemClock
 internal class SecureSessionManager(private val clock: () -> Long = { SystemClock.elapsedRealtime() }) {
     private var grant: AuthGrant? = null
     private var issuedAt = 0L
+    private var generation = 0L
+    @Synchronized fun sessionGeneration(): Long? = if (active() != null) generation else null
     @Synchronized fun install(value: AuthGrant): Boolean {
         clear()
         if (!AccountApprovalPolicy.showTrading(value.identity) ||
@@ -37,6 +39,7 @@ internal class SecureSessionManager(private val clock: () -> Long = { SystemCloc
         return value.accessToken
     }
     @Synchronized fun clear(): String? {
+        generation++
         val token = grant?.accessToken
         grant = null
         issuedAt = 0L
