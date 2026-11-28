@@ -11,7 +11,20 @@ internal class OwnerAccountController(
     // Bind this controller to the session that created the panel.
     private val generation = sessions.sessionGeneration()
 
+    private companion object {
+        val requestLock = java.util.concurrent.locks.ReentrantLock()
+    }
+
     private fun <T> authorized(action: (String) -> T): T {
+        requestLock.lockInterruptibly()
+        try {
+            return authorizedRequest(action)
+        } finally {
+            requestLock.unlock()
+        }
+    }
+
+    private fun <T> authorizedRequest(action: (String) -> T): T {
         if (generation == null || sessions.sessionGeneration() != generation)
             throw SecurityException("OWNER session changed")
         val token = sessions.ownerToken()
