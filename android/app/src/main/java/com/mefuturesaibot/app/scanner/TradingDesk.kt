@@ -214,10 +214,11 @@ internal class TradingDesk(
         onTabSelected?.invoke()
     }
 
-    private fun researchText(active:Boolean, now:Long): String =
-        ResearchSignalDisplay.freshText(active && BotForegroundService.isRunning && BotPreferences.shouldRun(activity),
-            com.mefuturesaibot.app.ScreeningService.researchStatus,
-            com.mefuturesaibot.app.ScreeningService.researchUpdatedElapsed, now)
+    private fun researchText(active:Boolean, now:Long): String {
+        val display = com.mefuturesaibot.app.ScreeningService.researchDisplay
+        return ResearchSignalDisplay.freshText(active && BotForegroundService.isRunning && BotPreferences.shouldRun(activity),
+            display.status, display.updatedElapsed, now)
+    }
 
     private var displayedResearchStatus = ""
     fun update(scan: Scan, active: Boolean, force: Boolean = false) {
