@@ -8,7 +8,7 @@ from auth_accounts import normalize, verify_password
 from auth_db import transaction
 from auth_devices import valid_digest
 from auth_security import permit
-from auth_device_proof import verify_device_proof
+from auth_device_proof import verify_recovery_proof
 
 def provision(path, username):
     """Trusted offline operator only. Return secret once; never log it."""
@@ -43,7 +43,7 @@ def recover(path, username, password, secret, new_digest, *, nonce=None, public_
             challenge = db.execute("SELECT * FROM owner_recovery_challenges WHERE account_id=?", (account,)).fetchone()
             if challenge is None or challenge["expires"] <= int(time.time()) or challenge["nonce"] != nonce or challenge["key_digest"] != new_digest:
                 return False
-            if not verify_device_proof(account,new_digest,nonce,public_der,signature):
+            if not verify_recovery_proof(account,new_digest,nonce,public_der,signature):
                 return False
             db.execute("DELETE FROM owner_recovery_challenges WHERE account_id=?", (account,))
             db.execute("""INSERT INTO device_bindings VALUES(?,?)
