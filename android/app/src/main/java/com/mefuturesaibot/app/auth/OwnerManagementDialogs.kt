@@ -4,15 +4,24 @@ import android.app.AlertDialog
 import android.app.Activity
 import android.widget.EditText
 import android.text.InputFilter
+import com.mefuturesaibot.app.security.SecureActivity
 
 internal class OwnerManagementDialogs(
     private val activity: Activity,
     private val coordinator: OwnerPanelCoordinator
 ) {
+    private fun allowed(): Boolean =
+        (activity as? SecureActivity)?.canUseProtectedUi() == true &&
+            ApplicationAuthentication.allowsOwnerScreen()
+
+    private fun protect(dialog: AlertDialog) {
+        (activity as SecureActivity).registerProtectedDialog(dialog)
+    }
+
     fun license(row: OwnerDirectoryRow) {
-        if (activity.isFinishing || activity.isDestroyed) return
+        if (!allowed()) return
         val choices = arrayOf("FAMILY — gratis", "MONTHLY — 30 hari", "Cabut lisensi")
-        AlertDialog.Builder(activity).setTitle("Lisensi: " + row.username)
+        protect(AlertDialog.Builder(activity).setTitle("Lisensi: " + row.username)
             .setItems(choices) { _, index ->
                 confirm(choices[index] + " untuk " + row.username + "?") {
                     when (index) {
@@ -22,11 +31,11 @@ internal class OwnerManagementDialogs(
                         2 -> coordinator.revokeLicense(row)
                     }
                 }
-            }.setNegativeButton("Batal", null).show()
+            }.setNegativeButton("Batal", null).show())
     }
 
     fun device(row: OwnerDirectoryRow) {
-        if (activity.isFinishing || activity.isDestroyed) return
+        if (!allowed()) return
         val input = EditText(activity).apply {
             hint = "Kode perangkat (64 karakter)"
             isSingleLine = true
@@ -38,7 +47,9 @@ internal class OwnerManagementDialogs(
             .setView(input).setNegativeButton("Batal", null)
             .setPositiveButton("Lanjut", null).create()
         dialog.show()
+        protect(dialog)
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            if (!allowed()) { dialog.dismiss(); return@setOnClickListener }
             val digest = input.text.toString().trim()
             if (!digest.matches(Regex("[0-9a-f]{64}")) || digest == row.deviceDigest) {
                 input.error = "Kode perangkat baru tidak valid"
@@ -52,9 +63,9 @@ internal class OwnerManagementDialogs(
     }
 
     private fun confirm(message: String, action: () -> Unit) {
-        if (activity.isFinishing || activity.isDestroyed) return
-        AlertDialog.Builder(activity).setMessage(message)
+        if (!allowed()) return
+        protect(AlertDialog.Builder(activity).setMessage(message)
             .setNegativeButton("Batal", null)
-            .setPositiveButton("Konfirmasi") { _, _ -> action() }.show()
+            .setPositiveButton("Konfirmasi") { _, _ -> if (allowed()) action() }.show())
     }
 }
