@@ -40,3 +40,5 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 ## Authentication view closure follow-up
 - 2f85908: check originating view closure before login and conditional installation.
 - Serialize closure flag with session installation using the existing session monitor. This orders closure and installation, but does not revoke a session installed before closure or address background pause. Verify lifecycle behavior and regression tests before approval.
+
+- Cancel pending login on Startup pause/close, conditionally clear an installed grant using its expected revision. Review revision ownership assumptions, biometric navigation lifecycle, remote revocation and tests; not yet verified.

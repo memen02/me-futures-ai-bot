@@ -195,6 +195,11 @@ class StartupActivity : SecureActivity() {
         super.onDestroy()
     }
 
+    override fun onPause() {
+        loginView?.cancelPendingLogin()
+        super.onPause()
+    }
+
     override fun onStop() {
         stopChecks()
         super.onStop()

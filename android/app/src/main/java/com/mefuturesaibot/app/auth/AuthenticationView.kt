@@ -16,6 +16,7 @@ internal class AuthenticationView(
 ) : LinearLayout(activity), AutoCloseable {
     private val worker = OwnerRequestWorker()
     @Volatile private var closed = false
+    @Volatile private var pendingLogin: Long? = null
     private val username = EditText(activity).apply {
         hint = "Username"
         isSingleLine = true
@@ -69,17 +70,38 @@ internal class AuthenticationView(
         val p = take(password)
         repeated.text.clear()
         val expected = runtime.sessions.revision()
-        if (!worker.submit({ runtime.login(role,name,p,expected) { !closed } }) { result ->
-            if (closed || activity.isFinishing || activity.isDestroyed) return@submit
+        if (pendingLogin != null) { p.fill('\u0000'); return }
+        pendingLogin = expected
+        if (!worker.submit({ runtime.login(role,name,p,expected) { !closed && pendingLogin == expected } }) { result ->
+            if (pendingLogin != expected) return@submit
+            if (closed || activity.isFinishing || activity.isDestroyed ||
+                (activity as? SecureActivity)?.canUseProtectedUi() != true) {
+                cancelPendingLogin()
+                return@submit
+            }
+            pendingLogin = null
             if (result.getOrNull() == true) {
                 if ((activity as? SecureActivity)?.canUseProtectedUi() == true) onAuthenticated()
                 else status.text = "Login selesai; verifikasi ulang diperlukan"
             }
             else status.text = "Login gagal atau akun belum disetujui"
         }) {
+            pendingLogin = null
             p.fill('\u0000')
             status.text = "Permintaan sedang diproses"
         }
+    }
+
+    fun cancelPendingLogin() {
+        var token: String? = null
+        runtime.sessions.withSessionLock {
+            val expected = pendingLogin
+            pendingLogin = null
+            if (expected != null && runtime.sessions.revision() == expected + 2L) {
+                token = runtime.sessions.clear()
+            }
+        }
+        token?.let { value -> Thread { runtime.revokeSession(value) }.start() }
     }
 
     private fun take(field: EditText): CharArray {
@@ -99,6 +121,7 @@ internal class AuthenticationView(
 
     override fun close() {
         runtime.sessions.withSessionLock { closed = true }
+        cancelPendingLogin()
         worker.close()
         password.text.clear()
         repeated.text.clear()
