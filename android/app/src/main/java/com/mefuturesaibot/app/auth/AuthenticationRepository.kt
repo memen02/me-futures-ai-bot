@@ -37,8 +37,7 @@ internal class AuthenticationRepository(private val api: AuthenticationApi,
         } finally { password.fill('\u0000') }
     }
     @Synchronized fun logout() {
-        sessions.clear()?.let { token ->
-            sessions.rememberPendingRevocation(token)
+        sessions.clearAndRemember()?.let { token ->
             api.revoke(token)
             sessions.confirmRevocation(token)
         }
