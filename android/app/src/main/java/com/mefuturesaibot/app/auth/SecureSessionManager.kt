@@ -29,6 +29,13 @@ internal class SecureSessionManager(private val clock: () -> Long = { SystemCloc
         return value
     }
     @Synchronized fun identity(): AccountIdentity? = active()?.identity
+    @Synchronized fun ownerToken(): String? {
+        val value = active() ?: return null
+        if (value.identity.role != UserRole.SUPER_ADMIN ||
+            value.identity.status != AccountStatus.APPROVED ||
+            !value.accessToken.matches(Regex("[0-9a-f]{64}"))) return null
+        return value.accessToken
+    }
     @Synchronized fun clear(): String? {
         val token = grant?.accessToken
         grant = null
