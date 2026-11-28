@@ -105,3 +105,7 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 ## Role rejection follow-up
 - Runtime role adapters retain rejected tokens before revoke. Conditional installation fails while pending revocations exist. Added two regression tests.
 - Android process restart still loses memory-only pending tokens; owner device proof and deployed HTTPS remain open. CI pending.
+
+## Owner device proof foundation
+- Existing binding/challenge/proof path supports enrolled Owner; password-only login denied once bound. Regression covers proof and nonce replay.
+- No production Owner enrollment or recovery endpoint yet; Android Owner client still needs verified route before enrollment. Do not manually enroll production Owner until client and recovery are ready. Unenrolled Owner password-only path remains for bootstrap compatibility. CI pending.
