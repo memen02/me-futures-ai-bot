@@ -44,3 +44,24 @@ class VerifiedServiceTest(unittest.TestCase):
             self.assertIsNone(service.login("tester",password,proof))
             self.assertEqual(service.bind_device(admin,target,"b"*64,expected=digest),"APPLIED")
             self.assertIsNone(service.authorize(token))
+
+    def test_challenge_revocation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp)/"auth.db")
+            initialize(path)
+            service = AuthService(path)
+            password = "test-password-123"
+            bootstrap_owner(path,"owner",password)
+            admin = service.login("owner",password)["accessToken"]
+            service.register("tester",password)
+            with transaction(path) as db:
+                target = db.execute("SELECT id FROM accounts WHERE username='tester'").fetchone()[0]
+            self.assertEqual(service.review(admin,target,"PENDING","APPROVED"),"APPLIED")
+            self.assertEqual(service.bind_device(admin,target,"a"*64),"APPLIED")
+            self.assertEqual(service.grant_license(admin,target,"FAMILY"),"APPLIED")
+            self.assertIsNone(service.device_challenge("tester","wrong","a"*64))
+            self.assertIsNotNone(service.device_challenge("tester",password,"a"*64))
+            self.assertEqual(service.revoke_license(admin,target),"APPLIED")
+            with transaction(path) as db:
+                self.assertIsNone(db.execute("SELECT nonce FROM device_challenges WHERE account_id=?",(target,)).fetchone())
+            self.assertIsNone(service.device_challenge("tester",password,"a"*64))
