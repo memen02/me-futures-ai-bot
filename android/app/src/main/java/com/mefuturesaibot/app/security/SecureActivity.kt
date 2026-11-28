@@ -20,6 +20,7 @@ import android.widget.TextView
 open class SecureActivity : Activity() {
 
     protected open val requiresBackendAccount: Boolean = false
+    protected open val requiresOwnerAccount: Boolean = false
     private val accountHandler = Handler(Looper.getMainLooper())
     private val accountCheck = object : Runnable {
         override fun run() {
@@ -38,7 +39,8 @@ open class SecureActivity : Activity() {
     }
 
     private fun accountAllowed(): Boolean =
-        !requiresBackendAccount || ApplicationAuthentication.allowsDashboard()
+        if (requiresOwnerAccount) ApplicationAuthentication.allowsOwnerScreen()
+        else !requiresBackendAccount || ApplicationAuthentication.allowsDashboard()
 
     private var screenReceiverRegistered = false
 
