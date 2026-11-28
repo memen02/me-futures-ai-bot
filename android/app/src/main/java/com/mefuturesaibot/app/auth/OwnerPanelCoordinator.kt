@@ -1,0 +1,49 @@
+package com.mefuturesaibot.app.auth
+
+internal class OwnerPanelCoordinator(
+    private val view: OwnerDirectoryView,
+    private val controller: OwnerAccountController,
+    private val sessions: SecureSessionManager,
+    private val onError: (String) -> Unit,
+    private val manageLicense: (OwnerDirectoryRow) -> Unit,
+    private val manageDevice: (OwnerDirectoryRow) -> Unit
+) : AutoCloseable {
+    private val worker = OwnerRequestWorker()
+
+    fun refresh(after: String? = null) {
+        if (sessions.ownerToken() == null) {
+            view.removeAllViews()
+            onError("Sesi OWNER berakhir")
+            return
+        }
+        if (!worker.submit({
+            OwnerDirectoryPage.parse(controller.listUsers(after))
+        }) { result ->
+            if (sessions.ownerToken() == null) {
+                view.removeAllViews()
+                onError("Sesi OWNER berakhir")
+            } else result.fold(
+                onSuccess = { page ->
+                    view.render(page, ::review, { refresh(it) },
+                        manageLicense, manageDevice)
+                },
+                onFailure = { onError("Gagal memuat pengguna") }
+            )
+        }) onError("Permintaan sedang diproses")
+    }
+
+    private fun review(row: OwnerDirectoryRow, desired: AccountStatus) {
+        if (!worker.submit({
+            controller.review(row.accountId, row.status, desired)
+        }) { result ->
+            if (result.getOrNull() != true)
+                onError("Perubahan belum terkonfirmasi")
+            refresh()
+        }) onError("Permintaan sedang diproses")
+    }
+
+    override fun close() {
+        worker.close()
+        view.removeAllViews()
+    }
+}
