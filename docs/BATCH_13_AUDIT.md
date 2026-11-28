@@ -109,3 +109,7 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 ## Owner device proof foundation
 - Existing binding/challenge/proof path supports enrolled Owner; password-only login denied once bound. Regression covers proof and nonce replay.
 - No production Owner enrollment or recovery endpoint yet; Android Owner client still needs verified route before enrollment. Do not manually enroll production Owner until client and recovery are ready. Unenrolled Owner password-only path remains for bootstrap compatibility. CI pending.
+
+## Owner recovery foundation
+- Runs 46176548576 and 46176548495 passed. Added hashed random recovery credential, trusted offline provisioning and atomic recovery (binding replacement, session/challenge revocation, credential consumption, audit).
+- Offline primitive only: caller must verify new key possession; no HTTP endpoint, self-service UI, rate-limited remote recovery or secure operator deployment yet. Do not provision production Owner until verified Android login and recovery workflow are ready. New CI pending.
