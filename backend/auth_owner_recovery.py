@@ -24,7 +24,7 @@ def provision(path, username):
     return secret
 
 def recover(path, username, password, secret, new_digest, *, nonce=None, public_der=None, signature=None):
-    """Trusted offline operator only; caller verifies new device possession."""
+    """Trusted offline recovery; device proof is mandatory."""
     if not permit(path,"owner_recovery","all",limit=5,window=300):
         return False
     if not valid_digest(secret) or not valid_digest(new_digest):
@@ -41,11 +41,10 @@ def recover(path, username, password, secret, new_digest, *, nonce=None, public_
                 return False
             account = row["id"]
             challenge = db.execute("SELECT * FROM owner_recovery_challenges WHERE account_id=?", (account,)).fetchone()
-            if challenge is not None or nonce is not None or public_der is not None or signature is not None:
-                if challenge is None or challenge["expires"] <= int(time.time()) or challenge["nonce"] != nonce or challenge["key_digest"] != new_digest:
-                    return False
-                if not verify_device_proof(account,new_digest,nonce,public_der,signature):
-                    return False
+            if challenge is None or challenge["expires"] <= int(time.time()) or challenge["nonce"] != nonce or challenge["key_digest"] != new_digest:
+                return False
+            if not verify_device_proof(account,new_digest,nonce,public_der,signature):
+                return False
             db.execute("DELETE FROM owner_recovery_challenges WHERE account_id=?", (account,))
             db.execute("""INSERT INTO device_bindings VALUES(?,?)
                 ON CONFLICT(account_id) DO UPDATE SET public_key_digest=excluded.public_key_digest""",(account,new_digest))
