@@ -6,7 +6,8 @@ internal class OwnerPanelCoordinator(
     private val sessions: SecureSessionManager,
     private val onError: (String) -> Unit,
     private val manageLicense: (OwnerDirectoryRow) -> Unit,
-    private val manageDevice: (OwnerDirectoryRow) -> Unit
+    private val manageDevice: (OwnerDirectoryRow) -> Unit,
+    private val canAct: () -> Boolean
 ) : AutoCloseable {
     private val worker = OwnerRequestWorker()
 
@@ -24,7 +25,7 @@ internal class OwnerPanelCoordinator(
                 onError("Sesi OWNER berakhir")
             } else result.fold(
                 onSuccess = { page ->
-                    view.render(page, ::review, { refresh(it) },
+                    view.render(page, ::review, { if (canAct()) refresh(it) },
                         manageLicense, manageDevice)
                 },
                 onFailure = { onError("Gagal memuat pengguna") }
@@ -33,6 +34,7 @@ internal class OwnerPanelCoordinator(
     }
 
     private fun review(row: OwnerDirectoryRow, desired: AccountStatus) {
+        if (!canAct()) return
         if (!worker.submit({
             controller.review(row.accountId, row.status, desired)
         }) { result ->
@@ -55,6 +57,7 @@ internal class OwnerPanelCoordinator(
     }
 
     private fun mutate(action: () -> Boolean) {
+        if (!canAct()) return
         if (!worker.submit(action) { result ->
             if (result.getOrNull() != true)
                 onError("Perubahan belum terkonfirmasi; periksa status terbaru")

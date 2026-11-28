@@ -2,6 +2,7 @@ package com.mefuturesaibot.app.auth
 
 import android.app.Activity
 import android.widget.ScrollView
+import com.mefuturesaibot.app.security.SecureActivity
 
 // Host must close this component on navigation away or Activity destruction.
 internal class OwnerPanelHost(
@@ -19,7 +20,8 @@ internal class OwnerPanelHost(
     private val coordinator = OwnerPanelCoordinator(
         directory, OwnerAccountController(sessions, api), sessions, onError,
         { row -> dialogs.license(row) },
-        { row -> dialogs.device(row) }
+        { row -> dialogs.device(row) },
+        { (activity as? SecureActivity)?.canUseProtectedUi() == true }
     )
     private var closed = false
 
