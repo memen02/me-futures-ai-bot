@@ -93,3 +93,12 @@ class AuthService:
             return bind(self.path,token,target,key_digest,expected)
         except (ValueError,TypeError):
             return "DENIED"
+
+    def list_users(self,token,after=None,limit=20):
+        from auth_admin_directory import list_users
+        if not permit(self.path,"admin_global","all",limit=60):
+            return None
+        try:
+            return list_users(self.path,token,after,limit)
+        except (ValueError,TypeError):
+            return None
