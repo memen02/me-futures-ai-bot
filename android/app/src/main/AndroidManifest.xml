@@ -37,6 +37,7 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".auth.OwnerPanelActivity" android:exported="false" android:theme="@style/DashboardTheme" />
         <activity android:name=".TokenDetailActivity" android:theme="@style/DashboardTheme" android:exported="false" />
         <activity android:name=".MainActivity" android:theme="@style/DashboardTheme" android:exported="false" />
 
