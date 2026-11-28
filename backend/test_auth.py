@@ -242,6 +242,17 @@ class AuthTest(unittest.TestCase):
             self.assertIsNotNone(db.execute("SELECT 1 FROM owner_recovery").fetchone())
             self.assertIsNone(db.execute("SELECT 1 FROM device_bindings").fetchone())
 
+    def test_owner_recovery_expired_challenge_denied(self):
+        from auth_owner_recovery import provision, recover
+        bootstrap_owner(self.path,"owner",self.password)
+        secret = provision(self.path,"owner")
+        digest, proof = self.recovery_proof()
+        with transaction(self.path) as db:
+            db.execute("UPDATE owner_recovery_challenges SET expires=0")
+        self.assertFalse(recover(self.path,"owner",self.password,secret,digest,**proof))
+        with transaction(self.path) as db:
+            self.assertIsNotNone(db.execute("SELECT 1 FROM owner_recovery").fetchone())
+
     def test_rate_limit(self):
         for _ in range(5):
             self.assertTrue(permit(self.path,"login_user","tester"))
