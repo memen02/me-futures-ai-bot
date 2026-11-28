@@ -16,3 +16,9 @@ Status: IN PROGRESS; no release approval.
 - Device tests and documentation reconciliation remain pending.
 
 No Mainnet execution policy or TP/SL behavior changed in these commits.
+
+## Step 6 follow-up
+- f985224: guard authentication UI actions.
+- c6e0b6f: handle revocation exceptions and reject invalid grants locally.
+- Remaining: failed revocation clears local token, so a subsequent login may proceed without confirmation of old token revocation. Backend session replacement/expiry must be verified; do not mark this resolved.
+- Concurrent login/logout, background login completion, and regression tests remain open. CI not confirmed.
