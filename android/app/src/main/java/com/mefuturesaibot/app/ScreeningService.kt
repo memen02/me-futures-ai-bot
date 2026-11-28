@@ -45,6 +45,7 @@ class ScreeningService : Service() {
                     else "$symbol · ${decision.direction} · ${decision.reason} · ${decision.confirmations}"
                 }
             }
+            researchUpdatedElapsed = SystemClock.elapsedRealtime()
             val base = marketBase
             val elapsed = SystemClock.elapsedRealtime()
             val marketTime = base.time + elapsed - base.received
@@ -167,6 +168,7 @@ class ScreeningService : Service() {
         liveHandler.removeCallbacksAndMessages(null)
         liveFeed.close()
         researchStatus = "OFFLINE"
+        researchUpdatedElapsed = 0L
         marketStatus = "OFFLINE"
         monitor.close()
         scanner.close()
@@ -177,6 +179,9 @@ class ScreeningService : Service() {
         super.onDestroy()
     }
     companion object {
+        @Volatile internal var researchUpdatedElapsed = 0L
+            private set
+
         @Volatile internal var researchStatus = "OFFLINE"
             private set
 
