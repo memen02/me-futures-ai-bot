@@ -13,7 +13,7 @@ internal class HttpsAuthenticationApi(origin: HttpUrl) : AuthenticationApi, Veri
     private val client = security.client()
 
     private fun post(route: String, payload: JSONObject, token: String? = null): JSONObject {
-        val builder = Request.Builder().url(security.endpoint("v1","auth",route))
+        val builder = Request.Builder().url(security.endpoint(* (listOf("v1","auth") + route.split("/")).toTypedArray()))
             .header("Accept","application/json")
             .header("Cache-Control","no-store")
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
