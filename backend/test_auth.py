@@ -125,6 +125,18 @@ class AuthTest(unittest.TestCase):
         AuthService(self.path).logout(token)
         self.assertIsNone(AuthService(self.path).authorize(token))
 
+    def test_license_rejects_boolean_expiry(self):
+        bootstrap_owner(self.path,"owner",self.password)
+        register(self.path,"tester",self.password)
+        admin = login(self.path,"owner",self.password)["accessToken"]
+        with transaction(self.path) as db:
+            target = db.execute("SELECT id FROM accounts WHERE username='tester'").fetchone()[0]
+        self.assertEqual(review(self.path,admin,target,"PENDING","APPROVED"),"APPLIED")
+        self.assertEqual(grant(self.path,admin,target,"MONTHLY",True),"DENIED")
+        self.assertEqual(grant(self.path,admin,target,"FAMILY",0),"DENIED")
+        with transaction(self.path) as db:
+            self.assertIsNone(db.execute("SELECT 1 FROM entitlements WHERE account_id=?",(target,)).fetchone())
+
     def test_rate_limit(self):
         for _ in range(5):
             self.assertTrue(permit(self.path,"login_user","tester"))
