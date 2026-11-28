@@ -1,6 +1,10 @@
 package com.mefuturesaibot.app.security
 
 import android.app.Activity
+import com.mefuturesaibot.app.auth.ApplicationAuthentication
+import com.mefuturesaibot.app.StartupActivity
+import android.os.Handler
+import android.os.Looper
 import com.mefuturesaibot.app.BuildConfig
 import android.content.Intent
 import android.graphics.Color
@@ -14,6 +18,27 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 open class SecureActivity : Activity() {
+
+    protected open val requiresBackendAccount: Boolean = false
+    private val accountHandler = Handler(Looper.getMainLooper())
+    private val accountCheck = object : Runnable {
+        override fun run() {
+            if (!resumed || isFinishing || isDestroyed) return
+            if (!accountAllowed()) {
+                dismissProtectedDialogs()
+                showLock()
+                onProtectedUiRevoked()
+                startActivity(Intent(this@SecureActivity, StartupActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+                finish()
+            } else {
+                accountHandler.postDelayed(this, 1000L)
+            }
+        }
+    }
+
+    private fun accountAllowed(): Boolean =
+        !requiresBackendAccount || ApplicationAuthentication.allowsDashboard()
 
     private var screenReceiverRegistered = false
 
@@ -92,7 +117,7 @@ open class SecureActivity : Activity() {
         resumed &&
             !isFinishing &&
             !isDestroyed &&
-            !AppLock.requiresUnlock(this)
+            !AppLock.requiresUnlock(this) && accountAllowed()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -124,6 +149,11 @@ open class SecureActivity : Activity() {
     override fun onResume() {
         super.onResume()
         resumed = true
+        if (requiresBackendAccount) {
+            accountHandler.removeCallbacks(accountCheck)
+            accountCheck.run()
+            if (!accountAllowed() || isFinishing) return
+        }
 
         if (AppLock.requiresUnlock(this)) {
             showLock()
@@ -135,6 +165,7 @@ open class SecureActivity : Activity() {
 
     override fun onPause() {
         resumed = false
+        accountHandler.removeCallbacks(accountCheck)
         AppLock.invalidateUiSession()
         dismissProtectedDialogs()
 
@@ -417,6 +448,7 @@ open class SecureActivity : Activity() {
     }
 
     override fun onDestroy() {
+        accountHandler.removeCallbacks(accountCheck)
         if (screenReceiverRegistered) {
             unregisterReceiver(screenReceiver)
             screenReceiverRegistered = false
