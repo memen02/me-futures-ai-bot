@@ -89,3 +89,7 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 ## Server session boundary coverage
 - Added tests for exact expiry, failed owner login, expired admin mutation, service recreation after revocation.
 - These tests exercise the local backend database, not Android process death or deployed HTTPS. Owner device binding and offline revocation across restart remain release blockers. CI pending.
+
+## HTTP adapter follow-up
+- Reject nonstandard JSON constants and invalid route types; regression coverage for malformed logout payload and storage failure propagation.
+- Runs 46174912685 and 46174912720 passed. New tests pending CI. Hosting layer must map unexpected storage failures to non-success responses without leaking details.
