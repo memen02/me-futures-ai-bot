@@ -7,6 +7,7 @@ import sqlite3
 from auth_accounts import normalize, verify_password
 from auth_db import transaction
 from auth_devices import valid_digest
+from auth_security import permit
 
 def provision(path, username):
     """Trusted offline operator only. Return secret once; never log it."""
@@ -22,6 +23,8 @@ def provision(path, username):
 
 def recover(path, username, password, secret, new_digest):
     """Trusted offline operator only; caller verifies new device possession."""
+    if not permit(path,"owner_recovery","all",limit=5,window=300):
+        return False
     if not valid_digest(secret) or not valid_digest(new_digest):
         return False
     try:
