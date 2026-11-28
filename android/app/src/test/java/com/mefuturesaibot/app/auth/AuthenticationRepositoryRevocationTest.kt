@@ -65,4 +65,14 @@ class AuthenticationRepositoryRevocationTest {
         assertEquals(revision, sessions.revision())
         assertTrue(password.all { it == '\u0000' })
     }
+    @Test fun invalidInputDoesNotReachTransport() {
+        val sessions = SecureSessionManager { 1000L }
+        sessions.rememberPendingRevocation(token)
+        val api = FakeApi()
+        val password = charArrayOf('x')
+        assertFalse(AuthenticationRepository(api, sessions).login("bad name", password))
+        assertEquals(0, api.revokes)
+        assertEquals(0, api.logins)
+        assertTrue(password.all { it == '\u0000' })
+    }
 }
