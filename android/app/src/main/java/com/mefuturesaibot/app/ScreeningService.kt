@@ -13,8 +13,8 @@ import com.mefuturesaibot.app.scanner.*
 /** Owns public screening and the local paper ledger independently of the exchange executor. */
 class ScreeningService : Service() {
     private lateinit var researchRepository: com.mefuturesaibot.app.ai.MultiTimeframeRepository
-    private lateinit var researchWorker: com.mefuturesaibot.app.ai.UnifiedAnalysisWorker
-    private val researchDepth = com.mefuturesaibot.app.ai.ResearchDepthFeed()
+    private lateinit var researchWorkers: Map<String,com.mefuturesaibot.app.ai.UnifiedAnalysisWorker>
+    private val researchDepth = listOf("BTCUSDT","ETHUSDT").associateWith { com.mefuturesaibot.app.ai.ResearchDepthFeed(it) }
     private val researchScheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
     private lateinit var monitor: PaperPositionMonitor
     private lateinit var scanner: MarketScanner
@@ -27,20 +27,23 @@ class ScreeningService : Service() {
     private val liveTick = object : Runnable {
         override fun run() {
             val bounds = researchRepository.clockBounds()
-            val book = bounds?.let(researchDepth::liquidity)
+            
             val active = BotPreferences.shouldRun(this@ScreeningService) && BotForegroundService.isRunning
-            researchStatus = if (!active) "OFFLINE" else if (book == null) "WAIT · depth tidak valid"
+            researchStatus = if (!active) "OFFLINE" else researchDepth.entries.joinToString("\n") { (symbol,feed) ->
+                val book = bounds?.let(feed::liquidity)
+                if (book == null) "$symbol · WAIT · depth tidak valid"
                 else {
-                    val decision = researchWorker.read("BTCUSDT")
+                    val decision = researchWorkers.getValue(symbol).read(symbol)
                     val expected = when (decision.direction) {
                         com.mefuturesaibot.app.ai.decision.MasterDirection.LONG -> com.mefuturesaibot.app.ai.decision.EvidenceDirection.LONG
                         com.mefuturesaibot.app.ai.decision.MasterDirection.SHORT -> com.mefuturesaibot.app.ai.decision.EvidenceDirection.SHORT
                         else -> null
                     }
-                    if (expected != null && book.direction("BTCUSDT",bounds!!.latest) != expected)
-                        "WAIT · likuiditas berubah"
-                    else "BTCUSDT · ${decision.direction} · ${decision.reason} · ${decision.confirmations}"
+                    if (expected != null && book.direction(symbol,bounds!!.latest) != expected)
+                        "$symbol · WAIT · likuiditas berubah"
+                    else "$symbol · ${decision.direction} · ${decision.reason} · ${decision.confirmations}"
                 }
+            }
             val base = marketBase
             val elapsed = SystemClock.elapsedRealtime()
             val marketTime = base.time + elapsed - base.received
@@ -110,7 +113,7 @@ class ScreeningService : Service() {
         else startForeground(2, notification)
         // Lifecycle ownership only until the shared rate budget and depth feed are ready.
         researchRepository = com.mefuturesaibot.app.ai.MultiTimeframeRepository(guard = com.mefuturesaibot.app.ai.ResearchApiBudget.guard)
-        researchWorker = com.mefuturesaibot.app.ai.UnifiedAnalysisWorker { researchRepository.clockBounds() }
+        researchWorkers = researchDepth.keys.associateWith { com.mefuturesaibot.app.ai.UnifiedAnalysisWorker { researchRepository.clockBounds() } }
         val store = DeskStore(this)
         val enabled = { BotPreferences.shouldRun(this) && BotForegroundService.isRunning }
         monitor = PaperPositionMonitor(store,enabled).also { it.start() }
@@ -125,17 +128,19 @@ class ScreeningService : Service() {
             }
         }
 
-        researchDepth.start()
+        researchDepth.values.forEach { it.start() }
         // Pilot only: BTC, two frames, no order authorization. Missing depth means WAIT.
         researchScheduler.scheduleWithFixedDelay({
             try {
                 if (enabled()) {
                     val frames = setOf(com.mefuturesaibot.app.ai.Timeframe.M1, com.mefuturesaibot.app.ai.Timeframe.M5)
-                    for (frame in frames) researchRepository.refresh("BTCUSDT",frame)
-                    researchDepth.refreshSnapshot()
-                    val capture = researchRepository.researchCapture("BTCUSDT")
-                    if (capture != null) researchWorker.submit(capture.first,
-                        com.mefuturesaibot.app.ai.Timeframe.M1,frames,capture.second,researchRepository.clockBounds()?.let(researchDepth::liquidity))
+                    for ((symbol,feed) in researchDepth) {
+                    for (frame in frames) researchRepository.refresh(symbol,frame)
+                    feed.refreshSnapshot()
+                    val capture = researchRepository.researchCapture(symbol)
+                    if (capture != null) researchWorkers.getValue(symbol).submit(capture.first,
+                        com.mefuturesaibot.app.ai.Timeframe.M1,frames,capture.second,researchRepository.clockBounds()?.let(feed::liquidity))
+                    }
                     // Status is read independently on the main tick, with current liquidity.
                 } else { researchStatus = "OFFLINE" }
             } catch (_: Exception) { researchStatus = "WAIT · data riset tidak tersedia" }
@@ -147,8 +152,8 @@ class ScreeningService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onDestroy() {
         researchScheduler.shutdownNow()
-        researchDepth.close()
-        researchWorker.close()
+        researchDepth.values.forEach { it.close() }
+        if (::researchWorkers.isInitialized) researchWorkers.values.forEach { it.close() }
         researchRepository.close()
         liveHandler.removeCallbacksAndMessages(null)
         liveFeed.close()
