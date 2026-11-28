@@ -11,21 +11,8 @@ def digest(token):
     return hashlib.sha256(token.encode("ascii")).hexdigest()
 
 def login(path, username, password):
-    username = normalize(username)
-    with transaction(path) as db:
-        row = db.execute("SELECT * FROM accounts WHERE username=?", (username,)).fetchone()
-        if row is None or not verify_password(password,row["password_hash"]) or row["status"]!="APPROVED":
-            return None
-        token = secrets.token_hex(32)
-        now = int(time.time())
-        if row["role"] != "SUPER_ADMIN":
-            from auth_entitlements import licensed
-            if not licensed(db, row["id"], now):
-                return None
-        db.execute("DELETE FROM sessions WHERE expires<=?",(now,))
-        db.execute("INSERT INTO sessions VALUES(?,?,?)",(digest(token),row["id"],now+900))
-        return {"accountId":row["id"],"username":row["username"],"role":row["role"],
-                "status":row["status"],"accessToken":token,"lifetimeSeconds":900}
+    """Compatibility entry point: password-only login is OWNER-only."""
+    return owner_login(path, username, password)
 
 def actor(db, token):
     now = int(time.time())
