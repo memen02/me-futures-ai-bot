@@ -39,3 +39,9 @@ object DeviceLoginKey {
         }.sign()
     }
 }
+
+internal object KeystoreDeviceSigner : DeviceSigner {
+    override fun publicDer(): ByteArray = DeviceLoginKey.publicKeyDer()
+    override fun sign(accountId: String, digest: String, nonce: String): ByteArray =
+        DeviceLoginKey.sign(accountId, digest, nonce)
+}
