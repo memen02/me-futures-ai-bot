@@ -12,14 +12,16 @@ def verified_login(path, username, password, key_digest, nonce, public_der, sign
     username = normalize(username)
     with transaction(path) as db:
         row = db.execute("SELECT * FROM accounts WHERE username=?", (username,)).fetchone()
-        if row is None or row["role"] != "USER" or row["status"] != "APPROVED":
+        if row is None or row["role"] not in ("USER","SUPER_ADMIN") or row["status"] != "APPROVED":
             return None
         if not verify_password(password,row["password_hash"]):
             return None
         if not verify_device_proof(row["id"],key_digest,nonce,public_der,signature):
             return None
         now = int(time.time())
-        if not licensed(db,row["id"],now) or not consume(db,row["id"],key_digest,nonce,now):
+        if row["role"] == "USER" and not licensed(db,row["id"],now):
+            return None
+        if not consume(db,row["id"],key_digest,nonce,now):
             return None
         token = secrets.token_hex(32)
         db.execute("DELETE FROM sessions WHERE expires<=? OR account_id=?", (now,row["id"]))
