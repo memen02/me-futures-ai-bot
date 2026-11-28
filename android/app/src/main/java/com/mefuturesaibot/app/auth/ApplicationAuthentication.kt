@@ -30,6 +30,11 @@ internal object ApplicationAuthentication {
 
     @Synchronized fun current(): AuthenticationRuntime? = runtime
 
+    fun requiresAccount(): Boolean = BuildConfig.AUTH_ORIGIN.isNotBlank()
+
+    fun allowsDashboard(): Boolean =
+        AccountEntryPolicy.allowsDashboard(requiresAccount(), allowsTradingScreen())
+
     fun allowsTradingScreen(): Boolean =
         current()?.accessGate?.allowsTradingScreen() == true
 
