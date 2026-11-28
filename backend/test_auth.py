@@ -165,6 +165,20 @@ class AuthTest(unittest.TestCase):
         self.assertEqual(result["role"],"SUPER_ADMIN")
         self.assertIsNone(verified_login(self.path,"owner",self.password,digest,nonce,der,signature))
 
+    def test_offline_owner_recovery_revokes_old_session_and_consumes_secret(self):
+        from auth_owner_recovery import provision, recover
+        bootstrap_owner(self.path,"owner",self.password)
+        old = login(self.path,"owner",self.password)["accessToken"]
+        secret = provision(self.path,"owner")
+        self.assertFalse(recover(self.path,"owner","wrong",secret,"a"*64))
+        self.assertTrue(recover(self.path,"owner",self.password,secret,"a"*64))
+        self.assertFalse(recover(self.path,"owner",self.password,secret,"b"*64))
+        with transaction(self.path) as db:
+            self.assertIsNone(actor(db,old))
+            self.assertEqual(db.execute("SELECT public_key_digest FROM device_bindings").fetchone()[0],"a"*64)
+            self.assertIsNone(db.execute("SELECT 1 FROM owner_recovery").fetchone())
+        self.assertIsNone(login(self.path,"owner",self.password))
+
     def test_rate_limit(self):
         for _ in range(5):
             self.assertTrue(permit(self.path,"login_user","tester"))
