@@ -12,6 +12,7 @@ internal class ResearchDepthBook(private val symbol: String = "BTCUSDT") {
     private val bids = TreeMap<BigDecimal,BigDecimal>(reverseOrder())
     private val asks = TreeMap<BigDecimal,BigDecimal>()
     private val pending = ArrayDeque<DepthDelta>()
+    private var cachedLiquidity: com.mefuturesaibot.app.ai.decision.LiquiditySnapshot? = null
     private var pendingLevels = 0
     private var anchored = false
     private var time = 0L
@@ -20,7 +21,7 @@ internal class ResearchDepthBook(private val symbol: String = "BTCUSDT") {
     private var revision = 0L
     @Synchronized fun epoch() = revision
     @Synchronized fun clear() {
-        revision++; floor=null; ceiling=null; guard.invalidate(); bids.clear(); asks.clear(); pending.clear(); pendingLevels=0; anchored=false; time=0
+        cachedLiquidity=null; revision++; floor=null; ceiling=null; guard.invalidate(); bids.clear(); asks.clear(); pending.clear(); pendingLevels=0; anchored=false; time=0
     }
     private fun valid(levels: List<Pair<BigDecimal,BigDecimal>>) = levels.size <= 1000 &&
         levels.all { (p,q) -> p.signum()>0 && q.signum()>=0 && p.precision()<=32 && q.precision()<=32 &&
@@ -40,7 +41,7 @@ internal class ResearchDepthBook(private val symbol: String = "BTCUSDT") {
             return
         }
         if (d.time<time) { clear(); return }
-        apply(bids,d.bids); apply(asks,d.asks); time=d.time
+        cachedLiquidity=null; apply(bids,d.bids); apply(asks,d.asks); time=d.time
         if (bids.size>1000||asks.size>1000||bids.isEmpty()||asks.isEmpty()||bids.firstKey()>=asks.firstKey()) clear()
     }
     @Synchronized fun needsSnapshot() = !anchored && pending.isNotEmpty()
@@ -59,11 +60,12 @@ internal class ResearchDepthBook(private val symbol: String = "BTCUSDT") {
     }
     @Synchronized fun liquidity(): com.mefuturesaibot.app.ai.decision.LiquiditySnapshot? {
         if (!guard.synchronized()) return null
+        cachedLiquidity?.let { return it }
         val low=floor ?: return null
         val high=ceiling ?: return null
         val mid=bids.firstKey().add(asks.firstKey()).divide(BigDecimal("2"))
         if (mid.multiply(BigDecimal("0.999"))<low || mid.multiply(BigDecimal("1.001"))>high) return null
         return ResearchLiquidityBand.calculate(symbol,time,bids.entries.map { it.key.toDouble() to it.value.toDouble() },
-            asks.entries.map { it.key.toDouble() to it.value.toDouble() },true)
+            asks.entries.map { it.key.toDouble() to it.value.toDouble() },true).also { cachedLiquidity=it }
     }
 }
