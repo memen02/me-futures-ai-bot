@@ -17,6 +17,19 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], qualifiers = "w320dp-h640dp")
 class DeskNavigationTest {
+    @org.junit.Before fun authorizeTestAccount() {
+        val runtime = com.mefuturesaibot.app.auth.ApplicationAuthentication.initialize(
+            okhttp3.HttpUrl.Builder().scheme("https").host("test.invalid").build())
+        val identity = com.mefuturesaibot.app.auth.AccountIdentity("test_account_0001", "test_user",
+            com.mefuturesaibot.app.auth.UserRole.USER, com.mefuturesaibot.app.auth.AccountStatus.APPROVED)
+        assertTrue(runtime.sessions.install(com.mefuturesaibot.app.auth.AuthGrant(identity, "a".repeat(64), 900)))
+        assertTrue(runtime.accessGate.unlock(runtime.sessions.sessionGeneration()!!))
+    }
+
+    @org.junit.After fun clearTestAccount() {
+        com.mefuturesaibot.app.auth.ApplicationAuthentication.current()?.clearLocalSession()
+    }
+
     @Test fun fiveTabsAreExclusiveAndViewingThemDoesNotStartTrading() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         try {
