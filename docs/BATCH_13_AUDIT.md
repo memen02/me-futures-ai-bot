@@ -80,3 +80,8 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 ## Step 6 — lifecycle follow-up
 - Track cancelled login grants before releasing session lock; guard owner refresh and UI callbacks; skip closed worker requests; recheck cancellation after revocation I/O.
 - Static review only; CI and regression coverage pending. In-flight requests cannot be undone by UI closure. Pending revocations remain memory-only; server expiry and deployment verification remain required.
+
+## Revocation regression checkpoint
+- Runs 46174126594, 46174234529, 46174244487 passed.
+- Added repository tests for cross-role/shared-session revocation, logout failure, cancellation during I/O, invalid input. New CI pending.
+- Process restart and deployed server verification remain open; no persistent token storage introduced.
