@@ -23,6 +23,10 @@ class AuthTest(unittest.TestCase):
         self.assertTrue(verify_password(self.password,a))
         self.assertFalse(verify_password("wrong",a))
 
+    def test_malformed_password_hash_fails_closed(self):
+        for value in (None, 123, "", "a"*32+":"+"b"*128+" ", "a"*10000):
+            self.assertFalse(verify_password(self.password,value))
+
     def test_approval_and_revocation(self):
         bootstrap_owner(self.path,"owner",self.password)
         with self.assertRaises(ValueError):

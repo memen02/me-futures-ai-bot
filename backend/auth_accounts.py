@@ -22,6 +22,8 @@ def verify_password(password, encoded):
     if not isinstance(password,str) or not 1<=len(password)<=128:
         return False
     try:
+        if not isinstance(encoded, str) or not re.fullmatch(r"[0-9a-f]{32}:[0-9a-f]{128}", encoded):
+            return False
         salt, digest = map(bytes.fromhex, encoded.split(":"))
         if len(salt)!=16 or len(digest)!=64:
             return False
