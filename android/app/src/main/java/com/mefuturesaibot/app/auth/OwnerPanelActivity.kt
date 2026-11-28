@@ -13,6 +13,7 @@ internal class OwnerPanelActivity : SecureActivity() {
     override val requiresBackendAccount: Boolean = true
     override val requiresOwnerAccount: Boolean = true
     private var host: OwnerPanelHost? = null
+    private lateinit var panelContainer: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -20,10 +21,6 @@ internal class OwnerPanelActivity : SecureActivity() {
         if (runtime == null || !ApplicationAuthentication.allowsOwnerScreen()) {
             finish()
             return
-        }
-        host = runtime.ownerPanel(this) { message ->
-            if (!isFinishing && !isDestroyed)
-                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         }
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -48,7 +45,8 @@ internal class OwnerPanelActivity : SecureActivity() {
                     finish()
                 }
             })
-            addView(host!!.view, LinearLayout.LayoutParams(-1, 0, 1f))
+            panelContainer = LinearLayout(this@OwnerPanelActivity).apply { orientation = LinearLayout.VERTICAL }
+            addView(panelContainer, LinearLayout.LayoutParams(-1, 0, 1f))
         })
     }
 
@@ -58,18 +56,35 @@ internal class OwnerPanelActivity : SecureActivity() {
             finish()
             return
         }
+        if (isFinishing || isDestroyed) return
+        val runtime = ApplicationAuthentication.current() ?: return
+        if (host == null) {
+            host = runtime.ownerPanel(this) { message ->
+                if (canUseProtectedUi()) Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            }
+            panelContainer.addView(host!!.view, LinearLayout.LayoutParams(-1, -1))
+        }
         host?.refresh()
     }
 
-    override fun onProtectedUiRevoked() {
+    private fun closeHost() {
         host?.close()
         host = null
+        if (::panelContainer.isInitialized) panelContainer.removeAllViews()
+    }
+
+    override fun onPause() {
+        closeHost()
+        super.onPause()
+    }
+
+    override fun onProtectedUiRevoked() {
+        closeHost()
         finish()
     }
 
     override fun onDestroy() {
-        host?.close()
-        host = null
+        closeHost()
         super.onDestroy()
     }
 }
