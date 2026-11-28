@@ -24,6 +24,7 @@ import java.math.BigDecimal
 import java.util.Locale
 
 class TokenDetailActivity : SecureActivity() {
+    override val requiresBackendAccount: Boolean = true
     private lateinit var contract: Contract
     private lateinit var store: DeskStore
     private lateinit var chart: ClosePriceChart
