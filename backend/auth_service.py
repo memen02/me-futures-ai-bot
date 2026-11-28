@@ -51,7 +51,10 @@ class AuthService:
             return "DENIED"
 
     def logout(self,token):
-        revoke(self.path,token)
+        try:
+            revoke(self.path,token)
+        except (ValueError,TypeError):
+            return None
 
     def authorize(self,token):
         try:
