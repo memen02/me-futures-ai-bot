@@ -85,3 +85,7 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 - Runs 46174126594, 46174234529, 46174244487 passed.
 - Added repository tests for cross-role/shared-session revocation, logout failure, cancellation during I/O, invalid input. New CI pending.
 - Process restart and deployed server verification remain open; no persistent token storage introduced.
+
+## Server session boundary coverage
+- Added tests for exact expiry, failed owner login, expired admin mutation, service recreation after revocation.
+- These tests exercise the local backend database, not Android process death or deployed HTTPS. Owner device binding and offline revocation across restart remain release blockers. CI pending.
