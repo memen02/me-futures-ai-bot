@@ -19,12 +19,11 @@ def initialize_entitlements(path):
         )""")
 
 def grant(path, token, target, kind, expires=None):
-    now = int(time.time())
     if kind == "FAMILY":
         if expires is not None:
             return "DENIED"
     elif kind == "MONTHLY":
-        if type(expires) is not int or not now < expires <= now + 31*86400:
+        if type(expires) is not int:
             return "DENIED"
     else:
         return "DENIED"
@@ -35,6 +34,13 @@ def grant(path, token, target, kind, expires=None):
         user = db.execute("SELECT id FROM accounts WHERE id=? AND role='USER' AND status='APPROVED'", (target,)).fetchone()
         if user is None:
             return "DENIED"
+        now = int(time.time())
+        if kind == "MONTHLY":
+            if not now < expires <= now + 31*86400:
+                return "DENIED"
+            current = db.execute("SELECT kind,expires FROM entitlements WHERE account_id=?", (target,)).fetchone()
+            if current and current["kind"] == "MONTHLY" and expires <= current["expires"]:
+                return "CONFLICT"
         db.execute("""INSERT INTO entitlements VALUES(?,?,?)
             ON CONFLICT(account_id) DO UPDATE SET kind=excluded.kind, expires=excluded.expires""",
             (target,kind,expires))
