@@ -70,3 +70,9 @@ No Mainnet execution policy or TP/SL behavior changed in these commits.
 
 ## CI regression repair
 - d0d627b: DeskNavigationTest uses approved USER fixture and clears local session after tests; production account gate unchanged. Five failed runs (46168623045, 46168895372, 46169001067, 46169319227, 46169447156) each had 2 Debug navigation failures and 932 passing DEV tests. Await fresh CI on repair commit; do not rerun old commits as validation.
+
+## Step 6 — verified CI checkpoint
+- 09eb625: Real mode navigation fixture; run 46171909694 SUCCESS.
+- ba24689: validate login input before locking local gate; run 46172676165 SUCCESS.
+- 659751c: regression test invalid/stale login preserves approved session and wipes password; run 46172796248 SUCCESS.
+- Remaining: failed remote revocation handling across role changes and process restart; backend expiry/device enforcement; Owner panel lifecycle audit and device tests. Do not treat local logout as confirmed server revocation.
