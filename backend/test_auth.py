@@ -102,6 +102,17 @@ class AuthTest(unittest.TestCase):
         with transaction(self.path) as db:
             self.assertIsNotNone(actor(db,token))
 
+    def test_expired_owner_cannot_approve(self):
+        bootstrap_owner(self.path,"owner",self.password)
+        register(self.path,"tester",self.password)
+        token = login(self.path,"owner",self.password)["accessToken"]
+        with transaction(self.path) as db:
+            target = db.execute("SELECT id FROM accounts WHERE username='tester'").fetchone()[0]
+            db.execute("UPDATE sessions SET expires=0")
+        self.assertEqual(review(self.path,token,target,"PENDING","APPROVED"),"DENIED")
+        with transaction(self.path) as db:
+            self.assertEqual(db.execute("SELECT status FROM accounts WHERE id=?",(target,)).fetchone()[0],"PENDING")
+
     def test_rate_limit(self):
         for _ in range(5):
             self.assertTrue(permit(self.path,"login_user","tester"))
