@@ -58,3 +58,16 @@ def review(path,token,target,expected,desired):
         db.execute("INSERT INTO admin_audit(actor,target,action,created) VALUES(?,?,?,?)",
                    (admin["id"],target,expected+"->"+desired,int(time.time())))
         return "APPLIED"
+
+def owner_login(path, username, password):
+    username = normalize(username)
+    with transaction(path) as db:
+        row = db.execute("SELECT * FROM accounts WHERE username=? AND role='SUPER_ADMIN' AND status='APPROVED'",(username,)).fetchone()
+        if row is None or not verify_password(password,row["password_hash"]):
+            return None
+        now = int(time.time())
+        token = secrets.token_hex(32)
+        db.execute("DELETE FROM sessions WHERE expires<=? OR account_id=?",(now,row["id"]))
+        db.execute("INSERT INTO sessions VALUES(?,?,?)",(digest(token),row["id"],now+900))
+        return {"accountId":row["id"],"username":row["username"],"role":row["role"],
+                "status":row["status"],"accessToken":token,"lifetimeSeconds":900}
