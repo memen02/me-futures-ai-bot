@@ -89,4 +89,10 @@ class AuthenticationRepositoryRevocationTest {
         } catch (_: IllegalStateException) {}
         assertTrue(sessions.flushPendingRevocation { assertEquals(token, it) })
     }
+    @Test fun pendingRevocationBlocksConditionalInstall() {
+        val sessions = SecureSessionManager { 1000L }
+        sessions.rememberPendingRevocation(token)
+        assertFalse(sessions.installIfUnchanged(AuthGrant(identity, "b".repeat(64), 60), sessions.revision()))
+        assertNull(sessions.identity())
+    }
 }
